@@ -1,0 +1,5 @@
+public/firebase-messaging-sw.js
+test-results/
+playwright-report/
+next-env.d.ts
+*.tsbuildinfo

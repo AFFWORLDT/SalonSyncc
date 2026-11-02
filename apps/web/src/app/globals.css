@@ -1,0 +1,172 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * FM Salon uses the deHertz admin design system: the shadcn tokens are written
+ * inline by AppThemeProvider (src/components/theme) on the app root and
+ * mirrored on <html>, so portalled popovers and dialogs inherit them.
+ */
+@theme inline {
+  --font-sans: var(--font-gsf);
+  --font-mono: var(--font-gsc);
+  --font-heading: var(--font-sans);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-faint: var(--faint);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* The app scrolls inside <main>, so the page itself must never rubber-band
+   or pull-to-refresh; inner scrollers keep their own bounce. */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+}
+
+/* Fixed inset tracks the visible viewport (like 100dvh); pad the sides so
+   landscape phones keep content clear of the notch. */
+body > .app-root {
+  position: fixed;
+  inset: 0;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+.app-root { font-size: 0.9375rem; }
+
+/* Controls: no 300ms double-tap wait, no text selection or callout on long press. */
+button,
+a,
+[role="button"],
+[role="tab"],
+[role="menuitem"],
+[role="option"] {
+  touch-action: manipulation;
+}
+button,
+[role="button"],
+[role="tab"],
+[role="menuitem"],
+[role="option"] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* iOS zooms into any field under 16px; utilities like md:text-sm are width
+   based, so tablets would still zoom. Unlayered, so it beats utilities. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* Reduced motion: keep fades, drop the slides, zooms and press scale. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-enter-scale: 1 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+    --tw-exit-scale: 1 !important;
+  }
+  [data-slot="sheet-content"] {
+    translate: none !important;
+  }
+  [data-slot="button"]:active {
+    scale: none !important;
+  }
+  .skeleton::after {
+    animation: none;
+  }
+  [data-slot="progress-indicator"],
+  .animate-pulse {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* Loading placeholder: a fast left-to-right shine, so waits feel short.
+   Only `transform` animates (composited, no layout or paint per frame). */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--muted);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--foreground) 10%, transparent) 50%, transparent 100%);
+  animation: skeleton-shine 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes skeleton-shine {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Money and counts line up in columns. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Printing a bill from the app: printBill() copies it into #print-root and only that prints. */
+#print-root { display: none; }
+@media print {
+  html.print-bill body > *:not(#print-root) { display: none !important; }
+  html.print-bill #print-root { display: block; }
+  #print-root [data-print] { max-width: 420px; margin: 0 auto; border-radius: 0; box-shadow: none; --tw-ring-shadow: 0 0 #0000; }
+  html.print-bill, html.print-bill body { background: #fff !important; height: auto !important; overflow: visible !important; }
+}
