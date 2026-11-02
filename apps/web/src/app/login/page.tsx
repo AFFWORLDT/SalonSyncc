@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthSplit, PasswordInput } from "@/components/ui/auth-ui";
+import { LOGIN_SCENES, pickScene, type LoginScene } from "@/lib/login-scenes";
 
 const TAGLINE = "Sales, bills and reports for your salon.";
 const QUOTES = ["Every chair, every bill, one place.", "Welcome back. Your salon is ready.", "Less paperwork, more fresh cuts."];
@@ -36,6 +37,12 @@ export default function LoginPage() {
     setOrg(lastOrg());
   }, []);
   const needOrg = hostSalon === null;
+  // A different salon photo (and matching moving background) on every visit; chosen after mount (static export).
+  const [scene, setScene] = useState<LoginScene | null>(null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setScene(LOGIN_SCENES[pickScene()]!);
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,7 +60,7 @@ export default function LoginPage() {
 
   return (
     <AuthSplit
-      image={{ src: "/login/salon.jpg", alt: "A barbershop with three chairs under warm lights" }}
+      scene={scene}
       quote={{ text: QUOTES, author: BRAND_NAME }}
     >
       <div className="mx-auto grid w-full max-w-[350px] gap-8">

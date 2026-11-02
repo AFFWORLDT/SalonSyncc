@@ -6,6 +6,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { MeshGradient } from "@paper-design/shaders-react";
+import type { LoginScene } from "@/lib/login-scenes";
 
 /**
  * Split-screen sign-in layout (adapted from the EaseMize auth UI): the form on the left, a full-height photo with a
@@ -99,27 +101,61 @@ PasswordInput.displayName = "PasswordInput";
 
 export interface AuthSplitProps {
   children: React.ReactNode;
-  image: { src: string; alt: string };
+  scene: LoginScene | null;
   quote: { text: string | string[]; author: string };
 }
 
-/** The page frame: form column + photo column with a typed quote over a bottom fade. */
-export function AuthSplit({ children, image, quote }: AuthSplitProps) {
+/** Reduced-motion users get a still gradient. */
+function useReducedMotion(): boolean {
+  const [reduce, setReduce] = useState(false);
+  useEffect(() => {
+    const m = window.matchMedia("(prefers-reduced-motion: reduce)");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setReduce(m.matches);
+    const on = () => setReduce(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, []);
+  return reduce;
+}
+
+/**
+ * The page frame: a slowly moving mesh (colours from the photo) behind a glass form card, and the photo with a typed
+ * quote on the right (md and up). The photo's left edge fades into the mesh so the two halves read as one scene.
+ */
+export function AuthSplit({ children, scene, quote }: AuthSplitProps) {
+  const reduce = useReducedMotion();
+  const mesh = scene?.mesh ?? ["#141c16", "#1d4a42", "#1f7a6a", "#b8935a", "#0f2e29"];
   return (
-    <div className="min-h-full w-full md:grid md:grid-cols-2">
+    <div className="relative min-h-full w-full overflow-hidden md:grid md:grid-cols-2">
       <style>{`input[type="password"]::-ms-reveal,input[type="password"]::-ms-clear{display:none}`}</style>
-      <div className="flex min-h-full items-center justify-center p-6 md:py-12">
-        <div className="glass w-full max-w-[420px] rounded-2xl p-6 shadow-xl sm:p-8">{children}</div>
+      <div aria-hidden className="pointer-events-none absolute inset-0 md:right-1/2" style={{ background: `linear-gradient(135deg, ${mesh[0]}, ${mesh[2]})` }}>
+        {scene && (
+          <MeshGradient className="h-full w-full" colors={mesh} speed={reduce ? 0 : 0.25} distortion={0.8} swirl={0.15} grainOverlay={0.05} maxPixelCount={1280 * 900} />
+        )}
+        <div className="absolute inset-0 bg-black/10" />
       </div>
-      <div className="relative hidden bg-cover bg-center md:block" style={{ backgroundImage: `url(${image.src})` }} role="img" aria-label={image.alt}>
-        <div className="absolute inset-0 bg-black/30" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-background to-transparent" />
+      <div className="relative z-10 flex min-h-full items-center justify-center p-6 md:py-12">
+        <div className="glass w-full max-w-[420px] rounded-2xl p-6 shadow-2xl [background-color:color-mix(in_oklab,var(--background)_80%,transparent)] sm:p-8">{children}</div>
+      </div>
+      <div className="relative hidden overflow-hidden md:block" style={{ background: mesh[0] }}>
+        {scene && (
+          <div
+            key={scene.src}
+            className="absolute inset-0 animate-in fade-in bg-cover bg-center duration-700"
+            style={{ backgroundImage: `url(${scene.src})` }}
+            role="img"
+            aria-label={scene.alt}
+          />
+        )}
+        <div className="absolute inset-y-0 left-0 w-1/3" style={{ background: `linear-gradient(to right, ${mesh[1]}, transparent)` }} />
+        <div className="absolute inset-x-0 bottom-0 h-48" style={{ background: `linear-gradient(to top, ${mesh[0]}e6, transparent)` }} />
         <div className="relative z-10 flex h-full flex-col items-center justify-end p-6 pb-10">
-          <blockquote className="space-y-2 text-center text-foreground">
-            <p className="text-lg font-medium">
+          <blockquote className="space-y-2 text-center text-white">
+            <p className="text-lg font-medium drop-shadow">
               “<Typewriter text={quote.text} speed={60} loop={Array.isArray(quote.text)} delay={2500} />”
             </p>
-            <cite className="block text-sm font-light not-italic text-muted-foreground">— {quote.author}</cite>
+            <cite className="block text-sm font-light not-italic text-white/75">— {quote.author}</cite>
           </blockquote>
         </div>
       </div>
