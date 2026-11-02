@@ -17,6 +17,7 @@ import { ledger } from "./tenant/ledger/routes";
 import { audit } from "./tenant/audit/routes";
 import { notifications } from "./tenant/notifications/routes";
 import { announcements } from "./tenant/announcements/routes";
+import { ratings } from "./tenant/ratings/routes";
 
 const app = new Hono<AppEnv>();
 
@@ -76,6 +77,8 @@ tenantApi.route("/", audit);
 tenantApi.route("/", notifications);
 // /announcements; gated per route (feature announcements, admin).
 tenantApi.route("/", announcements);
+// /ratings; gated per route (feature ratings, admin).
+tenantApi.route("/", ratings);
 app.route("/api", tenantApi);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

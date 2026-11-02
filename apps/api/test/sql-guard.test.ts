@@ -27,7 +27,7 @@ it("every tenant table has a checked statement somewhere", () => {
   // Tables added by later tasks get their repo statements in their own task; they are listed here as they gain one.
   // expenses/company_expenses: reports.ts SELECTs (Task 8) and expenses.ts reads/writes (Task 9).
   // Plan 2b Task 1 creates the engagement tables; each later task removes its tables from here as it adds their SQL.
-  const pending: string[] = ["ratings", "wa_campaigns", "wa_messages"];
+  const pending: string[] = ["wa_campaigns"];
   // Pending tables must really have no statement yet; once a task adds SQL for one, remove it from `pending`.
   for (const t of pending) {
     expect(stmts.some((s) => new RegExp(`\\b${t}\\b`, "i").test(s)), `${t} now has statements: remove it from pending`).toBe(false);
