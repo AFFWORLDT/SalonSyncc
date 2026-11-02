@@ -1,22 +1,6 @@
 import { PLAN_DEFAULTS, type FeatureKey, type PlanId } from "@ss/features";
 
-/** What each feature is called on screen (Upgrade card, plan page). */
-export const FEATURE_LABELS: Record<FeatureKey, string> = {
-  core_sales: "Sales and bills",
-  expenses: "Expenses",
-  daily_sheet: "Daily sheet",
-  customers_crm: "Customers",
-  ratings: "Ratings and reviews",
-  reports_advanced: "Monthly and yearly reports",
-  excel_export: "Excel export",
-  push: "Push notifications",
-  announcements: "Team announcements",
-  ledger: "Ledger and payouts",
-  audit_log: "Audit log",
-  whatsapp: "WhatsApp bills and reminders",
-  whatsapp_campaigns: "WhatsApp campaigns",
-  public_services_api: "Price list for your website",
-};
+export { FEATURE_LABELS } from "@ss/features";
 
 const ORDER: PlanId[] = ["free", "pro", "pro_max"];
 
