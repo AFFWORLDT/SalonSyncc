@@ -16,7 +16,7 @@ import { PageHeader } from "@/components/admin/page-header";
 import { cn } from "@/lib/utils";
 
 export default function AccountPage() {
-  const { user, isAdmin, refresh } = useAuth();
+  const { user, isAdmin, refresh, has } = useAuth();
   const { appearance, setAppearance } = useAppTheme();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -52,7 +52,7 @@ export default function AccountPage() {
         </CardContent>
       </Card>
 
-      <NotificationsCard />
+      {has("push") && <NotificationsCard />}
 
       <Card>
         <CardHeader>

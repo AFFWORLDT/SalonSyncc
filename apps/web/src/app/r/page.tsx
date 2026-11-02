@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Printer } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
+import { setFormat, getFormat } from "@/lib/format";
 import type { Receipt } from "@/lib/types";
 import { Bill, printBill } from "@/components/app/bill";
 import { Button } from "@/components/ui/button";
@@ -21,12 +22,17 @@ export default function ReceiptPage() {
       return;
     }
     api<Receipt>(`/api/public/receipt/${encodeURIComponent(t)}`, { redirectOn401: false })
-      .then(setData)
-      .catch((e) => setError(errorMessage(e)));
+      .then((r) => {
+        // A public page has no session: format with the receipt's own salon (currency, decimals, time zone).
+        const sl = r.salon;
+        setFormat({ currency: sl.currency, minor: sl.currency_minor || 1, locale: sl.locale || "en-GB", timezone: sl.timezone || "UTC", dayStartHour: 0, phoneCountry: getFormat().phoneCountry });
+        setData(r);
+      })
+      .catch((e) => setError(e?.status === 404 ? "This receipt link has expired or is wrong." : errorMessage(e)));
   }, []);
 
   useEffect(() => {
-    if (data) document.title = `Receipt ${data.sale.bill_no} — ${data.salon.salon_name}`;
+    if (data) document.title = `Receipt ${data.sale.bill_no} — ${data.salon.display_name}`;
   }, [data]);
 
   return (

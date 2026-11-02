@@ -23,10 +23,6 @@ const FORBIDDEN: [string, RegExp][] = [
 /** Country data may name 971 (it is one of many calling codes). */
 const ALLOW = new Set(["src/lib/phone-countries.ts"]);
 const PENDING = new Set<string>([
-  "src/app/monthly/page.tsx",
-  "src/app/rate/page.tsx",
-  "src/app/sheet/page.tsx",
-  "src/lib/excel.ts",
 ]);
 
 const root = join(__dirname, "..");

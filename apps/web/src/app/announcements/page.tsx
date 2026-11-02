@@ -20,6 +20,7 @@ import { ErrorState } from "@/components/admin/states";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WaAnnouncements } from "@/components/app/wa-announcements";
+import { FeatureGate } from "@/components/app/feature-gate";
 
 const TITLE_MAX = 80;
 const BODY_MAX = 500;
@@ -37,7 +38,13 @@ export default function AnnouncementsPage() {
           <TabsTrigger value="customers">Customers (WhatsApp)</TabsTrigger>
         </TabsList>
       </Tabs>
-      {tab === "team" ? <TeamAnnouncements /> : <WaAnnouncements />}
+      {tab === "team" ? (
+        <FeatureGate feature="announcements">
+          <TeamAnnouncements />
+        </FeatureGate>
+      ) : (
+        <WaAnnouncements />
+      )}
     </div>
   );
 }
