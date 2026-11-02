@@ -228,6 +228,17 @@ describe("company expenses (admin)", () => {
     }
   });
 
+  it("PUT without day keeps the existing row's day", async () => {
+    const a = await setup("ce-keepday");
+    const past = addDays(dubaiToday(), -3);
+    const c1 = await json(await call("POST", "/company-expenses", a.ck, { amount: 10, note: "rent", day: past }));
+    expect(c1.day).toBe(past);
+    const u = await call("PUT", `/company-expenses/${c1.id}`, a.ck, { amount: 12, note: "rent" });
+    expect(u.status).toBe(200);
+    expect((await json(u)).day).toBe(past);
+    expect(await env.DB.prepare("SELECT day FROM company_expenses WHERE org_id = ? AND id = ?").bind(a.org.id, c1.id).first()).toEqual({ day: past });
+  });
+
   it("create, edit (reverse + repost), delete (hard, reversal); ledger balances net correctly; audit rows", async () => {
     const a = await setup("ce-crud");
     const today = dubaiToday();

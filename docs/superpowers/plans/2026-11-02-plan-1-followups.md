@@ -3,23 +3,23 @@
 These come from the Plan 1 per-task reviews and the final review. Each was triaged as "can wait", with a deadline where one applies.
 
 ## Must land in Plan 2
-- **Login rate limiting / lockout:** port FM `limits.ts` onto `login_failures`, scoped by org. Required before any deploy.
-- **SQL guard:**
-  - Add every new tenant table to `TENANT_TABLES`.
-  - Point `scanSource` (`apps/api/test/sql-guard.ts`) at all of `src/**`.
-  - Re-include `login_failures` in the per-table coverage check once it has statements.
-- **Cross-org endpoint tests** for every ported module (spec §13), including `settings()`.
-- **Composite FKs** so a child row can't reference another salon's user or customer:
+- [x] **Login rate limiting / lockout:** port FM `limits.ts` onto `login_failures`, scoped by org. Required before any deploy. *(Done in Plan 2a.)*
+- [x] **SQL guard:**
+  - [x] Add every new tenant table to `TENANT_TABLES`.
+  - [x] Point `scanSource` (`apps/api/test/sql-guard.ts`) at all of `src/data/tenant/*` (Plan 2a; not `src/**`).
+  - [x] Re-include `login_failures` in the per-table coverage check once it has statements.
+- [x] **Cross-org endpoint tests** for every ported module (spec §13), including `settings()`. *(Done in Plan 2a: registry plus a coverage test over `app.routes`.)*
+- [x] **Composite FKs** so a child row can't reference another salon's user or customer:
   - `CREATE UNIQUE INDEX ... ON users(org_id, id)`.
-  - Child tables use `FOREIGN KEY (org_id, user_id) REFERENCES users(org_id, id)`.
-- **Public tenant routes** (receipt `/r`, `/rate`, public services API): give them a separate, explicitly allow-listed host→org mount registered before `tenantApi`. Extend the route-enumeration test's exclusions deliberately, not by prefix.
+  - Child tables use `FOREIGN KEY (org_id, user_id) REFERENCES users(org_id, id)`. *(Done in Plan 2a; FM `ON DELETE SET NULL` actor columns are plain integers by ruling.)*
+- [x] **Public tenant routes** (receipt `/r`, `/rate`, public services API): give them a separate, explicitly allow-listed host→org mount registered before `tenantApi`. Extend the route-enumeration test's exclusions deliberately, not by prefix. *(Done in Plan 2a: `publicApi` at `/api/public`.)*
 - **Serve the dashboard same-origin with the API:** the origin check compares Origin to the request host. A dev proxy that rewrites Host, or a separate frontend Worker, needs an explicit allow-list.
 - **Feature gating:** mount module routers with `module.use("*", requireFeature(key))`. Unknown sub-paths under a gated module return 401, not 404 (fails closed, accepted).
 - **Tests for write rules:**
   - The allow-list boundaries `/api/mex` and `/api/billingx` are blocked.
   - PUT, PATCH and DELETE are blocked for expired orgs.
   - HEAD and OPTIONS pass.
-- **Seed:** extend the delete list in `scripts/seed-local.sql` with every new `org_id` table.
+- [x] **Seed:** extend the delete list in `scripts/seed-local.sql` with every new `org_id` table. *(Done in Plan 2a.)*
 
 ## Later plans
 - **Plan 5 (super admin):**

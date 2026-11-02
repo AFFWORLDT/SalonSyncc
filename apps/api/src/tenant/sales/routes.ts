@@ -6,7 +6,7 @@ import { isAdmin } from "../../core/roles";
 import { requireFeature } from "../../core/pipeline";
 import { clockOf, customersRepo, salesRepo, settingsRepo, type SaleFilters, type VersionedSale } from "../../data/tenant";
 import { businessDay, dayStamp } from "../../lib/clock";
-import { DAY_RE, commissionOf, toMinor, vatOf } from "../../lib/money";
+import { DAY_RE, clampPage, commissionOf, toMinor, vatOf } from "../../lib/money";
 import { canonicalPhone } from "../../lib/phone";
 import { hooks } from "./hooks";
 
@@ -106,7 +106,7 @@ sales.use("*", requireFeature("core_sales"));
 sales.get("/", async (c) => {
   const me = c.var.tenant.user;
   const q = c.req.query();
-  const page = Math.max(1, Math.floor(Number(q.page)) || 1);
+  const page = clampPage(q.page);
   const page_size = Math.min(200, Math.max(1, Math.floor(Number(q.page_size)) || 50));
   const f: SaleFilters = {};
   if (q.day && DAY_RE.test(q.day)) f.day = q.day;

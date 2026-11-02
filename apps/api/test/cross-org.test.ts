@@ -42,6 +42,32 @@ async function runCase(fetcher: Fetcher, c: CrossOrgCase): Promise<string[]> {
 
 const real: Fetcher = (req) => app.fetch(req, { ...env, ROOT_DOMAIN: "" }, ctx);
 
+describe("cross-org registry coverage", () => {
+  it("every id-taking tenant route has a CrossOrgCase named '<METHOD> <path>'", async () => {
+    const { publicApi } = await import("../src/core/public");
+    const guard = app.routes.find((r) => r.method === "ALL" && r.path === "/api/*")!.handler;
+    const isPublic = (r: (typeof app.routes)[number]) =>
+      r.path.startsWith("/api/public/") &&
+      publicApi.routes.some((p) => p.handler === r.handler && p.method === r.method && `/api/public${p.path === "/*" ? "/*" : p.path}` === r.path);
+    const tenant = app.routes.filter(
+      (r) => r.path.startsWith("/api") && r.handler !== guard && r.path !== "/api/health" && !r.path.startsWith("/api/auth/") && !isPublic(r) && r.path.includes("/:"),
+    );
+    expect(tenant.length).toBeGreaterThan(10);
+    const names = new Set(CASES.map((c) => c.name));
+    const missing = [...new Set(tenant.map((r) => `${r.method} ${r.path}`))].filter((n) => !names.has(n));
+    expect(missing, `routes without a cross-org case:\n${missing.join("\n")}`).toEqual([]);
+  });
+});
+
+describe("no MAX(id) anywhere in src", () => {
+  it("no source file selects MAX(id)", () => {
+    const files = import.meta.glob("../src/**/*.ts", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+    expect(Object.keys(files).length).toBeGreaterThan(20);
+    const bad = Object.entries(files).filter(([, code]) => /max\s*\(\s*id\s*\)/i.test(code)).map(([n]) => n);
+    expect(bad).toEqual([]);
+  });
+});
+
 describe("cross-org isolation harness", () => {
   it("every registered case returns 404 for another org and leaves the row unchanged", async () => {
     for (const c of CASES) expect(await runCase(real, c), c.name).toEqual([]);

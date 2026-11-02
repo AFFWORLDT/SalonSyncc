@@ -162,7 +162,7 @@ export function expensesRepo(db: D1Database, orgId: string) {
 
     companyById,
 
-    /** FM POST /company-expenses. The batch finds its row by a per-row uid, never MAX(id) (RF4). */
+    /** FM POST /company-expenses. The batch finds its row by a per-row uid, never by newest-id lookup (RF4). */
     async companyCreate(w: CompanyExpenseWrite, actor: Actor): Promise<CompanyExpense> {
       const at = Date.now();
       const uid = randomToken(9);

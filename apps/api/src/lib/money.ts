@@ -47,3 +47,8 @@ export function barberNet(t: DayTotals): number {
 export function shopProfit(t: DayTotals): number {
   return t.sales - t.expense - t.commission;
 }
+
+/** `?page=` as a safe 1-based page: junk -> 1, capped so (page-1)*size never overflows SQLite's integer range. */
+export function clampPage(raw: unknown): number {
+  return Math.min(100_000, Math.max(1, Math.floor(Number(raw)) || 1));
+}

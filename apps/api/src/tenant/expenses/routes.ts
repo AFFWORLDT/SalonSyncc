@@ -109,8 +109,9 @@ export const companyExpenses = new Hono<AppEnv>();
 // Mounted at "/company-expenses".
 companyExpenses.use("*", requireFeature("expenses"), requireAdmin);
 
-function readCompanyExpense(b: Partial<CompanyExpenseInput>, today: string, minor: number) {
-  const day = b.day ?? today;
+/** `fallbackDay`: the day to use when the body has none (today on create, the existing row's day on edit). */
+function readCompanyExpense(b: Partial<CompanyExpenseInput>, today: string, minor: number, fallbackDay: string = today) {
+  const day = b.day ?? fallbackDay;
   if (typeof day !== "string" || !DAY_RE.test(day) || day > today) throw bad("Pick a valid day (not in the future)");
   const amount = toMinor(b.amount, minor);
   if (!amount) throw bad("Enter the expense amount (e.g. 500)");
@@ -150,7 +151,7 @@ companyExpenses.put("/:id", async (c) => {
   if (!old) throw new HttpError(404, "Not found");
   const b = await readBody<CompanyExpenseInput>(c);
   const { settings, today: t } = await today(c);
-  const e = readCompanyExpense(b, t, settings.currency_minor);
+  const e = readCompanyExpense(b, t, settings.currency_minor, old.day);
   lost(await repo.companyUpdate(old, e, { id: me.id, name: me.name }));
   const row = await repo.companyById(expenseId);
   if (!row) throw new HttpError(404, "Not found"); // deleted right after our write

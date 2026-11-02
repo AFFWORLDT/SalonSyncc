@@ -52,7 +52,7 @@ const transferSnap = (t: TransferWrite | Transfer) => ({ day: t.day, amount: t.a
 
 /**
  * Barber payouts and money moves. Every query here is scoped by org_id; test/sql-guard.test.ts enforces it.
- * Creates find their row by a per-row uid (never MAX(id), RF4). Edits and deletes are compare-and-set on updated_at, and
+ * Creates find their row by a per-row uid (never by newest-id lookup, RF4). Edits and deletes are compare-and-set on updated_at, and
  * the audit and ledger statements in the same batch are gated on the guarded write having taken effect (lesson 0012).
  */
 export function payoutsRepo(db: D1Database, orgId: string) {

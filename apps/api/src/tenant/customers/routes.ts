@@ -5,6 +5,7 @@ import { HttpError } from "../../core/errors";
 import { isAdmin, requireAdmin } from "../../core/roles";
 import { requireFeature } from "../../core/pipeline";
 import { customersRepo, settingsRepo } from "../../data/tenant";
+import { clampPage } from "../../lib/money";
 import { canonicalPhone } from "../../lib/phone";
 
 const PAGE = 8;
@@ -27,7 +28,7 @@ customers.get("/", async (c) => {
   const repo = customersRepo(c.env.DB, orgId);
   const q = (c.req.query("q") ?? "").trim().slice(0, 80);
   if (isAdmin(me) && c.var.tenant.features.includes("customers_crm")) {
-    const page = Math.max(1, Math.floor(Number(c.req.query("page"))) || 1);
+    const page = clampPage(c.req.query("page"));
     const page_size = Math.min(200, Math.max(1, Math.floor(Number(c.req.query("page_size"))) || 50));
     const r = await repo.adminList(q, page, page_size);
     const body: Paged<Customer> = { items: r.items, total: r.total, page, page_size };
