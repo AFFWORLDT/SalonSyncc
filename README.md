@@ -150,3 +150,26 @@ Going live needs:
 - **Deploy:**
   - Run `npm run db:migrate:remote` (or `wrangler d1 migrations apply salonkit-db --remote`) in apps/api, then build and deploy the web app and the API as before.
   - Then deploy the site: `cd apps/site && npm run build && wrangler deploy`. Use `XDG_CONFIG_HOME=~/.wrangler-affworld`.
+
+## Super admin panel (`admin.salonkit.online`)
+
+The `/platform/*` pages of `apps/web`, served by the same Worker. On `admin.<domain>` every other page redirects there; on
+workers.dev or localhost open `/platform/`. The API is `/api/platform/*` (`apps/api/src/platform/admin.ts`) with its own
+cookie `ss_platform` (12 hours), which only works on the admin host.
+
+- **Roles:** `owner` changes anything; `support` can look and use "Log in as salon", but can't change plans or delete.
+- **Log in as salon:** a 60-second single-use link opens a 2-hour session as the salon's owner, with a red Support mode
+  banner. Every link and every sign-in is in the platform audit.
+- **Every change** (plan, trial/grace extension, mark as paid, feature override with a reason, staff limit,
+  deactivate/reactivate, delete) writes `platform_audit` and refreshes the salon's features.
+- **Delete** is a soft delete: you type the salon ID, nobody can sign in, and the owner's email is free again.
+
+Add a super admin (prints the SQL; the password is shown once and never stored in git):
+
+```sh
+cd apps/api
+node --experimental-strip-types scripts/platform-user.ts you@example.com owner > /tmp/pu.sql
+XDG_CONFIG_HOME=~/.wrangler-affworld npx wrangler d1 execute salonkit-db --remote --file /tmp/pu.sql && rm /tmp/pu.sql
+```
+
+Running it again for the same email resets the password and signs that person out everywhere.
