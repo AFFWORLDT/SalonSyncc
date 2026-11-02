@@ -8,11 +8,14 @@
   "compatibility_flags": ["nodejs_compat"],
   "placement": { "mode": "smart" },
   "workers_dev": true,
+  // Every salon gets <slug>.salonkit.online (and admin.salonkit.online for the super admin). The apex is left for the
+  // marketing site (Plan 4). Needs a proxied wildcard DNS record "*" in the salonkit.online zone (AAAA 100::).
+  "routes": [{ "pattern": "*.salonkit.online/*", "zone_name": "salonkit.online" }],
   // The salon dashboard (apps/web static export), same origin as the API. Build it first: npm run build -w @ss/web.
   "assets": { "directory": "../web/out", "binding": "ASSETS", "not_found_handling": "404-page", "run_worker_first": ["/api/*"] },
   // The cron (src/jobs/hourly.ts): every 10 minutes, each tick within the free plan's per-invocation limits.
   "triggers": { "crons": ["*/10 * * * *"] },
-  "vars": { "BRAND_NAME": "SalonStation", "ROOT_DOMAIN": "", "ADMIN_HOST": "admin", "MAIL_FROM": "", "SUPPORT_EMAIL": "", "APP_ORIGIN": "https://salonstation-app.affworld0.workers.dev" },
+  "vars": { "BRAND_NAME": "SalonStation", "ROOT_DOMAIN": "salonkit.online", "ADMIN_HOST": "admin", "MAIL_FROM": "", "SUPPORT_EMAIL": "", "APP_ORIGIN": "https://salonstation-app.affworld0.workers.dev" },
   // Secrets (wrangler secret put): SESSION_SECRET, SECRETS_KEY (base64 32 bytes), FCM_SERVICE_ACCOUNT, WA_APP_SECRET, WA_VERIFY_TOKEN.
   "d1_databases": [
     {
