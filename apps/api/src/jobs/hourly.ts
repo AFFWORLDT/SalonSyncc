@@ -2,7 +2,7 @@
  * The cron (FM scheduled.ts hourly, per org). wrangler.jsonc triggers it every 10 minutes (R1); each invocation:
  *   1. prune (minute-0 tick only, before org work): jobs/prune.ts;
  *   2. loads every served org (trial/active/grace/past_due) with settings and feature inputs in ONE statement;
- *   3. visits them in id order from offset (tickIndex(at) * 7) % n, wrapping round, so the start rotates per tick;
+ *   3. visits them in id order from offset tickIndex(at) % n, wrapping round, so every org leads in turn (n ticks);
  *   4. per org, in its local hour (lib/clock), in two passes over that order: first the push jobs (the admins'
  *      summary and the barber reminder, due in their target hour and the next, once per business day:
  *      jobs/push-jobs.ts), then WhatsApp (one open campaign batch, visit reminders from wa_reminder_hour, rating
@@ -15,7 +15,8 @@
  * Before each step its worst-case statement cost is computed from the step's documented formula; the step is skipped
  * (left due for a later tick) when it would cross either counter, and each job's `limit` is derived from both:
  *   org loader 1 (prune 3 on minute 0) | WA config 1, once per org, only once something is due
- *   campaign drain: 6 + 2N (campaign row 1, claim 2, 2 per send, 1 per skipped row, finish 1, view 1, release 1)
+ *   campaign drain: 6 + 2N (campaign row 1, claim 2, 2 per send, 1 per skipped row, finish 1, view 1, release 1),
+ *     with WA config at most floor(CRON_STMTS / 2) per org per tick
  *   visit reminders: 3 + 2L (due 1, claim 1, 1 per item + 1 more for a failed one's release, release 1)
  *   rating requests / rating reminders: 3 + L each (due 1, claim 1, 1 per item, release 1)
  *   summary: SUMMARY_STMTS (7) | barber reminder: BARBER_REMINDER_STMTS (5); 0 once already run today
@@ -24,7 +25,7 @@
 import type { Env } from "../env";
 import { platformRepo, type CronOrg } from "../data/platform";
 import { clockOf, PUSH_MAX_TOKENS } from "../data/tenant";
-import { primeFeatures } from "../core/features-cache";
+import { computeFeatures } from "../core/features-cache";
 import type { WaConfig } from "../core/services";
 import { waSetup } from "../tenant/whatsapp/ready";
 import { localHour } from "../lib/clock";
@@ -45,6 +46,11 @@ export const tickIndex = (at: number): number => Math.floor(at / TICK_MS);
 const TOKEN_CAP = Math.min(PUSH_MAX_TOKENS, CRON_BUDGET - 1);
 const ORG_LOADER_STMTS = 1;
 const CAMPAIGN_FIXED_STMTS = 6;
+/**
+ * One org's campaign batch may use at most half a tick's statements (WA config included), so a big campaign never
+ * takes a whole tick from the other salons' reminders and ratings: 22 -> 7 sends a tick (6 + 2*7 + 1 = 21).
+ */
+const CAMPAIGN_STMT_CAP = Math.floor(CRON_STMTS / 2);
 const JOB_FIXED_STMTS = 3;
 /** The cheapest step's worst case (a rating job with limit 1, WA config loaded): below this nothing more fits. */
 const MIN_STEP_STMTS = JOB_FIXED_STMTS + 1;
@@ -84,7 +90,7 @@ export async function hourly(rawEnv: Env, at: number): Promise<HourlyResult> {
     }
   }
   const n = orgs.length;
-  const start = n ? (tickIndex(at) * 7) % n : 0;
+  const start = n ? tickIndex(at) % n : 0; // step 1: coprime with every n, so the lead org cycles through all of them
   const rotated = Array.from({ length: n }, (_, i) => orgs[(start + i) % n]!);
   const ctxs = new Map<string, OrgCtx>();
   const ctxOf = (o: CronOrg) => ctxs.get(o.org.id) ?? ctxs.set(o.org.id, orgCtx(env, o, at)).get(o.org.id)!;
@@ -114,14 +120,15 @@ interface OrgCtx {
 }
 
 function orgCtx(env: Env, o: CronOrg, at: number): OrgCtx {
-  const features = primeFeatures(o.org, o.planFeatures, o.limits, o.overrides).features; // waSetup then costs 0 for features
+  // Features from the loader row, passed to waSetup: no featuresFor (and no cache expiry costing unreserved statements).
+  const features = computeFeatures(o.org, o.planFeatures, o.limits, o.overrides).features;
   let cfgP: Promise<WaConfig | null> | null = null;
   return {
     o,
     features,
     hour: localHour(at, clockOf(o.settings)),
     wa: o.hasWa && features.includes("whatsapp"),
-    pre: { s: o.settings, cfg: () => (cfgP ??= waSetup(env, o.org)) },
+    pre: { s: o.settings, cfg: () => (cfgP ??= waSetup(env, o.org, features)) },
     cfgCost: () => (cfgP ? 0 : 1),
   };
 }
@@ -152,7 +159,8 @@ async function runWaJobs(env: Env, c: OrgCtx, at: number, budget: CronBudget): P
 
   if (openCampaign !== null && c.features.includes("whatsapp_campaigns")) {
     await step("campaign", async () => {
-      const limit = Math.min(CAMPAIGN_BATCH, budget.left, Math.floor((budget.stmts - c.cfgCost() - CAMPAIGN_FIXED_STMTS) / 2));
+      const stmts = Math.min(budget.stmts, CAMPAIGN_STMT_CAP);
+      const limit = Math.min(CAMPAIGN_BATCH, budget.left, Math.floor((stmts - c.cfgCost() - CAMPAIGN_FIXED_STMTS) / 2));
       if (limit < 1) return;
       const cfg = await c.pre.cfg();
       if (cfg) await drainCampaign(env, org.id, openCampaign, limit, budget, { cfg });

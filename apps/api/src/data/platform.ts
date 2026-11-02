@@ -59,7 +59,7 @@ export interface CronOrg {
   hasWa: boolean;
   /** Its oldest unfinished WhatsApp campaign, if any. */
   openCampaign: number | null;
-  /** Raw feature inputs for core/features-cache primeFeatures (no per-org features lookups). */
+  /** Raw feature inputs for core/features-cache computeFeatures (no per-org features lookups). */
   planFeatures: string[];
   limits: { max_staff: number | null };
   overrides: { feature_key: string; enabled: 0 | 1 }[];

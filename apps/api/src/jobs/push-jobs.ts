@@ -37,6 +37,12 @@ export type PushJobResult = "sent" | "done" | "budget";
 /**
  * The business day an hour-targeted job is due for at `at` (org-local hour = target or target+1), else null.
  */
+/*
+ * DST edge (accepted, review M4): `at - late * HOUR` assumes one wall hour is one real hour. On a fall-back night, in
+ * a zone where target+1 equals day_start_hour (e.g. America/New_York, summary_hour 0, day_start_hour 1), the repeated
+ * 01:xx hour maps back into the NEW business day, so that day's summary is sent (nearly empty) just after it starts
+ * and its real end-of-day run is then skipped as already claimed. Needs a DST zone and that exact hour pairing.
+ */
 export function pushDueDay(at: number, s: Pick<Settings, "timezone" | "day_start_hour">, target: number): string | null {
   const clock = clockOf(s);
   const late = (localHour(at, clock) - target + 24) % 24;
@@ -59,15 +65,24 @@ async function pushOnce(env: Env, org: Org, job: string, day: string, at: number
   if (cost > budget.left) return "budget";
   if (!(await jobRunsRepo(env.DB, org.id).claim(job, day, at))) return "done";
   if (!ids.length) return "done";
-  await repo.record(ids, push); // feed first, so the bell has it even if the push fails
-  if (!tokens.length) return "sent";
-  budget.left -= cost;
-  const link = new URL(push.path ?? "/", `${orgAppUrl(env, org)}/`).toString();
+  // From here the day is claimed (at-most-once): a failure below is not retried today, so it is logged as such.
+  let dead: string[];
   try {
-    const { dead } = await services(env).push.send(env, tokens, { ...push, link });
-    if (dead.length) await repo.deleteTokens(dead);
+    await repo.record(ids, push); // feed first, so the bell has it even if the push fails
+    if (!tokens.length) return "sent";
+    budget.left -= cost;
+    const link = new URL(push.path ?? "/", `${orgAppUrl(env, org)}/`).toString();
+    dead = (await services(env).push.send(env, tokens, { ...push, link })).dead;
   } catch (err) {
-    console.error("cron push failed", org.id, job, err);
+    console.error("cron push claimed but not sent (not retried today)", org.id, job, day, err);
+    return "done";
+  }
+  if (dead.length) {
+    try {
+      await repo.deleteTokens(dead);
+    } catch (err) {
+      console.error("cron push sent; dead-token cleanup failed", org.id, job, err);
+    }
   }
   return "sent";
 }

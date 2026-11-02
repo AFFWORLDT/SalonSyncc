@@ -10,6 +10,7 @@ import { reportsRepo, waConfigRepo } from "../src/data/tenant";
 import type { OrgStatus } from "../src/data/platform";
 import { CRON_BUDGET, CRON_STMTS, hourly, tickIndex } from "../src/jobs/hourly";
 import { moneyText } from "../src/lib/money";
+import { meteredEnv } from "../src/lib/metered";
 
 const E = { ...env, ROOT_DOMAIN: "", APP_ORIGIN: "https://app.salonstation.test", FCM_SERVICE_ACCOUNT: "fake-fcm-account" };
 const TOKEN = "EAAGcronSECRETtoken1234567890";
@@ -77,10 +78,16 @@ async function tick(at: number) {
   vi.setSystemTime(at);
   const { db, count } = countingDb(env.DB);
   const before = f.wa.length;
-  const pushTokensBefore = f.pushes.reduce((n, p) => n + p.tokens.length, 0);
+  const pushesBefore = f.pushes.length;
   const r = await hourly({ ...E, DB: db }, at);
-  const pushTokens = f.pushes.reduce((n, p) => n + p.tokens.length, 0) - pushTokensBefore;
-  return { r, statements: count.statements, sends: f.wa.length - before, pushTokens };
+  const pushes = f.pushes.slice(pushesBefore).filter((p) => p.tokens.length);
+  const pushTokens = pushes.reduce((n, p) => n + p.tokens.length, 0);
+  // The cron's own meter is exact: it agrees with the independent counting proxy below it, every tick.
+  expect(CRON_STMTS - r.stmtsLeft, "meter vs counting proxy").toBe(count.statements);
+  // R4 accounting: every WA send, every FCM token, and one OAuth call per push that had tokens.
+  const subrequests = f.wa.length - before + pushTokens + pushes.length;
+  expect(CRON_BUDGET - r.budgetLeft, "subrequests vs budget").toBe(subrequests);
+  return { r, statements: count.statements, sends: f.wa.length - before, pushTokens, subrequests };
 }
 
 describe("hourly cron: per-org schedule", () => {
@@ -254,14 +261,17 @@ describe("hourly cron: WhatsApp jobs", () => {
     expect(f.wa.map((s) => s.template)).toEqual(["ss_rating", "ss_fresh_cut"]);
   });
 
-  it("finishes an unfinished campaign in CAMPAIGN_BATCH steps on consecutive ticks", async () => {
+  it("finishes an unfinished campaign on consecutive ticks, at most half a tick's statements per tick", async () => {
     install();
     const a = await salon("cr-camp");
     await campaign(a.org.id, 20);
-    await tick(Date.UTC(2026, 10, 20, 8, 10));
-    expect(f.wa).toHaveLength(15);
-    await tick(Date.UTC(2026, 10, 20, 8, 20));
-    expect(f.wa).toHaveLength(20);
+    const counts = [];
+    for (let k = 0; k < 3; k++) {
+      const t = await tick(Date.UTC(2026, 10, 20, 8, 10 + k * 10));
+      expect(t.statements - 1, "campaign statements (loader excluded)").toBeLessThanOrEqual(Math.floor(CRON_STMTS / 2));
+      counts.push(f.wa.length);
+    }
+    expect(counts).toEqual([7, 14, 20]);
     const k = await env.DB.prepare("SELECT finished_at FROM wa_campaigns WHERE org_id = ?").bind(a.org.id).first<{ finished_at: number | null }>();
     expect(k!.finished_at).not.toBeNull();
   });
@@ -292,7 +302,7 @@ describe("hourly cron: WhatsApp jobs", () => {
     const ids = [bad.org.id, good.org.id].sort();
     const badFirst = ids[0] === bad.org.id ? 0 : 1;
     let at = at0;
-    while ((tickIndex(at) * 7) % 2 !== badFirst) at += TICK;
+    while (tickIndex(at) % 2 !== badFirst) at += TICK;
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const { r } = await tick(at);
     expect(err).toHaveBeenCalled();
@@ -353,7 +363,7 @@ describe("hourly cron: free-plan budget (R2)", () => {
     // 14 ticks: the push window (12:00-13:59 local) and the first ticks after it, where WhatsApp has the budget again.
     for (let k = 0; k < 14; k++) {
       const t = await tick(at + k * TICK);
-      expect(t.sends + t.pushTokens + (t.pushTokens ? 1 : 0), `tick ${k} subrequests`).toBeLessThanOrEqual(CRON_BUDGET);
+      expect(t.subrequests, `tick ${k} subrequests (OAuth counted per push)`).toBeLessThanOrEqual(CRON_BUDGET);
       expect(t.statements, `tick ${k} statements`).toBeLessThanOrEqual(CRON_STMTS);
     }
     expect(f.wa.length).toBeGreaterThan(0);
@@ -373,8 +383,11 @@ describe("hourly cron: free-plan budget (R2)", () => {
       orgs.push(s);
     }
     // R2 ruling bound ceil(30k/40) counts sends only; every send also costs a D1 statement (its log row) and each newly
-    // served org costs 3 more (WA config, due list, claim), out of 44 statements a tick after the org load. So:
-    const bound = Math.ceil((30 * (k + 3)) / (CRON_STMTS - 1)) + 1;
+    // served org costs 3 more (WA config, due list, claim), out of 44 statements a tick after the org load. The start
+    // moves by 1 a tick (fix round 1), so a tick may first re-check up to 29 already-served orgs (1 statement each, the
+    // empty due list) before reaching new ones: at least floor((44 - 29) / (k + 3)) new orgs a tick, guaranteed.
+    const perTick = Math.floor((CRON_STMTS - 1 - 29) / (k + 3));
+    const bound = Math.ceil(30 / perTick); // k = 2: 10 (measured: 6)
     const servedAt = new Map<string, number>();
     for (let n = 0; n < 30 && servedAt.size < 30; n++) {
       const t = await tick(at0 + n * TICK);
@@ -385,7 +398,7 @@ describe("hourly cron: free-plan budget (R2)", () => {
     expect(servedAt.size).toBe(30);
     expect(Math.max(...servedAt.values())).toBeLessThanOrEqual(bound);
     // The start rotates: consecutive ticks begin at different orgs.
-    expect((tickIndex(at0) * 7) % 30).not.toBe((tickIndex(at0 + TICK) * 7) % 30);
+    expect(tickIndex(at0) % 30).not.toBe(tickIndex(at0 + TICK) % 30);
   });
 });
 
@@ -436,5 +449,97 @@ describe("scheduled entry", () => {
     expect(sendsBy(f.wa, a.phoneNumberId)).toBe(1);
     const res = await (worker as any).fetch(new Request("https://x.test/api/health"), E, { waitUntil() {}, passThroughOnException() {} });
     expect(res.status).toBe(200);
+  });
+});
+
+describe("hourly cron: fix round 1 (rotation, failed sends, big pushes, fail-closed meter)", () => {
+  it("n = 7: a 1000-recipient campaign in the first org never starves the other six; all get their reminders within 7 ticks", async () => {
+    install();
+    const at0 = Date.UTC(2026, 10, 20, 8, 10);
+    const orgs = [];
+    for (let i = 0; i < 7; i++) orgs.push(await salon(`cr-seven${i}`));
+    orgs.sort((a, b) => (a.org.id < b.org.id ? -1 : 1));
+    const [big, ...rest] = orgs;
+    await env.DB.prepare(
+      `INSERT INTO wa_campaigns (org_id, uid, template, language, params, total, created_at) VALUES (?, 'big', 'eid_offer', 'en', '[]', 1000, 1)`,
+    )
+      .bind(big!.org.id)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO wa_messages (org_id, kind, phone, template, status, campaign_id, created_at)
+       WITH RECURSIVE k(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM k WHERE i < 1000)
+       SELECT ?1, 'announcement', '+97158' || printf('%07d', i), 'eid_offer', 'queued', (SELECT id FROM wa_campaigns WHERE org_id = ?1 AND uid = 'big'), 1 FROM k`,
+    )
+      .bind(big!.org.id)
+      .run();
+    for (const s of rest) await dueReminders(s.org.id, 2, at0);
+    // Start at the tick where the campaign org leads, the worst case for the others.
+    let at = at0;
+    while (tickIndex(at) % 7 !== 0) at += TICK;
+    for (let k = 0; k < 7; k++) {
+      const t = await tick(at + k * TICK);
+      expect(t.statements).toBeLessThanOrEqual(CRON_STMTS);
+      expect(t.subrequests).toBeLessThanOrEqual(CRON_BUDGET);
+    }
+    expect(rest.map((s) => sendsBy(f.wa, s.phoneNumberId))).toEqual([2, 2, 2, 2, 2, 2]);
+    expect(sendsBy(f.wa, big!.phoneNumberId)).toBeGreaterThan(0);
+  });
+
+  it("failed sends (2 statements each for visit reminders) keep every tick within 45 statements and 40 sends", async () => {
+    install({ send: () => ({ status: "failed", error: "graph down" }) });
+    const at = Date.UTC(2026, 10, 20, 8, 0);
+    for (let i = 0; i < 20; i++) {
+      const s = await salon(`cr-fail${i}`);
+      await dueReminders(s.org.id, 6, at);
+      await set(s.org.id, "wa_feedback_enabled = 1, wa_feedback_delay_min = 0");
+      const c = await env.DB.prepare("INSERT INTO customers (org_id, name, phone, created_at) VALUES (?, 'R', ?, 1) RETURNING id")
+        .bind(s.org.id, `+9715${String(++seq).padStart(8, "0")}`)
+        .first<{ id: number }>();
+      await sale(s.org.id, s.own.id, "2026-11-20", 1000, { customerId: c!.id, createdAt: at - HOUR });
+    }
+    for (let k = 0; k < 4; k++) {
+      const t = await tick(at + k * TICK);
+      expect(t.statements, `tick ${k}`).toBeLessThanOrEqual(CRON_STMTS);
+      expect(t.sends, `tick ${k}`).toBeLessThanOrEqual(CRON_BUDGET);
+    }
+    // Failed visit reminders were released (retried next tick, as FM), so the same customers come round again.
+    expect(f.wa.length).toBeGreaterThan(0);
+    const failed = await env.DB.prepare("SELECT COUNT(*) AS n FROM wa_messages WHERE status = 'failed'").first<{ n: number }>();
+    expect(failed!.n).toBe(f.wa.length);
+  });
+
+  it("a push to more than 90 recipients re-checks its cost and stays within 45 statements and 40 subrequests", async () => {
+    install();
+    const a = await salon("cr-big-push", { plan: "pro", wa: false });
+    await set(a.org.id, "notify_reminder = 1, reminder_hour = 13");
+    // 95 more idle barbers (direct rows: no password hashing), each with a device; plus b1.
+    await env.DB.prepare(
+      `INSERT INTO users (org_id, username, name, role, password_hash, created_at)
+       WITH RECURSIVE k(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM k WHERE i < 95)
+       SELECT ?1, 'bb' || i, 'Barber ' || i, 'barber', 'x', 1 FROM k`,
+    )
+      .bind(a.org.id)
+      .run();
+    await env.DB.prepare("INSERT INTO push_tokens (token, org_id, user_id, created_at, updated_at) SELECT 'tk' || id, org_id, id, 1, id FROM users WHERE org_id = ? AND role = 'barber'")
+      .bind(a.org.id)
+      .run();
+    const t = await tick(Date.UTC(2026, 10, 20, 9, 0)); // 13:00 Dubai
+    expect(t.statements).toBeLessThanOrEqual(CRON_STMTS);
+    expect(t.subrequests).toBeLessThanOrEqual(CRON_BUDGET);
+    expect(f.pushes).toHaveLength(1);
+    expect(f.pushes[0]!.tokens).toHaveLength(CRON_BUDGET - 1);
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM notifications WHERE org_id = ?").bind(a.org.id).first<{ n: number }>();
+    expect(n!.n).toBe(96);
+  });
+
+  it("the metered DB fails closed: an unmetered D1 method throws instead of running uncounted", async () => {
+    const budget = { left: 0, stmts: 10 };
+    const m = meteredEnv({ DB: env.DB }, budget);
+    expect(() => (m.DB as any).withSession("first-primary")).toThrow(/not metered/);
+    expect(() => (m.DB as any).dump()).toThrow(/not metered/);
+    const st = m.DB.prepare("SELECT 1 AS x").bind();
+    expect(await st.first()).toEqual({ x: 1 });
+    await m.DB.batch([m.DB.prepare("SELECT 1"), m.DB.prepare("SELECT 2")]);
+    expect(budget.stmts).toBe(7);
   });
 });

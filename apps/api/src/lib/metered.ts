@@ -3,9 +3,15 @@
  * cap, each statement inside a batch included. `meteredEnv` wraps env.DB so every `first/all/run/raw` takes 1 and
  * every `batch(stmts)` takes stmts.length from `budget.stmts`. It only counts: callers check their worst-case cost
  * BEFORE a step (jobs/hourly.ts) so the counter never goes below 0 in practice.
+ * FAIL-CLOSED: any other D1 method (withSession, dump, a future API) throws instead of running unmetered; meter it
+ * here before a cron path uses it.
  */
 
 const REAL = Symbol("metered-real");
+const STATEMENT_OK = new Set<PropertyKey>(["bind", "first", "all", "run", "raw"]);
+const unmetered = (p: PropertyKey) => {
+  throw new Error(`metered D1: ${String(p)}() is not metered; add it to lib/metered.ts before using it in the cron`);
+};
 
 export function meteredDb(real: D1Database, spend: (n: number) => void): D1Database {
   const wrap = (st: D1PreparedStatement): D1PreparedStatement =>
@@ -19,7 +25,8 @@ export function meteredDb(real: D1Database, spend: (n: number) => void): D1Datab
             return (t as any)[p](...a);
           };
         const v = (t as any)[p];
-        return typeof v === "function" ? v.bind(t) : v;
+        if (typeof v === "function" && !STATEMENT_OK.has(p)) return () => unmetered(p);
+        return v;
       },
     });
   return new Proxy(real, {
@@ -36,7 +43,7 @@ export function meteredDb(real: D1Database, spend: (n: number) => void): D1Datab
           return t.exec(sql);
         };
       const v = (t as any)[p];
-      return typeof v === "function" ? v.bind(t) : v;
+      return typeof v === "function" ? () => unmetered(p) : v;
     },
   });
 }
