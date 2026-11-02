@@ -1,8 +1,9 @@
 import type { Env } from "../env";
+import { fcmPush } from "../integrations/push-client";
 
 /**
  * Outbound service clients (WhatsApp Cloud API, FCM push) behind one seam so tests swap in fakes
- * (test/fakes.ts) and no test ever reaches Meta or Google. Real clients land in Tasks 3 (push) and 6 (WhatsApp).
+ * (test/fakes.ts) and no test ever reaches Meta or Google. The real push client is integrations/push-client.ts; WhatsApp lands in Task 6.
  */
 
 /** One org's WhatsApp number: from org_whatsapp with the token decrypted. Never logged or returned. */
@@ -57,6 +58,8 @@ export interface Push {
   path?: string;
   /** Same tag replaces an older notification instead of stacking. */
   tag?: string;
+  /** Absolute URL opened on tap (the salon's own app origin); notifyUsers sets it from `path`. */
+  link?: string;
 }
 
 export interface PushClient {
@@ -73,7 +76,7 @@ const notImplemented = (what: string) => async (): Promise<never> => {
   throw new Error(`${what}: not implemented`);
 };
 
-/** Real clients. Stubs until Task 3 (push) and Task 6 (WhatsApp) implement them. */
+/** Real clients. WhatsApp is a stub until Task 6 implements it. */
 const REAL: Services = {
   wa: {
     sendTemplate: notImplemented("wa.sendTemplate"),
@@ -81,7 +84,7 @@ const REAL: Services = {
     listTemplates: notImplemented("wa.listTemplates"),
     createTemplate: notImplemented("wa.createTemplate"),
   },
-  push: { send: notImplemented("push.send") },
+  push: fcmPush,
 };
 
 let override: ((env: Env) => Services) | null = null;

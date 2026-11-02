@@ -176,8 +176,13 @@ export interface AnnouncementInput {
 /**
  * Notification feed (the top-bar bell), per signed-in user.
  *   GET  /api/notifications?limit=  -> NotificationFeed
- *   POST /api/notifications/read    -> { ok }   (marks all unread as read)
+ *   POST /api/notifications/read  NotificationReadInput -> { ok }   (the given ids, or all unread when ids is omitted)
+ * Both need feature `push` (403 otherwise).
  */
+export interface NotificationReadInput {
+  ids?: number[]; // at most 50; ids that aren't the signed-in user's are ignored
+}
+
 export interface Notification {
   id: number;
   title: string;

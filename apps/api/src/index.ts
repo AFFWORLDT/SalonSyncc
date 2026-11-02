@@ -15,6 +15,7 @@ import { reports } from "./tenant/reports/routes";
 import { expenses, companyExpenses } from "./tenant/expenses/routes";
 import { ledger } from "./tenant/ledger/routes";
 import { audit } from "./tenant/audit/routes";
+import { notifications } from "./tenant/notifications/routes";
 
 const app = new Hono<AppEnv>();
 
@@ -70,6 +71,8 @@ tenantApi.route("/company-expenses", companyExpenses);
 tenantApi.route("/", ledger);
 // /audit, /sales/:id/history; gated per route.
 tenantApi.route("/", audit);
+// /push/tokens, /notifications, /notifications/read; gated per route (feature push).
+tenantApi.route("/", notifications);
 app.route("/api", tenantApi);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

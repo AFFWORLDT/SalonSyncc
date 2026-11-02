@@ -11,3 +11,4 @@ export * from "./tenant/expenses";
 export * from "./tenant/payouts";
 export * from "./tenant/assets";
 export * from "./tenant/audit-view";
+export * from "./tenant/notifications";

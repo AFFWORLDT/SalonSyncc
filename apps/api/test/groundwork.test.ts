@@ -121,9 +121,11 @@ describe("orgAppUrl", () => {
 
 describe("services seam", () => {
   afterEach(() => fakeServices().uninstall());
-  it("real clients by default (stubs until Tasks 3/6); a test override swaps them", async () => {
+  it("real clients by default (WhatsApp stub until Task 6); a test override swaps them", async () => {
     const real = services(env);
-    await expect(real.push.send(env, ["t"], { title: "x", body: "y" })).rejects.toThrow(/not implemented/);
+    // Real FCM client without FCM_SERVICE_ACCOUNT: a no-op, no network.
+    await expect(real.push.send({ ...env, FCM_SERVICE_ACCOUNT: undefined }, ["t"], { title: "x", body: "y" })).resolves.toEqual({ dead: [] });
+    await expect(real.wa.listTemplates({ phoneNumberId: "p", wabaId: "w", token: "t" })).rejects.toThrow(/not implemented/);
     const f = fakeServices();
     f.install();
     const r = await services(env).wa.sendTemplate({ phoneNumberId: "p", wabaId: "w", token: "t" }, "0501234567", "ss_bill", "en", ["Ali"]);
