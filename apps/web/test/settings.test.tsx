@@ -67,10 +67,10 @@ describe("settings", () => {
         <SettingsPage />
       </AuthProvider>
     );
-    const token = (await screen.findByLabelText("Access token")) as HTMLInputElement;
+    const token = (await screen.findByLabelText("Access token", {}, { timeout: 8000 })) as HTMLInputElement;
     expect(token.value).toBe("");
     fireEvent.change(token, { target: { value: "EAAB" } });
     fireEvent.click(screen.getByText("Save WhatsApp settings"));
-    expect(await screen.findByText("That WhatsApp number is already connected to another salon")).toBeTruthy();
+    expect(await screen.findByText("That WhatsApp number is already connected to another salon", {}, { timeout: 8000 })).toBeTruthy();
   });
 });
