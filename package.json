@@ -9,6 +9,8 @@
     "test": "node scripts/secret-scan.mjs && npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "secrets": "node scripts/secret-scan.mjs",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "build:web": "npm run build -w @ss/web",
+    "build:site": "npm run build -w @ss/site"
   }
 }

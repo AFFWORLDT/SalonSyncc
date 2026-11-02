@@ -125,3 +125,28 @@ Build env (`NEXT_PUBLIC_*`, not secret):
 ## Domain
 
 Salons live at `<slug>.salonkit.online` and the super admin at `admin.salonkit.online`. The zone is on the Affworld0 Cloudflare account, and the route `*.salonkit.online/*` is in `wrangler.jsonc`. The zone needs one proxied DNS record, `*` → AAAA `100::`, so the subdomains reach the Worker. The apex is kept for the marketing site (Plan 4).
+
+## Marketing site and signup (apps/site)
+
+`salonkit.online` (and `www`) is the marketing site: landing, pricing, signup and sign-in. It is a static export served by the assets-only Worker `salonkit-site`. `salonkit.online/api/*` goes to `salonkit-app`, which is a more specific route, so the signup form posts same-origin.
+
+How signup works:
+- `GET /api/public/slug?s=` checks whether a Salon ID is free.
+- `POST /api/public/signup` creates a 7-day Pro Max trial salon in one D1 batch (all or nothing). It is limited to 5 per IP per hour, and the Turnstile check is optional.
+- The response gives a single-use, 120-second `handoff_url`. Opening it on `<slug>.salonkit.online` signs the owner in, and the owner signs in later with their email and password.
+- The dashboard shows a setup checklist from `GET /api/settings/setup` until every step is done.
+
+```bash
+npm run dev -w @ss/site                 # :3001, /api proxied to wrangler on :8787
+npm run build -w @ss/site               # -> apps/site/out
+npm run e2e -w @ss/web                  # includes the signup -> handoff -> dashboard flow
+```
+
+Going live needs:
+- **DNS** in the `salonkit.online` zone: apex `@` and `www`, AAAA `100::`, proxied. The wildcard `*` record already exists.
+- **Turnstile (optional):** create a widget for `salonkit.online` in the Cloudflare dashboard.
+  - Run `wrangler secret put TURNSTILE_SECRET` in apps/api.
+  - Put `NEXT_PUBLIC_TURNSTILE_SITE_KEY=<site key>` in `apps/site/.env.production.local`, which is gitignored.
+- **Deploy:**
+  - Run `npm run db:migrate:remote` (or `wrangler d1 migrations apply salonkit-db --remote`) in apps/api, then build and deploy the web app and the API as before.
+  - Then deploy the site: `cd apps/site && npm run build && wrangler deploy`. Use `XDG_CONFIG_HOME=~/.wrangler-affworld`.
