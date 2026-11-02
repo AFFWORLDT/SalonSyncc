@@ -200,6 +200,35 @@ export function reportsRepo(db: D1Database, orgId: string) {
       return { year, barbers, months };
     },
 
+    /**
+     * One business day's totals for the cron's end-of-day summary push: the same numbers as `overview(day, day)`
+     * (totals, profit, and its top earner among per_barber with sales > 0, ties in sheet order) in 2 D1 statements
+     * (one batch) instead of overview's ~14, so it fits the cron's free-plan statement budget (jobs/hourly.ts).
+     */
+    async daySummary(day: string): Promise<Totals & { profit: number; top: { name: string; sales: number } | null }> {
+      const [t, best] = await db.batch([
+        db
+          .prepare(
+            `SELECT (SELECT COALESCE(SUM(amount),0) FROM sales WHERE org_id = ?1 AND deleted_at IS NULL AND day = ?2) AS sales,
+                    (SELECT COALESCE(SUM(commission),0) FROM sales WHERE org_id = ?1 AND deleted_at IS NULL AND day = ?2) AS commission,
+                    (SELECT COUNT(*) FROM sales WHERE org_id = ?1 AND deleted_at IS NULL AND day = ?2) AS count,
+                    (SELECT COALESCE(SUM(amount),0) FROM expenses WHERE org_id = ?1 AND day = ?2)
+                      + (SELECT COALESCE(SUM(amount),0) FROM company_expenses WHERE org_id = ?1 AND day = ?2) AS expense`,
+          )
+          .bind(orgId, day),
+        db
+          .prepare(
+            `SELECT u.name, SUM(s.amount) AS sales FROM sales s JOIN users u ON u.org_id = s.org_id AND u.id = s.barber_id
+             WHERE s.org_id = ?1 AND s.deleted_at IS NULL AND s.day = ?2
+             GROUP BY s.barber_id HAVING SUM(s.amount) > 0 ORDER BY sales DESC, u.sort_order, u.name LIMIT 1`,
+          )
+          .bind(orgId, day),
+      ]);
+      const totals = t!.results[0] as Totals;
+      const top = (best!.results[0] as { name: string; sales: number } | undefined) ?? null;
+      return { ...totals, profit: shopProfit(totals), top };
+    },
+
     /** Dashboard for a date range (default: today), compared with the same number of days just before it. */
     async overview(slug: string, clock: OrgClock, now: number, fromQ?: string, toQ?: string): Promise<Overview> {
       const today = businessDay(now, clock);

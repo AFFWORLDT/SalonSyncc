@@ -15,6 +15,7 @@ DELETE FROM services WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM audit_log WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM counters WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM login_failures WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM job_runs WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM users WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM org_settings WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM subscriptions WHERE org_id IN ('org_demo_alpha','org_demo_bravo');

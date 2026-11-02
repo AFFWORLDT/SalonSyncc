@@ -38,20 +38,21 @@ export function notificationsRepo(db: D1Database, orgId: string) {
     },
 
     /**
-     * One feed row per recipient. The INSERT ... SELECT only writes for ids that are users of this org, so an id from
-     * another org (or a deleted user) records nothing instead of tripping the FK.
+     * One feed row per recipient, in ONE statement (the cron counts D1 statements: jobs/hourly.ts). The INSERT ... SELECT
+     * only writes for ids that are users of this org, so an id from another org (or a deleted user) records nothing
+     * instead of tripping the FK. Rows are written in `userIds` order.
      */
     async record(userIds: number[], push: PushContent): Promise<void> {
       const ids = [...new Set(userIds)];
       if (!ids.length) return;
       const at = Date.now();
-      await db.batch(
-        ids.map((uid) =>
-          db
-            .prepare("INSERT INTO notifications (org_id, user_id, title, body, path, created_at) SELECT org_id, id, ?, ?, ?, ? FROM users WHERE org_id = ? AND id = ?")
-            .bind(push.title, push.body, push.path ?? "/", at, orgId, uid),
-        ),
-      );
+      await db
+        .prepare(
+          `INSERT INTO notifications (org_id, user_id, title, body, path, created_at)
+           SELECT u.org_id, u.id, ?, ?, ?, ? FROM json_each(?) j JOIN users u ON u.org_id = ? AND u.id = j.value ORDER BY j.key`,
+        )
+        .bind(push.title, push.body, push.path ?? "/", at, JSON.stringify(ids), orgId)
+        .run();
     },
 
     /** This org's device tokens for these users: the `limit` most recently updated (PUSH_MAX_TOKENS by default). */

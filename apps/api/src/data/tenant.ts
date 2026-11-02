@@ -16,3 +16,4 @@ export * from "./tenant/announcements";
 export * from "./tenant/ratings";
 export * from "./tenant/whatsapp";
 export * from "./tenant/wa-sql";
+export * from "./tenant/jobs";

@@ -1,6 +1,7 @@
 import { it, expect } from "vitest";
 import infraSrc from "../src/data/infra.ts?raw";
 import { TENANT_TABLES } from "../src/data/tenant";
+import { GLOBAL_RETENTION_SQL } from "../src/data/infra";
 import { checkStatement, scanSource, tenantStatements } from "./sql-guard";
 
 // Every .ts under src/data/tenant/ is scanned, each must hold at least one checked statement.
@@ -16,10 +17,13 @@ it("scans every file under src/data/tenant/ and each has checked statements", ()
   }
 });
 
-it("infra.ts (rate_hits) is global and not flagged", () => {
+it("infra.ts (rate_hits) is global; its only tenant-table SQL is the sanctioned age-based retention deletes", () => {
   expect(infraSrc).toMatch(/rate_hits/);
-  expect(scanSource(infraSrc)).toEqual({ checked: 0, violations: [] });
   expect(TENANT_TABLES).not.toContain("rate_hits");
+  // The cron's retention deletes (R5) are the one sanctioned unscoped tenant SQL: exactly these literals, each a bare
+  // "DELETE FROM <table> WHERE <time column> < ?" (no reads, no other conditions). Anything else in infra.ts is flagged.
+  expect(tenantStatements(infraSrc)).toEqual([...GLOBAL_RETENTION_SQL]);
+  for (const sql of GLOBAL_RETENTION_SQL) expect(sql).toMatch(/^DELETE FROM (login_failures|job_runs) WHERE (at|created_at) < \?$/);
 });
 
 it("every tenant table has a checked statement somewhere", () => {

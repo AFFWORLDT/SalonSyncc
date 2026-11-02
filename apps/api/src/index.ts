@@ -21,8 +21,11 @@ import { ratings } from "./tenant/ratings/routes";
 import { whatsapp } from "./tenant/whatsapp/routes";
 import { campaigns } from "./tenant/campaigns/routes";
 import { waWebhook } from "./integrations/wa-webhook";
+import { hourly } from "./jobs/hourly";
+import type { Env } from "./env";
 
-const app = new Hono<AppEnv>();
+/** The Hono app (also exported by name: tests read its route table). */
+export const app = new Hono<AppEnv>();
 
 app.get("/api/health", (c) => c.json({ ok: true, brand: c.env.BRAND_NAME }));
 
@@ -102,4 +105,10 @@ app.onError((err, c) => {
   return c.json({ error: "Something went wrong" }, 500);
 });
 
-export default app;
+// The Worker: HTTP through Hono, and the cron (wrangler.jsonc triggers, every 10 minutes) through jobs/hourly.ts.
+export default {
+  fetch: app.fetch,
+  scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(hourly(env, event.scheduledTime).catch((err) => console.error("cron failed", err)));
+  },
+};

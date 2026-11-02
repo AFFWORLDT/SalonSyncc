@@ -6,12 +6,16 @@
  * decremented BEFORE each Graph call and a job stops (leaving the rest due for the next run) when it reaches 0.
  * Overlapping runs (admin double-click, cron vs manual, cron vs the inline hook) never double-send: after the due
  * SELECT each job BULK-claims the rows in one UPDATE ... RETURNING id (stamp = `at`) and only messages the ids it won.
- * D1 cost per job (for Task 11's per-invocation query budget):
- *   setup: org lookup 1 + features (0 when cached, else 2-3) + org_whatsapp 1 + settings 1, then the due list 1
- *     (one SELECT ... LIMIT `limit`) + the claim 1 (skipped when nothing is due); 0 queries when `budget.left` is 0.
- *   per sent/failed/test-skipped item: exactly 1 D1 round trip (the wa_messages log row, batched with a failed
- *     reminder's claim release); a rating request skipped by the 20 h rule costs 0.
+ * D1 cost per job, in STATEMENTS (what the free plan counts; the cron's budget, jobs/hourly.ts):
+ *   setup without `pre`: org lookup 1 + features (0 when cached, else 1-3) + org_whatsapp 1 + settings 1; with the
+ *     cron's `pre` (settings from its org loader, lazy WA config): 0, plus org_whatsapp 1 on first need (only once
+ *     something is due). Then the due list 1 (one SELECT ... LIMIT `limit`) + the claim 1 (skipped when nothing is
+ *     due); 0 statements when `budget.left` is 0.
+ *   per sent/failed/test-skipped item: exactly 1 D1 round trip: the wa_messages log row (1 statement), batched with
+ *     the claim release for a FAILED visit reminder (2 statements); a rating request skipped by the 20 h rule costs 0.
  *   on a budget stop: 1 more (one UPDATE releasing every claimed-but-unsent row).
+ *   So with `pre`, worst case: runReminders 3 + 2*limit (+1 WA config), runFeedback / runFeedbackReminders
+ *   3 + limit (+1 WA config).
  * Opted-out customers are excluded by the due queries (RF3); a phone outside the org's test list is logged "skipped"
  * without a Graph call (and without spending budget).
  * The claims (wa_reminded_at, wa_feedback_at, wa_feedback_reminded_at) are stamped with the run time `at`.
@@ -39,7 +43,17 @@ export function inFeedbackHours(at: number, s: Pick<Settings, "timezone" | "day_
   return h >= FEEDBACK_HOURS.from && h < FEEDBACK_HOURS.to;
 }
 
-export type Budget = { left: number };
+/**
+ * Shared per-run budget: `left` = outbound Graph/FCM calls (decremented before each one). `stmts` = D1 statements
+ * left, set only by the cron and decremented by lib/metered.ts (the jobs never read it; the cron sizes `limit` from it).
+ */
+export type Budget = { left: number; stmts?: number };
+
+/** The cron's per-org context: settings from its one org-loader statement and the WA config, loaded on first use. */
+export interface JobPre {
+  s: Settings;
+  cfg: () => Promise<WaConfig | null>;
+}
 const empty = (): WaReminderRun => ({ due: 0, sent: 0, failed: 0, skipped: 0 });
 
 /** "Ali" for a real name; "Customer" for "Dear …" greetings when there is none. */
@@ -65,30 +79,36 @@ function ratingParams(env: Env, s: Settings, clock: OrgClock, kind: Picture, r: 
 }
 
 interface JobCtx {
-  cfg: WaConfig;
+  /** Resolved before setup returns (no `pre`) or on first call (cron `pre`): called only once something is due. */
+  cfg: () => Promise<WaConfig | null>;
   s: Settings;
   jobs: ReturnType<typeof waJobsRepo>;
   log: ReturnType<typeof waMessagesRepo>;
 }
 
-/** The org's WhatsApp setup and settings, or null when the org is gone or not WA-ready (no feature / no number). */
-async function setup(env: Env, orgId: string): Promise<JobCtx | null> {
+/**
+ * The org's WhatsApp setup and settings, or null when the org is gone or not WA-ready (no feature / no number). With
+ * the cron's `pre` nothing is read here: the cron already checked the feature and the number (its org loader).
+ */
+async function setup(env: Env, orgId: string, pre?: JobPre): Promise<JobCtx | null> {
+  const repos = { jobs: waJobsRepo(env.DB, orgId), log: waMessagesRepo(env.DB, orgId) };
+  if (pre) return { cfg: pre.cfg, s: pre.s, ...repos };
   const org = await platformRepo(env.DB).orgById(orgId);
   if (!org) return null;
   const cfg = await waSetup(env, org);
   if (!cfg) return null;
-  return { cfg, s: await settingsRepo(env.DB, orgId).get(), jobs: waJobsRepo(env.DB, orgId), log: waMessagesRepo(env.DB, orgId) };
+  return { cfg: async () => cfg, s: await settingsRepo(env.DB, orgId).get(), ...repos };
 }
 
 /**
  * One attempt: "skipped" for a phone outside the test list (no Graph call, no budget), null when the budget is spent
  * (the caller stops), else the Graph result after taking one from the budget.
  */
-async function attempt(env: Env, j: JobCtx, budget: Budget, phone: string, template: string, params: WaValue[]): Promise<SendResult | null> {
-  if (!allowedRecipient(j.cfg.testNumbers, phone, j.cfg.callingCode)) return { status: "skipped", error: "not in test numbers" };
+async function attempt(env: Env, j: JobCtx, cfg: WaConfig, budget: Budget, phone: string, template: string, params: WaValue[]): Promise<SendResult | null> {
+  if (!allowedRecipient(cfg.testNumbers, phone, cfg.callingCode)) return { status: "skipped", error: "not in test numbers" };
   if (budget.left <= 0) return null;
   budget.left--;
-  return services(env).wa.sendTemplate(j.cfg, phone, template, j.s.wa_language, params);
+  return services(env).wa.sendTemplate(cfg, phone, template, j.s.wa_language, params);
 }
 
 /**
@@ -96,14 +116,16 @@ async function attempt(env: Env, j: JobCtx, budget: Budget, phone: string, templ
  * reminded since, each sent the reminder template once. The claim stamps wa_reminded_at; a failed send restores the
  * previous value in the same batch as its log row, so it is tried again next run (FM); sent or skipped ones are done.
  */
-export async function runReminders(env: Env, orgId: string, at: number, limit: number, budget: Budget): Promise<WaReminderRun> {
+export async function runReminders(env: Env, orgId: string, at: number, limit: number, budget: Budget, pre?: JobPre): Promise<WaReminderRun> {
   const out = empty();
   if (budget.left <= 0) return out;
-  const j = await setup(env, orgId);
+  const j = await setup(env, orgId, pre);
   if (!j) return out;
   const clock = clockOf(j.s);
   const day = addDays(businessDay(at, clock), -j.s.wa_reminder_days);
   const found = await j.jobs.visitRemindersDue(businessDayStart(day, clock), businessDayStart(addDays(day, 1), clock), limit);
+  const cfg = found.length ? await j.cfg() : null;
+  if (!cfg) return out;
   const won = await j.jobs.claimReminders(found.map((c) => c.id), at);
   const due = found.filter((c) => won.has(c.id));
   out.due = due.length;
@@ -111,7 +133,7 @@ export async function runReminders(env: Env, orgId: string, at: number, limit: n
   for (let k = 0; k < due.length; k++) {
     const c = due[k]!;
     const params: WaValue[] = [picture(env, j.s, "fresh-cut"), dearName(c.name), String(j.s.wa_reminder_days)];
-    const r = await attempt(env, j, budget, c.phone, template, params);
+    const r = await attempt(env, j, cfg, budget, c.phone, template, params);
     if (!r) {
       await j.jobs.run([j.jobs.releaseReminders(due.slice(k).map((x) => [x.id, x.wa_reminded_at]), at)]);
       break;
@@ -128,14 +150,16 @@ export async function runReminders(env: Env, orgId: string, at: number, limit: n
  * (the inline request right after a sale). The claim marks each bill asked (sent, skipped or failed: FM keeps a
  * failed request done), and a customer is asked at most once per 20 hours: their other bills are done without a message.
  */
-export async function runFeedback(env: Env, orgId: string, at: number, limit: number, budget: Budget, saleId?: number): Promise<WaReminderRun> {
+export async function runFeedback(env: Env, orgId: string, at: number, limit: number, budget: Budget, saleId?: number, pre?: JobPre): Promise<WaReminderRun> {
   const out = empty();
   if (budget.left <= 0) return out;
-  const j = await setup(env, orgId);
+  const j = await setup(env, orgId, pre);
   if (!j) return out;
   const clock = clockOf(j.s);
   const cutoff = at - j.s.wa_feedback_delay_min * 60_000;
   const found = await j.jobs.feedbackDue(at - RECENT_MS, cutoff, cutoff - DAY_MS, saleId ?? null, limit);
+  const cfg = found.length ? await j.cfg() : null;
+  if (!cfg) return out;
   const won = await j.jobs.claimFeedback(found.map((r) => r.id), at);
   const due = found.filter((r) => won.has(r.id));
   out.due = due.length;
@@ -148,7 +172,7 @@ export async function runFeedback(env: Env, orgId: string, at: number, limit: nu
       continue;
     }
     const params = ratingParams(env, j.s, clock, "rating", row);
-    const r = await attempt(env, j, budget, row.phone, template, params);
+    const r = await attempt(env, j, cfg, budget, row.phone, template, params);
     if (!r) {
       // Unsent bills go back to due; ones skipped above for the 20 h rule stay done (FM marks them too).
       const unsent = due.slice(k).filter((x) => !x.recent && !asked.has(x.customer_id)).map((x) => x.id);
@@ -166,14 +190,16 @@ export async function runFeedback(env: Env, orgId: string, at: number, limit: nu
  * The one reminder: bills whose rating request was sent `wa_feedback_reminder_min` ago or more (within a day) and
  * whose customer neither rated nor tapped through to Google reviews. Each bill is reminded at most once (the claim).
  */
-export async function runFeedbackReminders(env: Env, orgId: string, at: number, limit: number, budget: Budget): Promise<WaReminderRun> {
+export async function runFeedbackReminders(env: Env, orgId: string, at: number, limit: number, budget: Budget, pre?: JobPre): Promise<WaReminderRun> {
   const out = empty();
   if (budget.left <= 0) return out;
-  const j = await setup(env, orgId);
+  const j = await setup(env, orgId, pre);
   if (!j || !j.s.wa_feedback_reminder_min) return out;
   const clock = clockOf(j.s);
   const cutoff = at - j.s.wa_feedback_reminder_min * 60_000;
   const found = await j.jobs.ratingReminderDue(cutoff, cutoff - DAY_MS, j.s.wa_feedback_template, limit);
+  const cfg = found.length ? await j.cfg() : null;
+  if (!cfg) return out;
   const won = await j.jobs.claimFeedbackReminder(found.map((r) => r.id), at);
   const due = found.filter((r) => won.has(r.id));
   out.due = due.length;
@@ -181,7 +207,7 @@ export async function runFeedbackReminders(env: Env, orgId: string, at: number, 
   for (let k = 0; k < due.length; k++) {
     const row = due[k]!;
     const params = ratingParams(env, j.s, clock, "rating-reminder", row);
-    const r = await attempt(env, j, budget, row.phone, template, params);
+    const r = await attempt(env, j, cfg, budget, row.phone, template, params);
     if (!r) {
       await j.jobs.run([j.jobs.releaseFeedbackReminder(due.slice(k).map((x) => x.id), at)]);
       break;

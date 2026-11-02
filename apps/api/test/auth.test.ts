@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
-import app from "../src/index";
+import { app } from "../src/index";
 import { sign } from "../src/core/crypto";
 import { makeOrg, makeUser, loginAs } from "./helpers";
 

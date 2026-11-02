@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
-import app, { tenantGuard } from "../src/index";
+import { app, tenantGuard } from "../src/index";
 import { HttpError } from "../src/core/errors";
 import { makeOrg, makeUser, loginAs } from "./helpers";
 import { CASES, type CrossOrgCase } from "./cross-org-cases";
