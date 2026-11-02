@@ -4,3 +4,4 @@ node_modules/
 .wrangler/
 out/
 .next/
+.superpowers/
