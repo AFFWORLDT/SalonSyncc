@@ -250,7 +250,7 @@ describe("/api/me today", () => {
     const b: any = await (await call("GET", "/me", owner)).json();
     expect(b.today).toBe("2026-03-11");
     expect(b.settings.timezone).toBe("Asia/Kolkata");
-    expect(Object.keys(b).sort()).toEqual(["brand", "features", "limits", "org", "settings", "subscription", "today", "user"]);
+    expect(Object.keys(b).sort()).toEqual(["brand", "features", "limits", "org", "settings", "subscription", "support", "today", "user"]);
     await env.DB.prepare("UPDATE org_settings SET timezone = ? WHERE org_id = ?").bind("Asia/Dubai", org.id).run();
     expect(((await (await call("GET", "/me", owner)).json()) as any).today).toBe("2026-03-10");
   });

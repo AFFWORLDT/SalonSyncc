@@ -16,7 +16,7 @@ export async function makeOrg(opts: { slug: string; plan?: PlanId; status?: OrgS
       .bind(id, name, (opts.slug.replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "ORG")),
     env.DB.prepare("INSERT INTO subscriptions(org_id) VALUES(?)").bind(id),
   ]);
-  return { id, slug: opts.slug, name, status, planId: plan, trialEndsAt: null, graceEndsAt: null };
+  return { id, slug: opts.slug, name, status, planId: plan, trialEndsAt: null, graceEndsAt: null, limitsOverride: null };
 }
 
 export async function makeUser(

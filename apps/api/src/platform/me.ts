@@ -30,6 +30,7 @@ export function registerMe(tenantApi: App): void {
       subscription: { status: org.status, planId: org.planId, trialEndsAt: org.trialEndsAt, graceEndsAt: org.graceEndsAt },
       brand: { name: c.env.BRAND_NAME },
       today: businessDay(Date.now(), clockOf(settings)),
+      support: c.var.tenant.supportBy !== null,
     };
     return c.json(body);
   });

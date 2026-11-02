@@ -45,9 +45,9 @@ export const originGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
 
 /**
  * D1 statements tenantAuth costs at most (unmetered, before a route runs): host org 1 + org 1 + user 1 + features 3
- * on a cold cache (plan features, plan limits, overrides). Routes metering their own work reserve this first.
+ * on a cold cache (plan features, plan limits, overrides) + 1 platform user check in support mode. Routes metering their own work reserve this first.
  */
-export const TENANT_AUTH_STMTS = 6;
+export const TENANT_AUTH_STMTS = 7;
 
 /**
  * Binds the request to exactly one org, taken ONLY from the signed session (and checked against the host).
@@ -74,8 +74,14 @@ export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     throw new HttpError(401, "Please sign in");
   }
 
+  // Support mode ends the moment the platform user is removed or changes their password.
+  if (session.sp !== undefined) {
+    const pu = await c.env.DB.prepare("SELECT session_version FROM platform_users WHERE id = ?").bind(session.sp).first<{ session_version: number }>();
+    if (!pu || pu.session_version !== session.spv) throw new HttpError(401, "Please sign in");
+  }
+
   const { features, limits } = await featuresFor(c.env.DB, org);
-  c.set("tenant", { org, user, repo, features, limits });
+  c.set("tenant", { org, user, repo, features, limits, supportBy: session.sp ?? null });
   await next();
 };
 

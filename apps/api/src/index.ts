@@ -8,6 +8,8 @@ import { auth } from "./platform/auth";
 import { publicApi } from "./core/public";
 // Registers /api/public/slug, /api/public/signup and /api/auth/handoff (before the routers are mounted below).
 import "./platform/signup";
+import "./platform/support";
+import { platformApi } from "./platform/admin";
 import { settings, logoPublic } from "./tenant/settings/routes";
 import { staff, avatarPublic } from "./tenant/staff/routes";
 import { services, servicesPublic } from "./tenant/services/routes";
@@ -33,6 +35,8 @@ export const app = new Hono<AppEnv>();
 app.get("/api/health", (c) => c.json({ ok: true, brand: c.env.BRAND_NAME }));
 
 app.route("/api/auth", auth);
+// The super admin panel's API (admin.<domain> only; its own ss_platform session). Before the tenant router.
+app.route("/api/platform", platformApi);
 
 // Public (no session) routes, before the tenant router so its guard never sees them.
 publicApi.route("/avatar", avatarPublic);

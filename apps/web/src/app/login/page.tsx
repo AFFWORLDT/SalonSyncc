@@ -28,7 +28,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   // A sign-in link in the address bar is checked first; a cached session must not skip past its outcome.
-  const [handingOff, setHandingOff] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("handoff"));
+  const [handingOff, setHandingOff] = useState(() => typeof window !== "undefined" && (new URLSearchParams(window.location.search).has("handoff") || new URLSearchParams(window.location.search).has("support")));
   useEffect(() => {
     if (!authLoading && user && !handingOff) router.replace("/");
   }, [authLoading, user, router, handingOff]);
@@ -39,10 +39,13 @@ export default function LoginPage() {
     const q = new URLSearchParams(window.location.search);
     setOrg(q.get("org") ?? lastOrg());
     // Fresh from signup: a single-use link signs the owner straight in.
+    // Or a support link from the SalonKit admin panel (Log in as salon): same single-use flow, a 2-hour session.
     const handoff = q.get("handoff");
-    if (handoff) {
+    const support = q.get("support");
+    if (handoff || support) {
       setLoading(true);
-      api("/api/auth/handoff", { body: { token: handoff, org: q.get("org") ?? undefined }, redirectOn401: false })
+      const org = q.get("org") ?? undefined;
+      api(handoff ? "/api/auth/handoff" : "/api/auth/support", { body: handoff ? { token: handoff, org } : { code: support, org }, redirectOn401: false })
         .then(() => refresh())
         .then(() => router.replace("/"))
         .catch(async (e) => {
@@ -51,7 +54,7 @@ export default function LoginPage() {
           await refresh();
           setHandingOff(false);
           window.history.replaceState(null, "", window.location.pathname + (q.get("org") ? `?org=${encodeURIComponent(q.get("org")!)}` : ""));
-          setError(errorMessage(e, "This sign-in link has expired. Sign in with your password."));
+          setError(errorMessage(e, handoff ? "This sign-in link has expired. Sign in with your password." : "This support link has expired."));
           setLoading(false);
         });
     }

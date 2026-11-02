@@ -78,3 +78,18 @@ export function ExpiredScreen() {
     </Card>
   );
 }
+
+/** Red bar while a SalonKit support person is signed in as the owner ("Log in as salon", 2 hours, audited). */
+export function SupportBanner() {
+  const { me, logout } = useAuth();
+  if (!me?.support) return null;
+  return (
+    <div role="alert" data-testid="support-banner" className="flex items-center justify-center gap-2 bg-destructive px-4 py-1.5 text-center text-xs font-semibold text-white">
+      <TriangleAlert className="size-3.5 shrink-0" />
+      <span>Support mode: you are signed in as {me.user.name} for {me.org.name}. Everything you do is recorded.</span>
+      <button type="button" onClick={() => void logout()} className="underline underline-offset-2">
+        End
+      </button>
+    </div>
+  );
+}
