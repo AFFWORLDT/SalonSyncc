@@ -61,6 +61,16 @@ describe("clock across zones and DST (RF2)", () => {
     const NY = { timezone: "America/New_York", dayStartHour: 2 };
     expect(businessDayStart("2026-03-08", NY)).toBe(Date.parse("2026-03-08T03:00:00-04:00"));
   });
+  it("half-hour-plus-quarter zone round-trips", () => {
+    const KT = { timezone: "Asia/Kathmandu", dayStartHour: 4 };
+    expect(businessDayStart("2026-11-02", KT)).toBe(Date.parse("2026-11-02T04:00:00+05:45"));
+    expect(businessDay(businessDayStart("2026-11-02", KT), KT)).toBe("2026-11-02");
+    expect(businessDay(businessDayStart("2026-11-02", KT) - 1, KT)).toBe("2026-11-01");
+  });
+  it("fall-back overlap picks the first repeated hour", () => {
+    const NY = { timezone: "America/New_York", dayStartHour: 1 };
+    expect(businessDayStart("2026-11-01", NY)).toBe(Date.parse("2026-11-01T01:00:00-04:00"));
+  });
   it("business day is wall-clock based around DST", () => {
     expect(businessDay(Date.parse("2026-03-29T03:30:00+01:00"), UK)).toBe("2026-03-28");
     expect(businessDay(Date.parse("2026-03-29T04:00:00+01:00"), UK)).toBe("2026-03-29");
@@ -153,6 +163,11 @@ describe("phones", () => {
     expect(canonicalPhone("123", "91")).toBeNull();
     expect(canonicalPhone("+1234567890123456", "91")).toBeNull();
     expect(canonicalPhone("abc", "91")).toBeNull();
+    expect(canonicalPhone("919876543210", "91")).toBe("+919876543210");
+    expect(canonicalPhone("9198765432", "91")).toBe("+919198765432");
+    expect(canonicalPhone("12345", "91")).toBeNull();
+    expect(canonicalPhone("+919876543210", "91")).toBe("+919876543210");
+    expect(canonicalPhone("123456789", "999")).toBe("+999123456789");
   });
   it("whatsapp digits", () => {
     expect(whatsappDigits("0501234567", "971")).toBe("971501234567");

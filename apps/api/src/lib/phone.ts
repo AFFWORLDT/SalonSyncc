@@ -3,6 +3,9 @@
  * 971 keeps FM's rules: local numbers are stored 05XXXXXXXX / 0[234679]XXXXXXX, foreign ones as +digits.
  * Any other code: stored as +<cc><national without leading 0>; a + or 00 prefix is kept as +digits.
  */
+/** National (significant) number length per calling code, used to tell "91XXXXXXXXXX" from a national number. */
+export const NATIONAL_LENGTHS: Record<string, number> = { "91": 10, "92": 10, "880": 10, "966": 9, "974": 8, "965": 8, "968": 8, "973": 8, "44": 10, "1": 10, "20": 10, "977": 10 };
+
 export function canonicalPhone(raw: unknown, callingCode: string): string | null {
   if (typeof raw !== "string") return null;
   const s = raw.replace(/[\s\-().]/g, "");
@@ -21,8 +24,13 @@ export function canonicalPhone(raw: unknown, callingCode: string): string | null
     if (s.startsWith("971") && s.length === 12) return uaeLocal(s.slice(3));
     return uaeLocal(s.startsWith("0") ? s.slice(1) : s);
   }
-  const digits = callingCode + (s.startsWith("0") ? s.slice(1) : s);
-  return digits.length >= 6 && digits.length <= 15 ? `+${digits}` : null;
+  let national = s.startsWith("0") ? s.slice(1) : s;
+  const len = NATIONAL_LENGTHS[callingCode];
+  if (len !== undefined) {
+    if (national.startsWith(callingCode) && national.length === callingCode.length + len) national = national.slice(callingCode.length);
+    if (national.length !== len) return null;
+  } else if (national.length < 6 || national.length > 14) return null;
+  return `+${callingCode}${national}`;
 }
 
 function uaeLocal(rest: string): string | null {
