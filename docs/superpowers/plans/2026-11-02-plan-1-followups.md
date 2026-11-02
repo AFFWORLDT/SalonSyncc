@@ -34,3 +34,20 @@ These come from the Plan 1 per-task reviews and the final review. Each was triag
   - A malformed `max_staff` JSON value becomes `null` (unlimited); consider `0`.
   - `test/env.d.ts` duplicates `Env`.
   - Test probes (`_whoami`, `_probe/*`) are registered in production behind auth and return 404 there.
+
+
+## From the Plan 2a final review: do at the start of Plan 3
+- **Stale avatar after clear and re-upload:** `clearAvatar` resets `avatar_v` to 0, so a new upload gets the same immutable URL again.
+  - Fix: never reset `avatar_v`; always increment it.
+  - Derive `has_avatar` from `avatar IS NOT NULL` instead of from `v`.
+- **`toUser` for inactive staff:** return `avatar_url: null`, because the public avatar route now 404s for inactive users.
+- **`PUT /api/sales/:id`:** a foreign-key failure (a service deleted mid-request) currently returns 500. Map it to 400 with "One of the services no longer exists", as create already does.
+
+## Carried into Plan 2b
+- **Edit and delete hooks** next to `hooks.afterSale`, for FM's "your sale was changed" barber push.
+- **Cron pruning** of `rate_hits` and `login_failures`.
+- **Org scoping in WhatsApp and push:**
+  - resolve the WhatsApp webhook's org from `phone_number_id`
+  - scope `adminIds()` by org
+  - remove the `MAX(id)` lookup from `wa_campaigns`
+- **Free plan:** no Queues. Send email via `waitUntil`, and have the hourly cron retry rows in `email_log` with status `failed` (spec D19).

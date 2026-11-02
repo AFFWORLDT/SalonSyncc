@@ -1,0 +1,38 @@
+# Plan 2a: controller rulings (decisions made during execution, each with what it costs if wrong)
+
+- Ruling: audit_log table moves into migration 0004 (Task 1) — T3/T4/T5 write audit rows before T6 — cost: none.
+- Ruling: data/tenant/audit.ts (auditStmt(db, orgId, …)) is created in Task 3 (first writer); Task 4 reuses it — cost: none.
+- Ruling: Task 5 services DELETE does not touch sale_items; Task 6 adds the `UPDATE sale_items SET service_id = NULL WHERE org_id=? AND service_id=?` statement to the services delete batch + a test — avoids sqlite_master probing — cost: none.
+- Ruling: Task 1 defines PUBLIC_LIMITS/minuteWindow in src/lib/limits.ts directly (Task 2 then adds the rest to the same file) — cost: none.
+- Ruling: FM columns with ON DELETE SET NULL (audit_log.actor_id, ledger_entries.actor_id, company_expenses/payouts/transfers.created_by, etc.) get NO composite FK — a composite SET NULL would null org_id too and violate NOT NULL; they keep a plain INTEGER (actor_name snapshot where FM has one); users are deactivated not deleted when referenced anyway — cost: no DB-level guard on those actor columns (app sets them from the session user, never from input).
+- Ruling: /api/me shape = Plan 1 shape + `today` + full `settings` (Task 3); contract `MeResponse` must mirror exactly {user, org, settings, features, limits, subscription, brand, today} — Task 3 updates the contract — cost: none.
+- Ruling: add positive control (A's owner same route ≠ 404) to every cross-org case — prevents vacuous passes from typo'd paths — cost: case bodies must be valid for the owner.
+- Ruling: phone uses a NATIONAL_LENGTHS table (IN/PK/BD 10, SA 9, QA/KW/OM/BH 8, GB 10, NANP 10, EG 10, NP 10) to strip a typed cc and validate national length; unknown codes 6..14 national digits — cost: unlisted countries get looser validation; table can grow.
+- Ruling: lockout check precedes password verification and returns identical 429 regardless of password; unknown-org login hits only the IP limiter — prevents lockout probing as a password oracle — cost: none.
+- Ruling: PUT /settings keeps FM full-replace semantics with named columns — cost: frontend must send all editable fields.
+- Ruling: restore FM/plan three-key lockout (ip 20 via rate_hits, u:user|ip 8 and u:user 50 in org-scoped login_failures) — plan Task 2 design, FM's documented intent — cost: none.
+- Ruling: settings hardening folded in: username cap 60, full round-trip assertion, helper prefix sanitising, tz/locale canonicalisation, currency change rejected when minor-unit digits differ, password-change attempts rate-limited, next ≤200 — cost: small.
+- Ruling: lockout keys get distinct kind prefixes + encodeURIComponent(username) — cost: none.
+- Ruling: usernames unique and looked up case-insensitively per org (FM COLLATE NOCASE parity) — cost: none.
+- Ruling: avatarUrl includes ?org=<slug> so public avatars work on workers.dev — cost: none.
+- Ruling: userHasActivity helper checks only existing tables; Tasks 6/9/10 extend it — cost: must remember (TODO in code + this line).
+- Ruling: migration 0005_users_ci (UNIQUE (org_id, lower(username))); plan's later migrations renumber (+1): sales 0006, expenses 0007, ledger 0008 — cost: plan text numbers are off by one; briefs must say so.
+- Ruling: staff-limit made atomic (conditional INSERT/UPDATE); avatar content-length early reject; admins can't change the owner's avatar — cost: none.
+- Ruling: service prices are entered in major units (FM parity) and stored in minor units via toMinor(currency_minor); public services answers CORS preflight — cost: none.
+- Ruling: Task 6 migration is 0006_sales.sql; audit_log not recreated; services DELETE gains sale_items null-out; userHasActivity counts sales + ledger — cost: none.
+- Ruling: admin past-day sales allowed only for days ≤ today (no future) and only for active barber/admin of the same org — cost: none.
+- Ruling: plan defect — FM resolveItems uses the barber-typed item price when given, catalogue price only as default; inactive same-org services allowed; only missing-in-org service is an error — FM is the behaviour authority per plan Architecture — cost: none (restores FM).
+- Ruling: >30 items stays 400 (explicit vs FM silent truncation); owner selectable as barber — cost: UI must cap at 30.
+- Ruling: Task 6 hook/stats hardening folded into Task 7 (same file); single afterSale seam (creates only) — cost: Plan 2b adds edit/delete hooks if needed.
+- Ruling: PUT /sales recomputation mirrors FM PUT exactly — cost: none.
+- Ruling: fix now with optimistic concurrency (updated_at compare-and-set + `when` guards on items/audit/ledger; 409 code "stale") — ledger integrity is the money invariant (lesson 0012) — cost: clients must handle 409 stale (reload).
+- Ruling: Task 8 creates 0007_expenses.sql (expenses, company_expenses w/ uid); Task 10 ledger migration becomes 0008 — cost: none.
+- Ruling: report data functions take an explicit today/now (no Date.now in data layer) — deterministic tests — cost: none.
+- Ruling: plan defect — brief said free org /daily 403, but PLAN_DEFAULTS free includes daily_sheet (spec §7.1); implementer's tests (free /monthly 403, /daily gate via override) are correct — cost: none.
+- Ruling: every edit/delete that reverses+reposts ledger lines (company expenses, barber expense upsert, payouts, transfers, openings) uses the Task 7 optimistic-concurrency pattern (updated_at compare-and-set + `when` guards, 409 code "stale") — same ledger-integrity invariant — cost: ~20 lines per module.
+- Ruling: CustomerDetail follows FM's contract (visits via GET /sales?customer_id), not the dispatch note's "recent sales" — FM is behaviour authority — cost: none.
+- Ruling: barber without can_add_expense → 403 (brief RF5) vs FM 400 — cost: frontend error handling must treat both.
+- Ruling: ledger migration is 0008_ledger.sql; opening balances use a compare-and-set on the live opening lines read (fail-closed) — cost: concurrent opening edits get 409.
+- Ruling: payout PUT may keep an existing (since-deactivated) barber; switching requires an active one — editing historic payouts must stay possible — cost: none.
+- Ruling: fold avatar v-check + own bucket, seed ledger lines, FK→400, broader userHasActivity into the fix wave — Plan 3 consumes these first — cost: small.
+- Ruling: park the three residuals as must-do items at the start of Plan 3 (first consumer of avatars/sale edit UI) — no second fix wave per process; none affect money or isolation — cost: stale avatar possible until Plan 3 fixes it.
