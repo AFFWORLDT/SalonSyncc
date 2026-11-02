@@ -17,7 +17,7 @@ export interface PushSend {
  * In-memory WhatsApp + push clients that record every call. `install()` swaps them in through the services seam;
  * call `uninstall()` (or `setServicesForTest(null)`) in afterEach.
  */
-export function fakeServices(opts: { send?: (s: WaSend) => SendResult; dead?: string[] } = {}) {
+export function fakeServices(opts: { send?: (s: WaSend) => SendResult | Promise<SendResult>; dead?: string[] } = {}) {
   const wa: WaSend[] = [];
   const pushes: PushSend[] = [];
   let n = 0;
@@ -26,7 +26,7 @@ export function fakeServices(opts: { send?: (s: WaSend) => SendResult; dead?: st
       async sendTemplate(cfg, phone, template, lang, params) {
         const s = { cfg, phone, template, lang, params };
         wa.push(s);
-        return opts.send ? opts.send(s) : { status: "sent", wa_id: `wamid.fake${++n}` };
+        return opts.send ? await opts.send(s) : { status: "sent", wa_id: `wamid.fake${++n}` };
       },
       async uploadMedia() {
         return `media_fake${++n}`;

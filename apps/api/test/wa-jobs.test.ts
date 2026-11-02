@@ -383,3 +383,113 @@ describe("POST /api/wa/reminders/run and /api/wa/feedback/run", () => {
     expect(f.wa.map((s) => s.template)).toEqual(["ss_rating", "ss_rating", "ss_rating_reminder"]);
   });
 });
+
+/** A FakeWa whose sends wait for `open()`: lets two runs overlap before either finishes. */
+function gated() {
+  let open!: () => void;
+  const gate = new Promise<void>((r) => (open = r));
+  const svc = install({ send: async () => (await gate, { status: "sent", wa_id: `wamid.g${Math.random()}` }) });
+  return { svc, release: () => setTimeout(open, 150) };
+}
+
+describe("bulk claim: overlapping runs never double-send (I1)", () => {
+  it("two overlapping runFeedback calls: exactly one Graph call per sale", async () => {
+    const g = gated();
+    const a = await setup("wj-c-fb");
+    const s1 = await newSale(a.k1);
+    const s2 = await newSale(a.k1);
+    const at = Date.now() + 1000;
+    g.release();
+    const [r1, r2] = await Promise.all([runFeedback(E, a.org.id, at, 40, { left: 40 }), runFeedback(E, a.org.id, at + 1, 40, { left: 40 })]);
+    expect(r1.sent + r2.sent).toBe(2);
+    expect(f.wa).toHaveLength(2);
+    expect(f.wa.map((s) => (s.params.at(-1) as any).text).sort()).toEqual([s1.token, s2.token].sort());
+    expect((await messages(a.org.id)).length).toBe(2);
+  });
+
+  it("two overlapping runReminders calls: exactly one Graph call per customer", async () => {
+    const g = gated();
+    const a = await setup("wj-c-vr");
+    await setSettings(a.org.id, "wa_reminder_days = 15");
+    const now = Date.now();
+    await customer(a.org.id, "+971500000081", now - 15 * DAY);
+    await customer(a.org.id, "+971500000082", now - 15 * DAY + 1);
+    g.release();
+    const [r1, r2] = await Promise.all([runReminders(E, a.org.id, now, 40, { left: 40 }), runReminders(E, a.org.id, now + 1, 40, { left: 40 })]);
+    expect(r1.sent + r2.sent).toBe(2);
+    expect(f.wa.map((s) => s.phone).sort()).toEqual(["+971500000081", "+971500000082"]);
+  });
+
+  it("overlapping rating reminders: one per bill", async () => {
+    install();
+    const a = await setup("wj-c-rr");
+    await newSale(a.k1);
+    const t0 = Date.now() + 1000;
+    await runFeedback(E, a.org.id, t0, 40, { left: 40 });
+    const g = gated();
+    g.release();
+    const later = t0 + 121 * 60_000;
+    const [r1, r2] = await Promise.all([runFeedbackReminders(E, a.org.id, later, 40, { left: 40 }), runFeedbackReminders(E, a.org.id, later + 1, 40, { left: 40 })]);
+    expect(r1.sent + r2.sent).toBe(1);
+    expect(g.svc.wa).toHaveLength(1);
+  });
+
+  it("two concurrent POST /api/wa/feedback/run: no duplicate sends", async () => {
+    const g = gated();
+    const a = await setup("wj-c-route");
+    await newSale(a.k1);
+    await newSale(a.k1);
+    g.release();
+    const [x, y] = await Promise.all([call("POST", "/wa/feedback/run", a.ck), call("POST", "/wa/feedback/run", a.ck)]);
+    const [bx, by] = [await json(x), await json(y)];
+    expect(bx.sent + by.sent).toBe(2);
+    expect(f.wa).toHaveLength(2);
+    expect(new Set(f.wa.map((s) => s.phone)).size).toBe(2);
+  });
+
+  it("a budget stop releases the unsent claims: they go out next run (feedback, reminders, rating reminders)", async () => {
+    install();
+    const a = await setup("wj-c-release");
+    await setSettings(a.org.id, "wa_reminder_days = 15");
+    for (let i = 0; i < 3; i++) await newSale(a.k1);
+    const now = Date.now();
+    for (let i = 0; i < 3; i++) await customer(a.org.id, `+97150000009${i}`, now - 15 * DAY + i, { reminded: 5 });
+    expect((await runFeedback(E, a.org.id, now + 1000, 40, { left: 1 })).sent).toBe(1);
+    const open = await env.DB.prepare("SELECT COUNT(*) AS n FROM sales WHERE org_id = ? AND wa_feedback_at IS NULL").bind(a.org.id).first<any>();
+    expect(open.n).toBe(2);
+    expect((await runReminders(E, a.org.id, now, 40, { left: 1 })).sent).toBe(1);
+    // released customers get their previous wa_reminded_at back
+    const prev = await env.DB.prepare("SELECT COUNT(*) AS n FROM customers WHERE org_id = ? AND wa_reminded_at = 5").bind(a.org.id).first<any>();
+    expect(prev.n).toBe(2);
+    const t1 = now + 2000;
+    expect((await runFeedback(E, a.org.id, t1, 40, { left: 40 })).sent).toBe(2);
+    expect((await runReminders(E, a.org.id, now + 1, 40, { left: 40 })).sent).toBe(2);
+    const later = t1 + 121 * 60_000;
+    expect((await runFeedbackReminders(E, a.org.id, later, 40, { left: 1 })).sent).toBe(1);
+    expect((await runFeedbackReminders(E, a.org.id, later, 40, { left: 40 })).sent).toBe(2);
+    expect(f.wa).toHaveLength(9);
+  });
+
+  it("the reminder window follows the DST change (Europe/London, 25-hour business day)", async () => {
+    install();
+    const a = await setup("wj-dst");
+    // Business day 2026-10-24 (04:00 BST = 03:00Z) runs to 2026-10-25 04:00 GMT = 04:00Z: 25 hours.
+    await setSettings(a.org.id, "timezone = 'Europe/London', day_start_hour = 4, phone_country = '44', wa_reminder_days = 2");
+    await customer(a.org.id, "+447700900001", Date.UTC(2026, 9, 24, 3, 0)); // first minute of 10-24
+    await customer(a.org.id, "+447700900002", Date.UTC(2026, 9, 25, 3, 30)); // 03:30 GMT: still 10-24 (the 25th hour)
+    await customer(a.org.id, "+447700900003", Date.UTC(2026, 9, 24, 2, 59)); // 03:59 BST: 10-23
+    await customer(a.org.id, "+447700900004", Date.UTC(2026, 9, 25, 4, 0)); // 10-25
+    expect((await runReminders(E, a.org.id, Date.UTC(2026, 9, 26, 12, 0), 40, { left: 40 })).sent).toBe(2);
+    expect(f.wa.map((s) => s.phone)).toEqual(["+447700900001", "+447700900002"]);
+  });
+
+  it("afterSale: a throwing bill send never stops the inline rating request", async () => {
+    install({ send: (s) => { if (s.template === "ss_bill") throw new Error("graph down"); return { status: "sent", wa_id: "wamid.r" }; } });
+    const a = await setup("wj-legs");
+    await setSettings(a.org.id, "wa_bill_auto = 1, wa_feedback_enabled = 1, wa_feedback_delay_min = 0");
+    const sale = await newSale(a.k1);
+    await flush();
+    expect(f.wa.map((s) => s.template).sort()).toEqual(["ss_bill", "ss_rating"]);
+    expect((await messages(a.org.id)).map((r) => [r.kind, r.sale_id])).toEqual([["feedback", sale.id]]);
+  });
+});

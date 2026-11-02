@@ -4,13 +4,17 @@
  *
  * Budget (Workers free plan, D19): every job takes a shared `budget: { left }` of outbound Graph calls. `left` is
  * decremented BEFORE each Graph call and a job stops (leaving the rest due for the next run) when it reaches 0.
+ * Overlapping runs (admin double-click, cron vs manual, cron vs the inline hook) never double-send: after the due
+ * SELECT each job BULK-claims the rows in one UPDATE ... RETURNING id (stamp = `at`) and only messages the ids it won.
  * D1 cost per job (for Task 11's per-invocation query budget):
  *   setup: org lookup 1 + features (0 when cached, else 2-3) + org_whatsapp 1 + settings 1, then the due list 1
- *     (one SELECT ... LIMIT `limit`); 0 queries in total when `budget.left` is already 0.
- *   per item: exactly 1 D1 round trip (the wa_messages log row batched with the item's "done" mark).
+ *     (one SELECT ... LIMIT `limit`) + the claim 1 (skipped when nothing is due); 0 queries when `budget.left` is 0.
+ *   per sent/failed/test-skipped item: exactly 1 D1 round trip (the wa_messages log row, batched with a failed
+ *     reminder's claim release); a rating request skipped by the 20 h rule costs 0.
+ *   on a budget stop: 1 more (one UPDATE releasing every claimed-but-unsent row).
  * Opted-out customers are excluded by the due queries (RF3); a phone outside the org's test list is logged "skipped"
  * without a Graph call (and without spending budget).
- * "Done" marks (wa_reminded_at, wa_feedback_at, wa_feedback_reminded_at) are stamped with the run time `at`.
+ * The claims (wa_reminded_at, wa_feedback_at, wa_feedback_reminded_at) are stamped with the run time `at`.
  * Like FM, the jobs don't check wa_*_enabled or the hour (the cron does, Task 11; the manual run routes don't).
  */
 import type { Settings, WaReminderRun } from "@ss/contract";
@@ -88,8 +92,8 @@ async function attempt(env: Env, j: JobCtx, budget: Budget, phone: string, templ
 
 /**
  * Customers whose last visit was exactly `wa_reminder_days` business days ago (org clock) and who have not been
- * reminded since, each sent the reminder template once. A failed send is tried again on the next run; sent or
- * skipped ones are done.
+ * reminded since, each sent the reminder template once. The claim stamps wa_reminded_at; a failed send restores the
+ * previous value in the same batch as its log row, so it is tried again next run (FM); sent or skipped ones are done.
  */
 export async function runReminders(env: Env, orgId: string, at: number, limit: number, budget: Budget): Promise<WaReminderRun> {
   const out = empty();
@@ -98,15 +102,21 @@ export async function runReminders(env: Env, orgId: string, at: number, limit: n
   if (!j) return out;
   const clock = clockOf(j.s);
   const day = addDays(businessDay(at, clock), -j.s.wa_reminder_days);
-  const due = await j.jobs.visitRemindersDue(businessDayStart(day, clock), businessDayStart(addDays(day, 1), clock), limit);
+  const found = await j.jobs.visitRemindersDue(businessDayStart(day, clock), businessDayStart(addDays(day, 1), clock), limit);
+  const won = await j.jobs.claimReminders(found.map((c) => c.id), at);
+  const due = found.filter((c) => won.has(c.id));
   out.due = due.length;
   const template = j.s.wa_reminder_template;
-  for (const c of due) {
+  for (let k = 0; k < due.length; k++) {
+    const c = due[k]!;
     const params: WaValue[] = [picture(env, j.s, "fresh-cut"), dearName(c.name), String(j.s.wa_reminder_days)];
     const r = await attempt(env, j, budget, c.phone, template, params);
-    if (!r) break;
+    if (!r) {
+      await j.jobs.run([j.jobs.releaseReminders(due.slice(k).map((x) => [x.id, x.wa_reminded_at]), at)]);
+      break;
+    }
     const log = j.log.logStatement({ kind: "reminder", phone: c.phone, template, params, customerId: c.id }, r);
-    await j.jobs.run(r.status === "failed" ? [log] : [log, j.jobs.markReminded(c.id, at)]);
+    await j.jobs.run(r.status === "failed" ? [log, j.jobs.releaseReminders([[c.id, c.wa_reminded_at]], at)] : [log]);
     out[r.status]++;
   }
   return out;
@@ -114,8 +124,8 @@ export async function runReminders(env: Env, orgId: string, at: number, limit: n
 
 /**
  * Asks for a rating on bills made `wa_feedback_delay_min` ago or more (within the last day), or only `saleId`
- * (the inline request right after a sale). Each bill is asked once (sent, skipped or failed), and a customer at
- * most once per 20 hours: their other bills are marked done without a message.
+ * (the inline request right after a sale). The claim marks each bill asked (sent, skipped or failed: FM keeps a
+ * failed request done), and a customer is asked at most once per 20 hours: their other bills are done without a message.
  */
 export async function runFeedback(env: Env, orgId: string, at: number, limit: number, budget: Budget, saleId?: number): Promise<WaReminderRun> {
   const out = empty();
@@ -124,29 +134,36 @@ export async function runFeedback(env: Env, orgId: string, at: number, limit: nu
   if (!j) return out;
   const clock = clockOf(j.s);
   const cutoff = at - j.s.wa_feedback_delay_min * 60_000;
-  const due = await j.jobs.feedbackDue(at - RECENT_MS, cutoff, cutoff - DAY_MS, saleId ?? null, limit);
+  const found = await j.jobs.feedbackDue(at - RECENT_MS, cutoff, cutoff - DAY_MS, saleId ?? null, limit);
+  const won = await j.jobs.claimFeedback(found.map((r) => r.id), at);
+  const due = found.filter((r) => won.has(r.id));
   out.due = due.length;
   const template = j.s.wa_feedback_template;
   const asked = new Set<number>();
-  for (const row of due) {
-    const stmts: D1PreparedStatement[] = [];
-    if (!row.recent && !asked.has(row.customer_id)) {
-      const params = ratingParams(env, j.s, clock, "rating", row);
-      const r = await attempt(env, j, budget, row.phone, template, params);
-      if (!r) break;
-      asked.add(row.customer_id);
-      stmts.push(j.log.logStatement({ kind: "feedback", phone: row.phone, template, params, customerId: row.customer_id, saleId: row.id }, r));
-      out[r.status]++;
-    } else out.skipped++;
-    stmts.push(j.jobs.markFeedback(row.id, at));
-    await j.jobs.run(stmts);
+  for (let k = 0; k < due.length; k++) {
+    const row = due[k]!;
+    if (row.recent || asked.has(row.customer_id)) {
+      out.skipped++; // already claimed = done; nothing to write
+      continue;
+    }
+    const params = ratingParams(env, j.s, clock, "rating", row);
+    const r = await attempt(env, j, budget, row.phone, template, params);
+    if (!r) {
+      // Unsent bills go back to due; ones skipped above for the 20 h rule stay done (FM marks them too).
+      const unsent = due.slice(k).filter((x) => !x.recent && !asked.has(x.customer_id)).map((x) => x.id);
+      await j.jobs.run([j.jobs.releaseFeedback(unsent, at)]);
+      break;
+    }
+    asked.add(row.customer_id);
+    await j.jobs.run([j.log.logStatement({ kind: "feedback", phone: row.phone, template, params, customerId: row.customer_id, saleId: row.id }, r)]);
+    out[r.status]++;
   }
   return out;
 }
 
 /**
  * The one reminder: bills whose rating request was sent `wa_feedback_reminder_min` ago or more (within a day) and
- * whose customer neither rated nor tapped through to Google reviews. Each bill is reminded at most once.
+ * whose customer neither rated nor tapped through to Google reviews. Each bill is reminded at most once (the claim).
  */
 export async function runFeedbackReminders(env: Env, orgId: string, at: number, limit: number, budget: Budget): Promise<WaReminderRun> {
   const out = empty();
@@ -155,17 +172,20 @@ export async function runFeedbackReminders(env: Env, orgId: string, at: number, 
   if (!j || !j.s.wa_feedback_reminder_min) return out;
   const clock = clockOf(j.s);
   const cutoff = at - j.s.wa_feedback_reminder_min * 60_000;
-  const due = await j.jobs.ratingReminderDue(cutoff, cutoff - DAY_MS, j.s.wa_feedback_template, limit);
+  const found = await j.jobs.ratingReminderDue(cutoff, cutoff - DAY_MS, j.s.wa_feedback_template, limit);
+  const won = await j.jobs.claimFeedbackReminder(found.map((r) => r.id), at);
+  const due = found.filter((r) => won.has(r.id));
   out.due = due.length;
   const template = j.s.wa_feedback_reminder_template;
-  for (const row of due) {
+  for (let k = 0; k < due.length; k++) {
+    const row = due[k]!;
     const params = ratingParams(env, j.s, clock, "rating-reminder", row);
     const r = await attempt(env, j, budget, row.phone, template, params);
-    if (!r) break;
-    await j.jobs.run([
-      j.log.logStatement({ kind: "feedback", phone: row.phone, template, params, customerId: row.customer_id, saleId: row.id }, r),
-      j.jobs.markFeedbackReminded(row.id, at),
-    ]);
+    if (!r) {
+      await j.jobs.run([j.jobs.releaseFeedbackReminder(due.slice(k).map((x) => x.id), at)]);
+      break;
+    }
+    await j.jobs.run([j.log.logStatement({ kind: "feedback", phone: row.phone, template, params, customerId: row.customer_id, saleId: row.id }, r)]);
     out[r.status]++;
   }
   return out;

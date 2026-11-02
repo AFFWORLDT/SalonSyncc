@@ -13,6 +13,7 @@ const SERVICES = `(SELECT group_concat(CASE WHEN i.qty > 1 THEN i.name || ' x' |
 /**
  * Sales due a rating request. Binds: ?1 org, ?2 "recent" cutoff (one request per customer per 20 h), ?3 newest
  * created_at, ?4 oldest created_at, ?5 one sale id or NULL for all, ?6 limit. Opted-out customers never come back (RF3).
+ * `recent` intentionally counts any feedback row (sent, skipped or failed, request or reminder), as FM does.
  */
 export const FEEDBACK_DUE_SQL = `SELECT s.id, s.token, s.customer_id, s.created_at, c.name, c.phone, u.name AS barber_name,
        ${SERVICES},
@@ -40,7 +41,7 @@ export const RATING_REMINDER_DUE_SQL = `SELECT s.id, s.token, s.customer_id, s.c
  * Customers due the visit reminder. Binds: ?1 org, ?2 business-day start, ?3 next business-day start, ?4 limit.
  * Not reminded since the last visit, not opted out (RF3).
  */
-export const VISIT_REMINDER_DUE_SQL = `SELECT id, name, phone FROM customers
+export const VISIT_REMINDER_DUE_SQL = `SELECT id, name, phone, wa_reminded_at FROM customers
      WHERE org_id = ?1 AND phone IS NOT NULL AND wa_opt_out = 0 AND last_visit_at >= ?2 AND last_visit_at < ?3
        AND COALESCE(wa_reminded_at, 0) < last_visit_at
      ORDER BY last_visit_at LIMIT ?4`;
@@ -62,9 +63,17 @@ export interface VisitDueRow {
   id: number;
   name: string | null;
   phone: string;
+  wa_reminded_at: number | null;
 }
 
-/** The jobs' due lists (one SELECT each) and the per-item "done" marks (statements, batched with the send log). */
+/** Ids of the rows an UPDATE ... RETURNING id claimed. */
+const ids = (r: D1Result<{ id: number }>) => new Set(r.results.map((x) => x.id));
+
+/**
+ * The jobs' due lists (one SELECT each), the BULK claims (one UPDATE ... RETURNING per job, before any send, so
+ * overlapping runs never message the same row twice) and their releases. Ids travel as a JSON array (json_each).
+ * Every release only touches rows still carrying this run's claim stamp `at`.
+ */
 export function waJobsRepo(db: D1Database, orgId: string) {
   return {
     async feedbackDue(recentSince: number, newest: number, oldest: number, saleId: number | null, limit: number): Promise<FeedbackDueRow[]> {
@@ -76,16 +85,65 @@ export function waJobsRepo(db: D1Database, orgId: string) {
     async visitRemindersDue(from: number, to: number, limit: number): Promise<VisitDueRow[]> {
       return (await db.prepare(VISIT_REMINDER_DUE_SQL).bind(orgId, from, to, limit).all<VisitDueRow>()).results;
     },
-    markFeedback(saleId: number, at: number): D1PreparedStatement {
-      return db.prepare("UPDATE sales SET wa_feedback_at = ? WHERE org_id = ? AND id = ?").bind(at, orgId, saleId);
+
+    /** Claims the not-yet-asked sales among `saleIds` (wa_feedback_at = at); returns the ids this run won. */
+    async claimFeedback(saleIds: number[], at: number): Promise<Set<number>> {
+      if (!saleIds.length) return new Set();
+      const r = await db
+        .prepare("UPDATE sales SET wa_feedback_at = ?3 WHERE org_id = ?1 AND id IN (SELECT value FROM json_each(?2)) AND wa_feedback_at IS NULL RETURNING id")
+        .bind(orgId, JSON.stringify(saleIds), at)
+        .all<{ id: number }>();
+      return ids(r);
     },
-    markFeedbackReminded(saleId: number, at: number): D1PreparedStatement {
-      return db.prepare("UPDATE sales SET wa_feedback_reminded_at = ? WHERE org_id = ? AND id = ?").bind(at, orgId, saleId);
+    /** Hands back claimed-but-unsent sales (budget ran out): due again next run. */
+    releaseFeedback(saleIds: number[], at: number): D1PreparedStatement {
+      return db
+        .prepare("UPDATE sales SET wa_feedback_at = NULL WHERE org_id = ?1 AND id IN (SELECT value FROM json_each(?2)) AND wa_feedback_at = ?3")
+        .bind(orgId, JSON.stringify(saleIds), at);
     },
-    markReminded(customerId: number, at: number): D1PreparedStatement {
-      return db.prepare("UPDATE customers SET wa_reminded_at = ? WHERE org_id = ? AND id = ?").bind(at, orgId, customerId);
+
+    /** Claims the not-yet-reminded sales among `saleIds` (wa_feedback_reminded_at = at). */
+    async claimFeedbackReminder(saleIds: number[], at: number): Promise<Set<number>> {
+      if (!saleIds.length) return new Set();
+      const r = await db
+        .prepare(
+          "UPDATE sales SET wa_feedback_reminded_at = ?3 WHERE org_id = ?1 AND id IN (SELECT value FROM json_each(?2)) AND wa_feedback_reminded_at IS NULL RETURNING id",
+        )
+        .bind(orgId, JSON.stringify(saleIds), at)
+        .all<{ id: number }>();
+      return ids(r);
     },
-    /** One D1 round trip for an item's writes. */
+    releaseFeedbackReminder(saleIds: number[], at: number): D1PreparedStatement {
+      return db
+        .prepare("UPDATE sales SET wa_feedback_reminded_at = NULL WHERE org_id = ?1 AND id IN (SELECT value FROM json_each(?2)) AND wa_feedback_reminded_at = ?3")
+        .bind(orgId, JSON.stringify(saleIds), at);
+    },
+
+    /** Claims the customers among `customerIds` not reminded since their last visit (wa_reminded_at = at). */
+    async claimReminders(customerIds: number[], at: number): Promise<Set<number>> {
+      if (!customerIds.length) return new Set();
+      const r = await db
+        .prepare(
+          "UPDATE customers SET wa_reminded_at = ?3 WHERE org_id = ?1 AND id IN (SELECT value FROM json_each(?2)) AND COALESCE(wa_reminded_at, 0) < last_visit_at RETURNING id",
+        )
+        .bind(orgId, JSON.stringify(customerIds), at)
+        .all<{ id: number }>();
+      return ids(r);
+    },
+    /**
+     * Restores each customer's previous wa_reminded_at (pairs [id, previous]) where this run's claim is still in
+     * place: a failed send (FM retries it next run) or an unsent one (budget ran out).
+     */
+    releaseReminders(pairs: [number, number | null][], at: number): D1PreparedStatement {
+      return db
+        .prepare(
+          `UPDATE customers SET wa_reminded_at = (SELECT json_extract(p.value, '$[1]') FROM json_each(?2) p WHERE json_extract(p.value, '$[0]') = customers.id)
+           WHERE org_id = ?1 AND id IN (SELECT json_extract(value, '$[0]') FROM json_each(?2)) AND wa_reminded_at = ?3`,
+        )
+        .bind(orgId, JSON.stringify(pairs), at);
+    },
+
+    /** One D1 round trip for an item's (or a release's) writes. */
     async run(stmts: D1PreparedStatement[]): Promise<void> {
       if (stmts.length) await db.batch(stmts);
     },

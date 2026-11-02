@@ -26,27 +26,30 @@ async function salePush(c: Context<AppEnv>, sale: Sale, s: Settings): Promise<vo
   });
 }
 
-/**
- * WhatsApp (FM routes.ts 760-770): the bill when wa_bill_auto is on, then the rating request inline when
- * wa_feedback_enabled && wa_feedback_delay_min === 0 (one send at most; like FM, no hour window). Both check readiness.
- * A failed rating request is logged and never stops the bill.
- */
-async function saleWhatsapp(c: Context<AppEnv>, sale: Sale, s: Settings): Promise<void> {
-  if (!hasFeature(c, "whatsapp") || !sale.customer_phone) return;
-  const orgId = c.var.tenant.org.id;
-  if (s.wa_bill_auto) await sendBill(c.env, orgId, sale.id, c.var.tenant.user.id);
-  if (s.wa_feedback_enabled && s.wa_feedback_delay_min === 0)
-    await runFeedback(c.env, orgId, Date.now(), 1, { left: 1 }, sale.id).catch((err) => console.error("whatsapp feedback failed", err));
+/** WhatsApp bill (FM routes.ts 760-765): when wa_bill_auto is on (sendBill checks readiness). */
+async function saleBill(c: Context<AppEnv>, sale: Sale, s: Settings): Promise<void> {
+  if (!hasFeature(c, "whatsapp") || !sale.customer_phone || !s.wa_bill_auto) return;
+  await sendBill(c.env, c.var.tenant.org.id, sale.id, c.var.tenant.user.id);
 }
 
 /**
- * Runs in waitUntil after a sale is created: the push part and the WhatsApp part, independently (one failing never
- * stops the other; the first error is rethrown afterwards so runHook logs it).
+ * The rating request inline (FM routes.ts 766-767) when wa_feedback_enabled && wa_feedback_delay_min === 0: one send
+ * at most, for this sale only; like FM, no hour window. runFeedback checks readiness and claims the sale first.
+ */
+async function saleRating(c: Context<AppEnv>, sale: Sale, s: Settings): Promise<void> {
+  if (!hasFeature(c, "whatsapp") || !sale.customer_phone) return;
+  if (!s.wa_feedback_enabled || s.wa_feedback_delay_min !== 0) return;
+  await runFeedback(c.env, c.var.tenant.org.id, Date.now(), 1, { left: 1 }, sale.id);
+}
+
+/**
+ * Runs in waitUntil after a sale is created: the push, the WhatsApp bill and the rating request, independently (one failing never
+ * stops the others; the first error is rethrown afterwards so runHook logs it).
  */
 export async function afterSale(c: Context<AppEnv>, sale: Sale): Promise<void> {
   if (!hasFeature(c, "push") && !hasFeature(c, "whatsapp")) return;
   const s = await settingsRepo(c.env.DB, c.var.tenant.org.id).get();
-  const results = await Promise.allSettled([salePush(c, sale, s), saleWhatsapp(c, sale, s)]);
+  const results = await Promise.allSettled([salePush(c, sale, s), saleBill(c, sale, s), saleRating(c, sale, s)]);
   const failed = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
   if (failed) throw failed.reason;
 }
