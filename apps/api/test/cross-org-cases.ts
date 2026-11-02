@@ -221,3 +221,24 @@ CASES.push(
     }),
   },
 );
+
+// ---- Plan 2b Task 10: WhatsApp campaigns ----
+const seedCampaign = async (orgId: string): Promise<number> => {
+  const k = await env.DB.prepare("INSERT INTO wa_campaigns(org_id,uid,template,language,params,total,created_at) VALUES(?,?,?,?,?,?,?) RETURNING id")
+    .bind(orgId, randomToken(9), "eid_offer", "en", "[]", 1, 1)
+    .first<{ id: number }>();
+  await env.DB.prepare("INSERT INTO wa_messages(org_id,kind,phone,template,status,campaign_id,created_at) VALUES(?,?,?,?,?,?,?)")
+    .bind(orgId, "announcement", "+919800000001", "eid_offer", "queued", k!.id, 1)
+    .run();
+  return k!.id;
+};
+CASES.push({
+  name: "POST /api/wa/campaigns/:id/next",
+  method: "POST",
+  path: (id) => `/api/wa/campaigns/${id}/next`,
+  seed: seedCampaign,
+  read: async (orgId, id) => ({
+    campaign: await env.DB.prepare("SELECT * FROM wa_campaigns WHERE org_id = ? AND id = ?").bind(orgId, id).first(),
+    messages: (await env.DB.prepare("SELECT * FROM wa_messages WHERE org_id = ? AND campaign_id = ?").bind(orgId, id).all()).results,
+  }),
+});

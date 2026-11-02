@@ -19,6 +19,7 @@ import { notifications } from "./tenant/notifications/routes";
 import { announcements } from "./tenant/announcements/routes";
 import { ratings } from "./tenant/ratings/routes";
 import { whatsapp } from "./tenant/whatsapp/routes";
+import { campaigns } from "./tenant/campaigns/routes";
 import { waWebhook } from "./integrations/wa-webhook";
 
 const app = new Hono<AppEnv>();
@@ -87,6 +88,8 @@ tenantApi.route("/", announcements);
 tenantApi.route("/", ratings);
 // /whatsapp/config; gated per route (feature whatsapp, admin).
 tenantApi.route("/", whatsapp);
+// /wa/templates, /wa/test, /wa/audience, /wa/campaigns(/:id/next), /wa/media; gated per route (feature whatsapp_campaigns, admin, WA-ready).
+tenantApi.route("/", campaigns);
 app.route("/api", tenantApi);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

@@ -1,6 +1,6 @@
 import { decryptSecret, encryptSecret } from "../../lib/secrets";
 import { auditRepo } from "./audit";
-import type { Customer, WaMessage } from "@ss/contract";
+import type { Customer, WaCampaign, WaMessage } from "@ss/contract";
 import type { SendResult, WaConfig } from "../../core/services";
 import type { WaStatusEvent } from "../../lib/whatsapp";
 
@@ -232,6 +232,184 @@ export function waMessagesRepo(db: D1Database, orgId: string) {
         .bind(orgId, customerId)
         .first<CustomerRow>();
       return row ? { ...row, wa_opt_out: !!row.wa_opt_out } : null;
+    },
+  };
+}
+
+// ---------- campaigns (wa_campaigns + their queued wa_messages) ----------
+
+/** Customers a campaign goes to (FM AUDIENCE, per org): a phone and not opted out (RF3). Binds ?1 = org. */
+const AUDIENCE_SQL = "FROM customers WHERE org_id = ?1 AND phone IS NOT NULL AND wa_opt_out = 0";
+
+/**
+ * FM CAMPAIGN_SELECT, per org: every count and the creator's name are tied to the campaign's own org. Binds ?1 = org;
+ * callers append " AND k.<col> = ?2" (or nothing) and the ORDER/LIMIT.
+ */
+export const CAMPAIGN_SELECT = `SELECT k.id, k.template, k.total, k.created_at, k.finished_at, u.name AS created_by_name,
+    (SELECT COUNT(*) FROM wa_messages m WHERE m.org_id = k.org_id AND m.campaign_id = k.id AND m.status = 'sent') AS sent,
+    (SELECT COUNT(*) FROM wa_messages m WHERE m.org_id = k.org_id AND m.campaign_id = k.id AND m.status = 'failed') AS failed,
+    (SELECT COUNT(*) FROM wa_messages m WHERE m.org_id = k.org_id AND m.campaign_id = k.id AND m.status = 'skipped') AS skipped,
+    (SELECT COUNT(*) FROM wa_messages m WHERE m.org_id = k.org_id AND m.campaign_id = k.id AND m.status = 'queued') AS queued
+  FROM wa_campaigns k LEFT JOIN users u ON u.org_id = k.org_id AND u.id = k.created_by
+  WHERE k.org_id = ?1`;
+
+/** A campaign's send settings (what a drain needs). */
+export interface CampaignRow {
+  id: number;
+  template: string;
+  language: string;
+  params: string; // JSON WaParam[]
+  finished_at: number | null;
+}
+
+/** One claimed queued message, with the customer's name and opt-out flag read at claim (= send) time. */
+export interface ClaimedMessage {
+  id: number;
+  phone: string;
+  customer_id: number | null;
+  name: string | null;
+  opted_out: number;
+}
+
+export interface CampaignCreate {
+  uid: string;
+  template: string;
+  language: string;
+  params: unknown[];
+  actor: { id: number; name: string };
+  /** At most this many recipients are queued (backstop for the route's audience check). */
+  cap: number;
+}
+
+/** A drain claim older than this is taken over (a crashed drain); far longer than one batch of 40 sends takes. */
+export const CLAIM_STALE_MS = 300_000;
+
+/**
+ * This org's WhatsApp campaigns (FM routes.ts 1474-1521, wa-jobs drainCampaign). Every statement binds org_id as ?1.
+ * The create batch finds the new campaign by (org_id, uid), never by the highest id (INV §8.2). The drain claim keeps FM's
+ * sent_at claim marker: one UPDATE ... RETURNING stamps up to `limit` queued, unclaimed (or stale) rows, so two
+ * overlapping drains (two /next clicks, /next vs the cron) get disjoint rows and never send a message twice.
+ */
+export function waCampaignsRepo(db: D1Database, orgId: string) {
+  const view = (where: string, ...binds: unknown[]) => db.prepare(`${CAMPAIGN_SELECT}${where}`).bind(orgId, ...binds);
+  return {
+    async audienceSize(): Promise<number> {
+      return (await db.prepare(`SELECT COUNT(*) AS n ${AUDIENCE_SQL}`).bind(orgId).first<{ n: number }>())?.n ?? 0;
+    },
+
+    /** The newest 20 (FM). */
+    async list(): Promise<WaCampaign[]> {
+      return (await view(" ORDER BY k.id DESC LIMIT 20").all<WaCampaign>()).results;
+    },
+
+    view(id: number): Promise<WaCampaign | null> {
+      return view(" AND k.id = ?2", id).first<WaCampaign>();
+    },
+
+    row(id: number): Promise<CampaignRow | null> {
+      return db
+        .prepare("SELECT id, template, language, params, finished_at FROM wa_campaigns WHERE org_id = ?1 AND id = ?2")
+        .bind(orgId, id)
+        .first<CampaignRow>();
+    },
+
+    /**
+     * One batch (one D1 round trip, atomic): the campaign row, a queued 'announcement' message per audience customer
+     * (INSERT ... SELECT, at most `cap`), total = the rows queued, the audit row, and the campaign as the API shows it.
+     */
+    async create(k: CampaignCreate): Promise<WaCampaign> {
+      const at = Date.now();
+      const idExpr = { sql: "(SELECT id FROM wa_campaigns WHERE org_id = ? AND uid = ?)", binds: [orgId, k.uid] };
+      const res = await db.batch([
+        db
+          .prepare("INSERT INTO wa_campaigns (org_id, uid, template, language, params, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+          .bind(orgId, k.uid, k.template, k.language, JSON.stringify(k.params), k.actor.id, at),
+        db
+          .prepare(
+            `INSERT INTO wa_messages (org_id, kind, customer_id, phone, template, status, campaign_id, created_by, created_at)
+             SELECT ?1, 'announcement', id, phone, ?2, 'queued', (SELECT id FROM wa_campaigns WHERE org_id = ?1 AND uid = ?3), ?4, ?5
+             ${AUDIENCE_SQL} ORDER BY id LIMIT ?6`,
+          )
+          .bind(orgId, k.template, k.uid, k.actor.id, at, k.cap),
+        db
+          .prepare(
+            `UPDATE wa_campaigns SET total = (SELECT COUNT(*) FROM wa_messages m WHERE m.org_id = ?1 AND m.campaign_id = wa_campaigns.id)
+             WHERE org_id = ?1 AND uid = ?2`,
+          )
+          .bind(orgId, k.uid),
+        auditRepo(db, orgId).stmt({
+          actor: k.actor,
+          entity: "settings", // FM parity
+          entityId: idExpr,
+          ref: `WhatsApp announcement ${k.template}`,
+          action: "create",
+          before: null,
+          after: { template: k.template, params: k.params },
+        }),
+        view(" AND k.uid = ?2", k.uid),
+      ]);
+      return (res[4]!.results as WaCampaign[])[0]!;
+    },
+
+    /** Audits a template submitted to Meta (FM parity: entity settings, id 1). */
+    async templateCreated(actor: { id: number; name: string }, after: Record<string, unknown>): Promise<void> {
+      await auditRepo(db, orgId)
+        .stmt({ actor, entity: "settings", entityId: 1, ref: `WhatsApp template ${String(after.name)}`, action: "create", before: null, after })
+        .run();
+    },
+
+    /**
+     * Claims up to `limit` of the campaign's queued messages for this drain (sent_at = `claim`): unclaimed ones, or
+     * ones whose claim is older than CLAIM_STALE_MS. Returns exactly the rows this statement stamped, each with the
+     * customer's CURRENT name and opt-out flag (so an opt-out after queueing is honoured at send time, RF3).
+     */
+    async claim(campaignId: number, claim: number, limit: number): Promise<ClaimedMessage[]> {
+      const r = await db
+        .prepare(
+          `UPDATE wa_messages SET sent_at = ?3
+           WHERE org_id = ?1 AND id IN (
+             SELECT id FROM wa_messages WHERE org_id = ?1 AND campaign_id = ?2 AND status = 'queued' AND COALESCE(sent_at, 0) < ?4 ORDER BY id LIMIT ?5)
+           RETURNING id, phone, customer_id,
+             (SELECT c.name FROM customers c WHERE c.org_id = ?1 AND c.id = wa_messages.customer_id) AS name,
+             COALESCE((SELECT c.wa_opt_out FROM customers c WHERE c.org_id = ?1 AND c.id = wa_messages.customer_id), 0) AS opted_out`,
+        )
+        .bind(orgId, campaignId, claim, claim - CLAIM_STALE_MS, limit)
+        .all<ClaimedMessage>();
+      return r.results.sort((a, b) => a.id - b.id);
+    },
+
+    /** The result of one claimed message; only applies while this drain's claim is in place. */
+    resultStatement(messageId: number, claim: number, r: SendResult, params: unknown[]): D1PreparedStatement {
+      return db
+        .prepare(
+          "UPDATE wa_messages SET status = ?3, wa_id = ?4, error = ?5, params = ?6, sent_at = ?7 WHERE org_id = ?1 AND id = ?2 AND status = 'queued' AND sent_at = ?8",
+        )
+        .bind(orgId, messageId, r.status, r.status === "sent" ? r.wa_id : null, r.status === "sent" ? null : r.error, JSON.stringify(params), Date.now(), claim);
+    },
+
+    /** Hands claimed-but-unsent messages back (budget ran out): queued and unclaimed again. */
+    releaseStatement(messageIds: number[], claim: number): D1PreparedStatement {
+      return db
+        .prepare("UPDATE wa_messages SET sent_at = NULL WHERE org_id = ?1 AND id IN (SELECT value FROM json_each(?2)) AND status = 'queued' AND sent_at = ?3")
+        .bind(orgId, JSON.stringify(messageIds), claim);
+    },
+
+    /** Marks the campaign finished once no queued message remains (no-op otherwise). */
+    finishStatement(campaignId: number): D1PreparedStatement {
+      return db
+        .prepare(
+          `UPDATE wa_campaigns SET finished_at = ?3 WHERE org_id = ?1 AND id = ?2 AND finished_at IS NULL
+             AND NOT EXISTS (SELECT 1 FROM wa_messages m WHERE m.org_id = ?1 AND m.campaign_id = ?2 AND m.status = 'queued')`,
+        )
+        .bind(orgId, campaignId, Date.now());
+    },
+
+    viewStatement(campaignId: number): D1PreparedStatement {
+      return view(" AND k.id = ?2", campaignId);
+    },
+
+    async run(stmts: D1PreparedStatement[]): Promise<D1Result[]> {
+      return stmts.length ? db.batch(stmts) : [];
     },
   };
 }

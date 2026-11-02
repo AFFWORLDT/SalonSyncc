@@ -17,14 +17,15 @@
  * The claims (wa_reminded_at, wa_feedback_at, wa_feedback_reminded_at) are stamped with the run time `at`.
  * Like FM, the jobs don't check wa_*_enabled or the hour (the cron does, Task 11; the manual run routes don't).
  */
-import type { Settings, WaReminderRun } from "@ss/contract";
+import type { Settings, WaCampaign, WaParam, WaReminderRun } from "@ss/contract";
 import type { Env } from "../env";
 import { platformRepo } from "../data/platform";
-import { clockOf, settingsRepo, waJobsRepo, waMessagesRepo, type RatingDueRow } from "../data/tenant";
+import { clockOf, settingsRepo, waCampaignsRepo, waJobsRepo, waMessagesRepo, type CampaignRow, type RatingDueRow } from "../data/tenant";
 import { services, type SendResult, type WaConfig } from "../core/services";
 import { addDays, businessDay, businessDayStart, localHour, type OrgClock } from "../lib/clock";
-import { allowedRecipient, firstName, visitTime, type WaValue } from "../lib/whatsapp";
+import { allowedRecipient, bodyParams, firstName, visitTime, type WaValue } from "../lib/whatsapp";
 import { waSetup } from "../tenant/whatsapp/ready";
+import { featuresFor } from "../core/features-cache";
 
 /** FM's batch: interactive runs (manual routes) send at most 40. */
 export const WA_BATCH = 40;
@@ -189,4 +190,69 @@ export async function runFeedbackReminders(env: Env, orgId: string, at: number, 
     out[r.status]++;
   }
   return out;
+}
+
+/**
+ * Sends the next batch of one campaign of org `orgId` (FM wa-jobs drainCampaign): POST /api/wa/campaigns/:id/next
+ * (limit and budget 40) and the cron (Task 11, shared budget). Null when this org has no such campaign; the campaign
+ * as the API shows it otherwise (unchanged when finished, out of budget or the org is not WA-ready).
+ *
+ * The claim (data/tenant waCampaignsRepo.claim) stamps sent_at on up to `limit` queued rows in ONE UPDATE ... RETURNING,
+ * so overlapping drains get disjoint rows and never send a message twice; a claim older than 5 minutes (a crashed drain)
+ * is taken over. Each result write only applies while this drain's claim is in place. A customer who opted out after the
+ * campaign was queued is logged "skipped" (RF3), as is a phone outside the org's test list; neither calls Graph nor
+ * spends budget. On a budget stop the unsent claims are released (queued, unclaimed) for the next drain. The campaign is
+ * finished (finished_at) once no queued row remains.
+ *
+ * D1 cost (round trips; for Task 11's per-invocation query budget): campaign row 1 (0 when `pre.row` is given) + WA
+ * setup when `pre.cfg` is not given (org 1 + features 0-3, cached + org_whatsapp 1; skipped without whatsapp_campaigns) + claim 1 + exactly 1 per Graph send (its
+ * result, batched with any skipped rows' results before it) + 1 final batch (remaining skipped results, the release,
+ * the finish check and the campaign view: up to 4 statements). Finished, unknown or budget-0: row 1 + view 1.
+ */
+export async function drainCampaign(
+  env: Env,
+  orgId: string,
+  campaignId: number,
+  limit: number,
+  budget: Budget,
+  pre: { cfg?: WaConfig; row?: CampaignRow } = {},
+): Promise<WaCampaign | null> {
+  const repo = waCampaignsRepo(env.DB, orgId);
+  const k = pre.row ?? (await repo.row(campaignId));
+  if (!k) return null;
+  if (k.finished_at || budget.left <= 0) return repo.view(k.id);
+  const cfg = pre.cfg ?? (await orgWa(env, orgId));
+  if (!cfg) return repo.view(k.id);
+  const claim = Date.now();
+  const claimed = await repo.claim(k.id, claim, limit);
+  const spec = JSON.parse(k.params) as WaParam[];
+  let pending: D1PreparedStatement[] = [];
+  for (let i = 0; i < claimed.length; i++) {
+    const m = claimed[i]!;
+    const params = bodyParams(spec, m.name);
+    let r: SendResult;
+    if (m.opted_out) r = { status: "skipped", error: "opted out" };
+    else if (!allowedRecipient(cfg.testNumbers, m.phone, cfg.callingCode)) r = { status: "skipped", error: "not in test numbers" };
+    else {
+      if (budget.left <= 0) {
+        pending.push(repo.releaseStatement(claimed.slice(i).map((x) => x.id), claim));
+        break;
+      }
+      budget.left--;
+      r = await services(env).wa.sendTemplate(cfg, m.phone, k.template, k.language, params);
+      await repo.run([...pending, repo.resultStatement(m.id, claim, r, params)]);
+      pending = [];
+      continue;
+    }
+    pending.push(repo.resultStatement(m.id, claim, r, params));
+  }
+  const res = await repo.run([...pending, repo.finishStatement(k.id), repo.viewStatement(k.id)]);
+  return (res[res.length - 1]!.results[0] as WaCampaign | undefined) ?? null;
+}
+
+/** No session (cron): the org's WhatsApp config when it has `whatsapp_campaigns` and is WA-ready, else null (silently skipped). */
+async function orgWa(env: Env, orgId: string): Promise<WaConfig | null> {
+  const org = await platformRepo(env.DB).orgById(orgId);
+  if (!org || !(await featuresFor(env.DB, org)).features.includes("whatsapp_campaigns")) return null;
+  return waSetup(env, org); // features are cached per isolate: no second lookup
 }
