@@ -35,6 +35,13 @@ describe("login lockout", () => {
     expect(await r.json()).toEqual({ error: MSG });
   });
 
+  it("a crafted username cannot lock another user's device key", async () => {
+    const org = await makeOrg({ slug: "lk-inj" });
+    await makeUser(org.id, { username: "sam", password: "rightpass" });
+    for (let i = 0; i < 8; i++) await login("lk-inj", "sam|1.2.3.4", "nope", "9.9.9.9");
+    expect((await login("lk-inj", "sam", "rightpass", "1.2.3.4")).status).toBe(200);
+  });
+
   it("a username over 60 chars is a plain 401 with no failure row", async () => {
     const org = await makeOrg({ slug: "lk-long" });
     expect((await login("lk-long", "x".repeat(61), "nope", "10.0.7.1")).status).toBe(401);

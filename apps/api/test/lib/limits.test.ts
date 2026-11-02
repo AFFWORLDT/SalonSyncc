@@ -5,10 +5,16 @@ describe("limits", () => {
   it("loginLimits: three counters, org-scoped usernames", () => {
     expect(loginLimits("org1", "admin", "1.2.3.4")).toEqual([
       { key: "login-ip:1.2.3.4", max: 20 },
-      { key: "u:org1:admin|1.2.3.4", max: 8 },
-      { key: "u:org1:admin", max: 50 },
+      { key: "d:org1:admin:1.2.3.4", max: 8 },
+      { key: "a:org1:admin", max: 50 },
     ]);
     expect(loginLimits("org2", "admin", "1.2.3.4")[2]!.key).not.toBe(loginLimits("org1", "admin", "1.2.3.4")[2]!.key);
+  });
+  it("an odd username cannot spell another key", () => {
+    const evil = loginLimits("org1", "sam|1.2.3.4", "9.9.9.9");
+    const real = loginLimits("org1", "sam", "1.2.3.4");
+    for (const e of evil) for (const r of real) expect(e.key).not.toBe(r.key);
+    expect(loginLimits("org1", "a:b", "1.1.1.1")[2]!.key).toBe("a:org1:a%3Ab");
   });
   it("isLocked is count >= max", () => {
     expect(isLocked(7, 8)).toBe(false);

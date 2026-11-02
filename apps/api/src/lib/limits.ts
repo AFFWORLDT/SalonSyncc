@@ -4,7 +4,8 @@
  *  - the device (IP), across usernames: stops guessing many accounts from one place;
  *  - the username on that device: someone typing "admin" wrongly only locks themselves out, not the real admin;
  *  - the username from anywhere, with a high max: slows a guess spread over many devices.
- * Usernames are only unique per org, so those keys carry the org id (login_failures rows also carry it as org_id).
+ * The two username key kinds have distinct prefixes (d:/a:) and the username is URI-encoded (no ":" or "|"), so no
+ * username can spell another key. Usernames are only unique per org, so those keys carry the org id (login_failures rows also carry it as org_id).
  * The device counter lives in rate_hits (key `login-ip:<ip>`); the two username counters are login_failures rows.
  */
 export const LOGIN_WINDOW_MS = 15 * 60_000;
@@ -12,8 +13,8 @@ export const LOGIN_WINDOW_MS = 15 * 60_000;
 export function loginLimits(orgId: string, username: string, ip: string): { key: string; max: number }[] {
   return [
     { key: `login-ip:${ip}`, max: 20 },
-    { key: `u:${orgId}:${username}|${ip}`, max: 8 },
-    { key: `u:${orgId}:${username}`, max: 50 },
+    { key: `d:${orgId}:${encodeURIComponent(username)}:${ip}`, max: 8 },
+    { key: `a:${orgId}:${encodeURIComponent(username)}`, max: 50 },
   ];
 }
 
