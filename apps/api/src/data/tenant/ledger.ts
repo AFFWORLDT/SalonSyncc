@@ -1,7 +1,7 @@
 import type { LedgerSource, Line } from "../../lib/ledger";
+import type { IdExpr } from "../../lib/audit";
 
-/** A source id known only inside the batch, e.g. `(SELECT id FROM sales WHERE org_id = ? AND bill_no = ?)`, with its binds. */
-export type IdExpr = { sql: string; binds: unknown[] };
+export type { IdExpr };
 
 /**
  * Ledger statements, returned unexecuted so callers put them in the same D1 batch as the change.

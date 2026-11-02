@@ -101,12 +101,12 @@ export function salesRepo(db: D1Database, orgId: string) {
         .first<SaleBarber>();
     },
 
-    /** This org's active catalogue services among `ids`. */
-    async activeServices(ids: number[]): Promise<Map<number, SaleServiceRow>> {
+    /** This org's catalogue services among `ids`, hidden ones included (FM: only a missing service is an error). */
+    async servicesByIds(ids: number[]): Promise<Map<number, SaleServiceRow>> {
       const out = new Map<number, SaleServiceRow>();
       if (!ids.length) return out;
       const r = await db
-        .prepare(`SELECT id, name, price FROM services WHERE org_id = ? AND active = 1 AND id IN (${ids.map(() => "?").join(",")})`)
+        .prepare(`SELECT id, name, price FROM services WHERE org_id = ? AND id IN (${ids.map(() => "?").join(",")})`)
         .bind(orgId, ...ids)
         .all<SaleServiceRow>();
       for (const s of r.results) out.set(s.id, s);

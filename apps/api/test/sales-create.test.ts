@@ -89,7 +89,7 @@ describe("POST /api/sales", () => {
     expect((await json(await post(a.ck, { amount: 1.255, payment_mode: "cash" }))).amount).toBe(1255);
   });
 
-  it("items: catalogue name and price override the client's, qty 1..20, one-off items, max 30", async () => {
+  it("items: catalogue name; typed price wins else catalogue price; hidden services ok; qty 1..20; one-off items; max 30", async () => {
     const a = await setup("items-sale");
     const svc = await json(await call("POST", "/services", a.ck, { category: "Haircuts", name: "Haircut", price: 30 }));
     const hidden = await json(await call("POST", "/services", a.ck, { category: "Haircuts", name: "Old", price: 5, active: false }));
@@ -98,6 +98,9 @@ describe("POST /api/sales", () => {
       amount: 999,
       items: [
         { service_id: svc.id, qty: 2, price: 10, name: "Cheap" },
+        { service_id: svc.id, qty: 1 },
+        { service_id: svc.id, qty: 1, price: "" },
+        { service_id: hidden.id, qty: 1 },
         { name: "Wax", price: "5.5", qty: 0 },
         { name: "Gel", price: 1, qty: 50 },
       ],
@@ -105,16 +108,23 @@ describe("POST /api/sales", () => {
     expect(r.status).toBe(201);
     const s = await json(r);
     expect(s.items).toEqual([
-      { service_id: svc.id, name: "Haircut", price: 3000, qty: 2 },
+      { service_id: svc.id, name: "Haircut", price: 1000, qty: 2 },
+      { service_id: svc.id, name: "Haircut", price: 3000, qty: 1 },
+      { service_id: svc.id, name: "Haircut", price: 3000, qty: 1 },
+      { service_id: hidden.id, name: "Old", price: 500, qty: 1 },
       { service_id: null, name: "Wax", price: 550, qty: 1 },
       { service_id: null, name: "Gel", price: 100, qty: 20 },
     ]);
-    expect(s.amount).toBe(6000 + 550 + 2000);
+    expect(s.amount).toBe(2000 + 3000 + 3000 + 500 + 550 + 2000);
     const rows = await env.DB.prepare("SELECT org_id, sale_id, service_id, name, price, qty FROM sale_items WHERE org_id = ? ORDER BY id").bind(a.org.id).all<any>();
-    expect(rows.results).toHaveLength(3);
+    expect(rows.results).toHaveLength(6);
     expect(rows.results.every((x) => x.sale_id === s.id)).toBe(true);
-    expect((await post(a.k1, { payment_mode: "cash", items: [{ service_id: hidden.id }] })).status).toBe(400);
-    expect((await post(a.k1, { payment_mode: "cash", items: [{ service_id: 999999 }] })).status).toBe(400);
+    const badPrice = await post(a.k1, { payment_mode: "cash", items: [{ service_id: svc.id, price: "abc" }] });
+    expect(badPrice.status).toBe(400);
+    expect(await badPrice.json()).toEqual({ error: "Enter a price for Haircut, e.g. 25" });
+    const gone = await post(a.k1, { payment_mode: "cash", items: [{ service_id: 999999 }] });
+    expect(gone.status).toBe(400);
+    expect(await gone.json()).toEqual({ error: "One of the services no longer exists. Refresh and pick again." });
     const many = Array.from({ length: 31 }, () => ({ service_id: svc.id }));
     expect((await post(a.k1, { payment_mode: "cash", items: many })).status).toBe(400);
     expect((await post(a.k1, { payment_mode: "cash", items: many.slice(0, 30) })).status).toBe(201);
@@ -218,7 +228,9 @@ describe("POST /api/sales", () => {
     const r = await post(b.ck, { amount: 10, payment_mode: "cash", barber_id: a.b1.id });
     expect(r.status).toBe(400);
     expect(await r.json()).toEqual({ error: "Choose an active barber" });
-    expect((await post(b.ck, { payment_mode: "cash", items: [{ service_id: svcA.id }] })).status).toBe(400);
+    const rs = await post(b.ck, { payment_mode: "cash", items: [{ service_id: svcA.id }] });
+    expect(rs.status).toBe(400);
+    expect(await rs.json()).toEqual({ error: "One of the services no longer exists. Refresh and pick again." });
     const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM sales WHERE org_id = ?").bind(b.org.id).first<any>();
     expect(n.n).toBe(0);
     expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM sales WHERE barber_id = ?").bind(a.b1.id).first<any>()).n).toBe(0);

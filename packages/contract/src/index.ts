@@ -238,7 +238,7 @@ export interface Sale {
 export interface SaleInput {
   /** Major units. Ignored when items are given (the total is their sum). */
   amount?: number | string;
-  /** At most 30. Catalogue services ({service_id, qty}; name and price come from the catalogue) and/or one-off items ({name, price (major units), qty}). qty is clamped to 1..20. */
+  /** At most 30. Catalogue services ({service_id, qty, price? (major units, when changed on the bill; else the catalogue price)}) and/or one-off items ({name, price (major units), qty}). qty is clamped to 1..20. */
   items?: { service_id?: number; name?: string; price?: number | string; qty?: number }[];
   payment_mode: PaymentMode;
   customer_name?: string | null;

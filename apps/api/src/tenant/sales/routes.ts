@@ -30,9 +30,9 @@ function id(v: string): number {
 const present = (v: unknown) => v !== undefined && v !== null && v !== "";
 
 /**
- * The bill lines and total (FM resolveItems). Catalogue services take their name and price from this org's active
- * catalogue (the catalogue price wins over a client-sent one); one-off items carry their own name and price (major
- * units). With no items, the typed amount is the total. Runs before any write, so a bad item never uses up a bill number.
+ * The bill lines and total (FM resolveItems). Catalogue services (of this org, hidden ones too) take their name from the
+ * catalogue and, unless a price was typed on the bill (major units), their catalogue price; one-off items carry their own
+ * name and price. With no items, the typed amount is the total. Runs before any write, so a bad item never uses up a bill number.
  */
 async function resolveItems(repo: ReturnType<typeof salesRepo>, b: Partial<SaleInput>, s: Settings): Promise<{ items: SaleItem[]; amount: number }> {
   if (present(b.items) && !Array.isArray(b.items)) throw bad("Send the items as a list");
@@ -45,13 +45,15 @@ async function resolveItems(repo: ReturnType<typeof salesRepo>, b: Partial<SaleI
   }
   if (raw.some((i) => !i || typeof i !== "object" || Array.isArray(i))) throw bad("Each extra item needs a name and a price");
   const ids = [...new Set(raw.map((i) => Number(i.service_id)).filter((n) => Number.isInteger(n) && n > 0))];
-  const services = await repo.activeServices(ids);
+  const services = await repo.servicesByIds(ids);
   const items: SaleItem[] = raw.map((i) => {
     const qty = Math.min(MAX_QTY, Math.max(1, Math.floor(Number(i.qty) || 1)));
     if (i.service_id) {
       const svc = services.get(Number(i.service_id));
       if (!svc) throw bad("One of the services no longer exists. Refresh and pick again.");
-      return { service_id: svc.id, name: svc.name, price: svc.price, qty };
+      const given = present(i.price) ? toMinor(i.price, s.currency_minor) : null;
+      if (present(i.price) && given === null) throw bad(`Enter a price for ${svc.name}, e.g. 25`);
+      return { service_id: svc.id, name: svc.name, price: given ?? svc.price, qty };
     }
     const name = clean(i.name, 80);
     const price = toMinor(i.price, s.currency_minor);

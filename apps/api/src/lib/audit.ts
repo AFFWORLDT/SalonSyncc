@@ -7,7 +7,7 @@ export type AuditEntity = "sale" | "expense" | "company_expense" | "payout" | "t
 export type AuditAction = "create" | "update" | "delete" | "password_reset";
 
 /** An id known only inside the batch, e.g. `(SELECT id FROM sales WHERE org_id = ? AND uid = ?)`. */
-export type IdExpr = { sql: string; args: unknown[] };
+export type IdExpr = { sql: string; binds: unknown[] };
 
 /** Top-level keys whose values differ (compared as JSON), sorted. */
 export function changedFields(before: object | null, after: object | null): string[] {
