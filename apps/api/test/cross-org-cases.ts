@@ -59,3 +59,29 @@ const serviceCase = (method: string, body?: unknown): CrossOrgCase => ({
   read: readService,
 });
 CASES.push(serviceCase("PUT", { category: "Pwned", name: "Pwned", price: 1 }), serviceCase("DELETE"));
+
+// ---- Task 7: sales edit/delete ----
+const seedSale = async (orgId: string): Promise<number> => {
+  const barber = await seedStaff(orgId);
+  const r = await env.DB.prepare(
+    `INSERT INTO sales(org_id,bill_no,token,day,barber_id,customer_label,amount,payment_mode,commission_pct,commission,vat_rate,vat_amount,created_by,created_at,updated_at)
+     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id`,
+  )
+    .bind(orgId, `XO-${randomToken(6)}`, randomToken(12), "2026-11-01", barber, "Customer 1", 1000, "cash", 0, 0, 0, 0, barber, 1, 1)
+    .first<{ id: number }>();
+  return r!.id;
+};
+const readSale = async (orgId: string, id: number) => ({
+  sale: await env.DB.prepare("SELECT * FROM sales WHERE org_id = ? AND id = ?").bind(orgId, id).first(),
+  items: (await env.DB.prepare("SELECT * FROM sale_items WHERE org_id = ? AND sale_id = ?").bind(orgId, id).all()).results,
+  ledger: (await env.DB.prepare("SELECT * FROM ledger_entries WHERE source = 'sale' AND source_id = ?").bind(id).all()).results,
+});
+const saleCase = (method: string, body?: unknown): CrossOrgCase => ({
+  name: `${method} /api/sales/:id`,
+  method,
+  path: (id) => `/api/sales/${id}`,
+  body,
+  seed: seedSale,
+  read: readSale,
+});
+CASES.push(saleCase("PUT", { amount: 25, payment_mode: "card", note: "Pwned" }), saleCase("DELETE"));

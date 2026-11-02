@@ -76,6 +76,29 @@ async function readBody(c: Context<AppEnv>): Promise<Partial<SaleInput>> {
   return raw as Partial<SaleInput>;
 }
 
+/** FM readSaleInput: payment mode, canonical phone (checked before any write, so a bad number never uses up a bill number), name, note. */
+function readSaleInput(b: Partial<SaleInput>, s: Settings) {
+  if (b.payment_mode !== "cash" && b.payment_mode !== "card") throw bad("Choose Cash or Card");
+  const rawPhone = clean(b.customer_phone, 30);
+  const phone = rawPhone ? canonicalPhone(rawPhone, s.phone_country) : null;
+  if (rawPhone && !phone) throw bad("Mobile number doesn't look right");
+  return { payment_mode: b.payment_mode, phone, name: clean(b.customer_name, 80), note: clean(b.note, 300) };
+}
+
+/** An admin-chosen day: valid and not after today. */
+function pastDay(v: unknown, today: string): string {
+  if (typeof v !== "string" || !DAY_RE.test(v) || v > today) throw bad("Pick a valid day (not in the future)");
+  return v;
+}
+
+/** Recomputes customer stats in the background; a failure never fails the request. */
+function refreshStats(c: Context<AppEnv>, ids: (number | null)[]) {
+  const repo = customersRepo(c.env.DB, c.var.tenant.org.id);
+  for (const cid of new Set(ids)) {
+    if (cid) c.executionCtx.waitUntil(repo.refreshStats(cid).catch((e) => console.error("customer stats refresh failed", e)));
+  }
+}
+
 export const sales = new Hono<AppEnv>();
 // Mounted at "/sales": the feature gate covers only this prefix.
 sales.use("*", requireFeature("core_sales"));
@@ -106,21 +129,11 @@ sales.post("/", async (c) => {
   const db = c.env.DB;
   const b = await readBody(c);
   const settings = await settingsRepo(db, orgId).get();
-
-  if (b.payment_mode !== "cash" && b.payment_mode !== "card") throw bad("Choose Cash or Card");
-  const rawPhone = clean(b.customer_phone, 30);
-  const phone = rawPhone ? canonicalPhone(rawPhone, settings.phone_country) : null;
-  // Checked before any write, so a bad number never uses up a bill number.
-  if (rawPhone && !phone) throw bad("Mobile number doesn't look right");
-  const name = clean(b.customer_name, 80);
-  const note = clean(b.note, 300);
+  const { payment_mode, phone, name, note } = readSaleInput(b, settings);
 
   const today = businessDay(Date.now(), clockOf(settings));
   let day = today;
-  if (present(b.day) && isAdmin(me)) {
-    if (typeof b.day !== "string" || !DAY_RE.test(b.day) || b.day > today) throw bad("Pick a valid day (not in the future)");
-    day = b.day;
-  }
+  if (present(b.day) && isAdmin(me)) day = pastDay(b.day, today);
 
   const repo = salesRepo(db, orgId);
   const { items, amount } = await resolveItems(repo, b, settings);
@@ -151,7 +164,7 @@ sales.post("/", async (c) => {
       customer: phone ? { phone, name, rename: isAdmin(me) } : null,
       customer_label: label,
       amount,
-      payment_mode: b.payment_mode,
+      payment_mode,
       note,
       commission_pct: pct,
       commission: commissionOf(amount, pct),
@@ -162,7 +175,87 @@ sales.post("/", async (c) => {
     { id: me.id, name: me.name },
   );
 
-  if (sale.customer_id) c.executionCtx.waitUntil(customersRepo(db, orgId).refreshStats(sale.customer_id));
-  c.executionCtx.waitUntil(hooks.afterSale(c, sale).catch((err) => console.error("afterSale hook failed", err)));
+  refreshStats(c, [sale.customer_id]);
+  // Promise.resolve().then: even a hook that throws synchronously can never fail a committed sale.
+  c.executionCtx.waitUntil(Promise.resolve().then(() => hooks.afterSale(c, sale)).catch((err) => console.error("afterSale hook failed", err)));
   return c.json(sale, 201);
+});
+
+/** FM editableSale: barbers may change only their own sales, and only on today's business day. 404 for missing/deleted/other org. */
+async function editableSale(c: Context<AppEnv>, repo: ReturnType<typeof salesRepo>, saleId: number, settings: Settings): Promise<Sale> {
+  const me = c.var.tenant.user;
+  const sale = await repo.byId(saleId);
+  if (!sale) throw new HttpError(404, "Not found");
+  if (!isAdmin(me)) {
+    if (sale.barber_id !== me.id) throw new HttpError(403, "You don't have access to this");
+    if (sale.day !== businessDay(Date.now(), clockOf(settings))) throw new HttpError(403, "Old sales can only be changed by the admin");
+  }
+  return sale;
+}
+
+const WALK_IN = /^Customer \d+$/;
+
+sales.put("/:id", async (c) => {
+  const me = c.var.tenant.user;
+  const orgId = c.var.tenant.org.id;
+  const db = c.env.DB;
+  const saleId = id(c.req.param("id"));
+  const settings = await settingsRepo(db, orgId).get();
+  const repo = salesRepo(db, orgId);
+  const sale = await editableSale(c, repo, saleId, settings);
+  const b = await readBody(c);
+  const { payment_mode, phone, name, note } = readSaleInput(b, settings);
+  const { items, amount } = await resolveItems(repo, b, settings);
+
+  // FM: the commission pct and VAT rate stay the sale's snapshot; only a barber change takes the new barber's pct.
+  let barber = { id: sale.barber_id, name: sale.barber_name };
+  let commissionPct = sale.commission_pct;
+  if (isAdmin(me) && present(b.barber_id) && Number(b.barber_id) !== sale.barber_id) {
+    const n = Number(b.barber_id);
+    const next = Number.isInteger(n) && n > 0 ? await repo.barberForSale(n) : null;
+    if (!next) throw bad(NO_BARBER);
+    barber = { id: next.id, name: next.name };
+    commissionPct = next.commission_pct ?? settings.default_commission_pct;
+  }
+  let day = sale.day;
+  if (isAdmin(me) && present(b.day) && b.day !== sale.day) day = pastDay(b.day, businessDay(Date.now(), clockOf(settings)));
+
+  const existing = phone ? await customersRepo(db, orgId).byPhone(phone) : null;
+  // No name now: the customer's saved name, else keep an existing "Customer N", else number a new walk-in.
+  const label =
+    name ?? existing?.name ?? (WALK_IN.test(sale.customer_label) ? sale.customer_label : `Customer ${await c.var.tenant.repo.nextSeq(`cust_${dayStamp(day)}`)}`);
+
+  await repo.update(
+    sale,
+    {
+      day,
+      barber,
+      customer: phone ? { phone, name, rename: isAdmin(me) } : null,
+      customer_label: label,
+      amount,
+      payment_mode,
+      note,
+      commission_pct: commissionPct,
+      commission: commissionOf(amount, commissionPct),
+      vat_amount: vatOf(amount, sale.vat_rate),
+      items,
+    },
+    { id: me.id, name: me.name },
+  );
+  const updated = await repo.byId(sale.id);
+  if (!updated) throw new HttpError(404, "Not found"); // deleted concurrently
+  refreshStats(c, [updated.customer_id, updated.customer_id !== sale.customer_id ? sale.customer_id : null]);
+  return c.json(updated);
+});
+
+sales.delete("/:id", async (c) => {
+  const me = c.var.tenant.user;
+  const orgId = c.var.tenant.org.id;
+  const db = c.env.DB;
+  const saleId = id(c.req.param("id"));
+  const repo = salesRepo(db, orgId);
+  const sale = await editableSale(c, repo, saleId, await settingsRepo(db, orgId).get());
+  await repo.remove(sale, { id: me.id, name: me.name });
+  refreshStats(c, [sale.customer_id]);
+  return c.json({ ok: true });
 });

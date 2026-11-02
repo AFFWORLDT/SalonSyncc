@@ -250,7 +250,11 @@ export interface SaleInput {
 
 export interface Receipt {
   sale: Pick<Sale, "bill_no" | "day" | "barber_name" | "customer_label" | "customer_phone" | "amount" | "payment_mode" | "vat_rate" | "vat_amount" | "created_at" | "items" | "note">;
-  salon: { salon_name: string } & Pick<Settings, "salon_name_ar" | "tagline" | "address" | "phone" | "trn" | "receipt_footer">;
+  /** The sale's own org's branding (from the token's row, never the host). salon_name = display_name (FM name). */
+  salon: { salon_name: string } & Pick<
+    Settings,
+    "display_name" | "salon_name_ar" | "tagline" | "address" | "phone" | "trn" | "licence_no" | "receipt_footer" | "logo_url" | "currency" | "currency_minor" | "locale" | "timezone"
+  >;
 }
 
 export interface Expense {

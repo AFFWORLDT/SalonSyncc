@@ -2,7 +2,7 @@ import type { Sale, SaleItem, PaymentMode } from "@ss/contract";
 import { auditRepo, type AuditInput } from "./audit";
 import { customersRepo, likeEscape } from "./customers";
 import { ledgerRepo } from "./ledger";
-import { saleLines } from "../../lib/ledger";
+import { needsRepost, saleLines } from "../../lib/ledger";
 import { randomToken } from "../../core/crypto";
 
 /** Sale rows with the barber's name, the customer's phone and the items (JSON). Every join and subquery stays in the org. */
@@ -11,7 +11,7 @@ const SALE_SELECT = `
          c.phone AS customer_phone, s.amount, s.payment_mode, s.note, s.commission_pct, s.commission,
          s.vat_rate, s.vat_amount, s.created_at,
          (SELECT json_group_array(json_object('service_id', i.service_id, 'name', i.name, 'price', i.price, 'qty', i.qty))
-            FROM sale_items i WHERE i.org_id = s.org_id AND i.sale_id = s.id) AS items_json
+            FROM (SELECT service_id, name, price, qty FROM sale_items WHERE org_id = s.org_id AND sale_id = s.id ORDER BY id) i) AS items_json
   FROM sales s
   JOIN users u ON u.org_id = s.org_id AND u.id = s.barber_id
   LEFT JOIN customers c ON c.org_id = s.org_id AND c.id = s.customer_id
@@ -67,6 +67,24 @@ export interface NewSale {
   items: SaleItem[];
 }
 
+/** An edit's new values (FM PUT /sales/:id); bill_no, token and created_by never change. */
+export interface SaleEdit {
+  day: string;
+  barber: { id: number; name: string };
+  customer: { phone: string; name: string | null; rename: boolean } | null;
+  customer_label: string;
+  amount: number;
+  payment_mode: PaymentMode;
+  note: string | null;
+  commission_pct: number;
+  commission: number;
+  vat_amount: number;
+  items: SaleItem[];
+}
+
+const linesOf = (s: Pick<Sale, "day" | "amount" | "payment_mode" | "barber_id" | "commission" | "bill_no" | "customer_label">) =>
+  saleLines({ day: s.day, amount: s.amount, payment_mode: s.payment_mode, barber_id: s.barber_id, commission: s.commission, bill_no: s.bill_no, customer_label: s.customer_label });
+
 /** What the audit log keeps of a bill (FM saleSnapshot). */
 export function saleSnapshot(s: Omit<Sale, "id" | "token" | "bill_no" | "created_at" | "customer_id">) {
   return {
@@ -111,6 +129,76 @@ export function salesRepo(db: D1Database, orgId: string) {
         .all<SaleServiceRow>();
       for (const s of r.results) out.set(s.id, s);
       return out;
+    },
+
+    /** A live (not deleted) sale of this org. */
+    async byId(id: number): Promise<Sale | null> {
+      const r = await db.prepare(`${SALE_SELECT} AND s.id = ?`).bind(orgId, id).first<SaleRow>();
+      return r ? toSale(r) : null;
+    },
+
+    /** A live sale of this org by its receipt token. */
+    async byToken(token: string): Promise<Sale | null> {
+      const r = await db.prepare(`${SALE_SELECT} AND s.token = ?`).bind(orgId, token).first<SaleRow>();
+      return r ? toSale(r) : null;
+    },
+
+    /**
+     * FM PUT /sales/:id in one batch: customer upsert, the row, items deleted and reinserted, the audit row (before/after),
+     * and the ledger reversed and reposted only when the money lines differ (needsRepost).
+     */
+    async update(old: Sale, e: SaleEdit, actor: AuditInput["actor"]): Promise<void> {
+      const at = Date.now();
+      const cust = e.customer ? customers.idByPhone(e.customer.phone) : { sql: "NULL", binds: [] };
+      const next = {
+        ...old,
+        day: e.day,
+        barber_id: e.barber.id,
+        barber_name: e.barber.name,
+        customer_label: e.customer_label,
+        customer_phone: e.customer?.phone ?? null,
+        amount: e.amount,
+        payment_mode: e.payment_mode,
+        note: e.note,
+        commission_pct: e.commission_pct,
+        commission: e.commission,
+        vat_amount: e.vat_amount,
+        items: e.items,
+      };
+      const oldLines = linesOf(old);
+      const newLines = linesOf(next);
+      const stmts: D1PreparedStatement[] = [];
+      if (e.customer) stmts.push(customers.upsertStmt(e.customer.name, e.customer.phone, e.customer.rename));
+      stmts.push(
+        db
+          .prepare(
+            `UPDATE sales SET day = ?, barber_id = ?, customer_id = ${cust.sql}, customer_label = ?, amount = ?, payment_mode = ?, note = ?,
+                    commission_pct = ?, commission = ?, vat_amount = ?, updated_at = ?
+             WHERE org_id = ? AND id = ? AND deleted_at IS NULL`,
+          )
+          .bind(e.day, e.barber.id, ...cust.binds, e.customer_label, e.amount, e.payment_mode, e.note, e.commission_pct, e.commission, e.vat_amount, at, orgId, old.id),
+        db.prepare("DELETE FROM sale_items WHERE org_id = ? AND sale_id = ?").bind(orgId, old.id),
+        ...e.items.map((i) =>
+          db
+            .prepare("INSERT INTO sale_items (org_id, sale_id, service_id, name, price, qty) VALUES (?, ?, ?, ?, ?, ?)")
+            .bind(orgId, old.id, i.service_id, i.name, i.price, i.qty),
+        ),
+        audit.stmt({ actor, entity: "sale", entityId: old.id, ref: old.bill_no, action: "update", before: saleSnapshot(old), after: saleSnapshot(next) }),
+      );
+      if (needsRepost(oldLines, newLines)) {
+        stmts.push(...ledger.reverseStmts("sale", old.id, actor.id), ...ledger.postStmts("sale", old.id, old.bill_no, actor.id, newLines));
+      }
+      await db.batch(stmts);
+    },
+
+    /** FM DELETE /sales/:id: soft delete, audit, and every live ledger line reversed, in one batch. */
+    async remove(old: Sale, actor: AuditInput["actor"]): Promise<void> {
+      const at = Date.now();
+      await db.batch([
+        db.prepare("UPDATE sales SET deleted_at = ?, updated_at = ? WHERE org_id = ? AND id = ? AND deleted_at IS NULL").bind(at, at, orgId, old.id),
+        audit.stmt({ actor, entity: "sale", entityId: old.id, ref: old.bill_no, action: "delete", before: saleSnapshot(old), after: null }),
+        ...ledger.reverseStmts("sale", old.id, actor.id),
+      ]);
     },
 
     /** Writes the bill, its items, the customer upsert, the audit row and the ledger lines in one batch. */
