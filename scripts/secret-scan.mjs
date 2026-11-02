@@ -15,7 +15,7 @@ const PATTERNS = [
   ["Meta access token", /\bEAA[A-Za-z0-9]{60,}/],
   ["Firebase service account", /"private_key_id"\s*:\s*"[0-9a-f]{20,}"/],
 ];
-const FORBIDDEN_FILES = [/(^|\/)\.dev\.vars$/, /(^|\/)\.env(\.local|\.development\.local|\.production\.local)?$/, /fmcreds\//, /\.pem$/, /service-account.*\.json$/i, /backup.*\.sql$/i];
+const FORBIDDEN_FILES = [/(^|\/)creds\//, /(^|\/)\.dev\.vars$/, /(^|\/)\.env(\.local|\.development\.local|\.production\.local)?$/, /fmcreds\//, /\.pem$/, /service-account.*\.json$/i, /backup.*\.sql$/i];
 
 const files = execSync("git ls-files -co --exclude-standard", { encoding: "utf8" })
   .split("\n")

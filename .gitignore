@@ -5,3 +5,11 @@ node_modules/
 out/
 .next/
 .superpowers/
+
+# Credentials: never commit (see scripts/secret-scan.mjs)
+creds/
+**/creds/
+fmcreds/
+*.pem
+.env*.local
+service-account*.json
