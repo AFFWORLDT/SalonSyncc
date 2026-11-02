@@ -10,7 +10,8 @@
  */
 export const LOGIN_WINDOW_MS = 15 * 60_000;
 
-export function loginLimits(orgId: string, username: string, ip: string): { key: string; max: number }[] {
+export function loginLimits(orgId: string, rawUsername: string, ip: string): { key: string; max: number }[] {
+  const username = rawUsername.toLowerCase(); // logins are case-insensitive, so counters are too
   return [
     { key: `login-ip:${ip}`, max: 20 },
     { key: `d:${orgId}:${encodeURIComponent(username)}:${ip}`, max: 8 },

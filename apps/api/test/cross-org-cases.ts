@@ -14,3 +14,30 @@ export interface CrossOrgCase {
   read: (orgId: string, id: number) => Promise<unknown>;
 }
 export const CASES: CrossOrgCase[] = [];
+
+// ---- Task 4: staff ----
+import { env } from "cloudflare:test";
+import { randomToken } from "../src/core/crypto";
+
+const seedStaff = async (orgId: string): Promise<number> => {
+  const r = await env.DB.prepare("INSERT INTO users(org_id,username,name,role,password_hash,created_at) VALUES(?,?,?,?,?,?) RETURNING id")
+    .bind(orgId, `s${randomToken(4)}`, "Staff", "barber", "x", Date.now())
+    .first<{ id: number }>();
+  return r!.id;
+};
+const readStaff = (orgId: string, id: number) => env.DB.prepare("SELECT * FROM users WHERE org_id = ? AND id = ?").bind(orgId, id).first();
+const staffCase = (method: string, pattern: string, body?: unknown): CrossOrgCase => ({
+  name: `${method} ${pattern}`,
+  method,
+  path: (id) => pattern.replace(":id", String(id)),
+  body,
+  seed: seedStaff,
+  read: readStaff,
+});
+CASES.push(
+  staffCase("PUT", "/api/users/:id", { name: "Pwned", username: "pwned" }),
+  staffCase("DELETE", "/api/users/:id"),
+  staffCase("POST", "/api/users/:id/reset-password", { password: "hacked1" }),
+  staffCase("PUT", "/api/users/:id/avatar", undefined),
+  staffCase("DELETE", "/api/users/:id/avatar"),
+);

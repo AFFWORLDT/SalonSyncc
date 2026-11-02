@@ -38,7 +38,7 @@
  *   POST   /api/services  ServiceInput (admin) -> Service · PUT /api/services/:id · DELETE /api/services/:id
  *
  * Photos (stored in D1)
- *   GET    /api/users/:id/avatar?v=   image bytes (no sign-in; cached for a year, ?v changes on upload)
+ *   GET    /api/public/avatar/:id/:v  image bytes (no sign-in; org from host, or ?org=<slug> on workers.dev; immutable)
  *   PUT    /api/me/avatar             body = image (webp/jpeg/png, max 200 KB)  -> { avatar_url }
  *   PUT    /api/users/:id/avatar      admin, same body
  *   DELETE /api/me/avatar | /api/users/:id/avatar

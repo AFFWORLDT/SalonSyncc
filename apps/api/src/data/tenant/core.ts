@@ -40,9 +40,10 @@ const USER_COLS = "id, org_id, username, name, role, password_hash, active, sess
 /** Every query here is scoped by org_id; tests/sql-guard.test.ts enforces it. */
 export function tenantRepo(db: D1Database, orgId: string) {
   return {
+    /** Case-insensitive within the org (usernames are unique ignoring case). */
     userByUsername(username: string): Promise<UserRow | null> {
       return db
-        .prepare(`SELECT ${USER_COLS} FROM users WHERE org_id = ? AND username = ?`)
+        .prepare(`SELECT ${USER_COLS} FROM users WHERE org_id = ? AND lower(username) = lower(?)`)
         .bind(orgId, username)
         .first<UserRow>();
     },
