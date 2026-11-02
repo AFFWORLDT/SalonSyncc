@@ -23,7 +23,8 @@ import { waSetup } from "../whatsapp/ready";
  * campaign message costs about 11 row writes over its life (queue + indexes, claim, SENDING mark, result, receipts):
  *  - CAMPAIGN_MAX_AUDIENCE: a campaign goes to at most 1000 customers (a bigger audience is refused with 400);
  *  - one unfinished campaign per org at a time (409 campaign_running);
- *  - each /next sends at most CAMPAIGN_BATCH (30), keeping the request well under ~50 D1 queries.
+ *  - each /next sends at most CAMPAIGN_BATCH (15): the free plan counts every D1 statement (batched ones too) toward
+ *    ~50 per request, and a cold /next costs about 11 + 2 per send (~41).
  */
 export const campaigns = new Hono<AppEnv>();
 
@@ -151,7 +152,7 @@ campaigns.post("/wa/campaigns", ...gate, async (c) => {
   return c.json(k, 201);
 });
 
-/** Sends the next batch of up to CAMPAIGN_BATCH (30). */
+/** Sends the next batch of up to CAMPAIGN_BATCH (15). */
 campaigns.post("/wa/campaigns/:id/next", ...gate, async (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id <= 0) throw new HttpError(404, "Not found");

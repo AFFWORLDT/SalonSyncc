@@ -192,8 +192,12 @@ export async function runFeedbackReminders(env: Env, orgId: string, at: number, 
   return out;
 }
 
-/** Campaign sends per drain call (/next, and the cron's per-campaign batch): below FM's 40 to keep /next well under the free plan's ~50 D1 queries per request. Free-plan limit: raise on upgrade. */
-export const CAMPAIGN_BATCH = 30;
+/**
+ * Campaign sends per drain call (/next, and the cron's per-campaign batch; Task 11 imports it). The free plan counts
+ * EVERY D1 statement (each one inside a batch too) toward ~50 per invocation; our ceiling is 45. A cold /next costs
+ * about 11 + 2N statements (N sends), so N = 15 is about 41. Free-plan limit: raise on upgrade.
+ */
+export const CAMPAIGN_BATCH = 15;
 
 /**
  * Sends the next batch of one campaign of org `orgId` (FM wa-jobs drainCampaign): POST /api/wa/campaigns/:id/next
@@ -214,10 +218,11 @@ export const CAMPAIGN_BATCH = 30;
  * neither calls Graph nor spends budget. On a budget stop the unsent claims are released (queued, unclaimed). The
  * campaign is finished (finished_at) once no queued row remains.
  *
- * D1 cost (round trips; for Task 11's per-invocation query budget): campaign row 1 (0 when `pre.row` is given) + WA
- * setup when `pre.cfg` is not given (org 1 + features 0-3, cached + org_whatsapp 1; skipped without whatsapp_campaigns)
- * + claim 1 (2 statements) + exactly 1 per Graph send (its SENDING mark, batched with the previous results) + 1 final
- * batch (the last results, the release, the finish check and the view). Finished, unknown or budget-0: row 1 + view 1.
+ * D1 cost in STATEMENTS (what the free plan counts, batched or not; for Task 11's per-invocation budget): campaign
+ * row 1 (0 when `pre.row` is given) + WA setup when `pre.cfg` is not given (org 1 + features 0-3, cached + org_whatsapp
+ * 1; skipped without whatsapp_campaigns) + claim 2 + 2 per Graph send (its SENDING mark and its result) + 1 per skipped
+ * row (its result) + finish 1 + view 1 (+ release 1 on a budget stop). Round trips: claim 1, 1 per send, final batch 1.
+ * Finished, unknown or budget-0: row 1 + view 1. A cold /next with 15 sends, session auth included: about 41.
  */
 export async function drainCampaign(
   env: Env,
