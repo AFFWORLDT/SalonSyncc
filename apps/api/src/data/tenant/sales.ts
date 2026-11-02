@@ -1,7 +1,7 @@
 import type { Sale, SaleItem, PaymentMode } from "@ss/contract";
 import { auditRepo, type AuditInput } from "./audit";
 import { customersRepo, likeEscape } from "./customers";
-import { ledgerRepo } from "./ledger";
+import { ledgerRepo, type Cond } from "./ledger";
 import { needsRepost, saleLines } from "../../lib/ledger";
 import { randomToken } from "../../core/crypto";
 
@@ -9,7 +9,7 @@ import { randomToken } from "../../core/crypto";
 const SALE_SELECT = `
   SELECT s.id, s.bill_no, s.token, s.day, s.barber_id, u.name AS barber_name, s.customer_id, s.customer_label,
          c.phone AS customer_phone, s.amount, s.payment_mode, s.note, s.commission_pct, s.commission,
-         s.vat_rate, s.vat_amount, s.created_at,
+         s.vat_rate, s.vat_amount, s.created_at, s.updated_at,
          (SELECT json_group_array(json_object('service_id', i.service_id, 'name', i.name, 'price', i.price, 'qty', i.qty))
             FROM (SELECT service_id, name, price, qty FROM sale_items WHERE org_id = s.org_id AND sale_id = s.id ORDER BY id) i) AS items_json
   FROM sales s
@@ -17,10 +17,13 @@ const SALE_SELECT = `
   LEFT JOIN customers c ON c.org_id = s.org_id AND c.id = s.customer_id
   WHERE s.org_id = ? AND s.deleted_at IS NULL`;
 
-type SaleRow = Omit<Sale, "items"> & { items_json: string | null };
+type SaleRow = Omit<Sale, "items"> & { items_json: string | null; updated_at: number };
+
+/** A sale plus its row version (updated_at), for optimistic concurrency on edit/delete. Not part of the API shape. */
+export type VersionedSale = Sale & { updated_at: number };
 
 function toSale(r: SaleRow): Sale {
-  const { items_json, ...rest } = r;
+  const { items_json, updated_at: _v, ...rest } = r;
   let items: SaleItem[] = [];
   try {
     items = items_json ? (JSON.parse(items_json) as SaleItem[]) : [];
@@ -137,6 +140,18 @@ export function salesRepo(db: D1Database, orgId: string) {
       return r ? toSale(r) : null;
     },
 
+    /** A live sale with its row version, for PUT/DELETE. */
+    async byIdVersioned(id: number): Promise<VersionedSale | null> {
+      const r = await db.prepare(`${SALE_SELECT} AND s.id = ?`).bind(orgId, id).first<SaleRow>();
+      return r ? { ...toSale(r), updated_at: r.updated_at } : null;
+    },
+
+    /** Whether this org has the sale at all, deleted or not (to tell 404 from 409 after a lost race). */
+    async isLive(id: number): Promise<boolean> {
+      const r = await db.prepare("SELECT 1 AS x FROM sales WHERE org_id = ? AND id = ? AND deleted_at IS NULL").bind(orgId, id).first();
+      return !!r;
+    },
+
     /** A live sale of this org by its receipt token. */
     async byToken(token: string): Promise<Sale | null> {
       const r = await db.prepare(`${SALE_SELECT} AND s.token = ?`).bind(orgId, token).first<SaleRow>();
@@ -147,11 +162,20 @@ export function salesRepo(db: D1Database, orgId: string) {
      * FM PUT /sales/:id in one batch: customer upsert, the row, items deleted and reinserted, the audit row (before/after),
      * and the ledger reversed and reposted only when the money lines differ (needsRepost).
      */
-    async update(old: Sale, e: SaleEdit, actor: AuditInput["actor"]): Promise<void> {
-      const at = Date.now();
+    async update(old: VersionedSale, e: SaleEdit, actor: AuditInput["actor"]): Promise<boolean> {
+      // A version that differs from the old one, so G below holds only if THIS batch's UPDATE took effect. G also pins the
+      // money fields: even if a concurrent edit landed in the same ms, G can only hold when the row's money equals ours,
+      // so the gated ledger statements still leave the ledger matching the row.
+      const at = Math.max(Date.now(), old.updated_at + 1);
+      const g: Cond = {
+        sql: `EXISTS (SELECT 1 FROM sales WHERE org_id = ? AND id = ? AND deleted_at IS NULL AND updated_at = ?
+                AND day = ? AND barber_id = ? AND amount = ? AND payment_mode = ? AND commission = ?)`,
+        binds: [orgId, old.id, at, e.day, e.barber.id, e.amount, e.payment_mode, e.commission],
+      };
       const cust = e.customer ? customers.idByPhone(e.customer.phone) : { sql: "NULL", binds: [] };
+      const { updated_at: _v, ...prev } = old;
       const next = {
-        ...old,
+        ...prev,
         day: e.day,
         barber_id: e.barber.id,
         barber_name: e.barber.name,
@@ -165,40 +189,48 @@ export function salesRepo(db: D1Database, orgId: string) {
         vat_amount: e.vat_amount,
         items: e.items,
       };
-      const oldLines = linesOf(old);
+      const oldLines = linesOf(prev);
       const newLines = linesOf(next);
       const stmts: D1PreparedStatement[] = [];
       if (e.customer) stmts.push(customers.upsertStmt(e.customer.name, e.customer.phone, e.customer.rename));
+      const updIdx = stmts.length;
+      // The row moves only from the version we read; every other statement is gated on G (this UPDATE took effect).
       stmts.push(
         db
           .prepare(
             `UPDATE sales SET day = ?, barber_id = ?, customer_id = ${cust.sql}, customer_label = ?, amount = ?, payment_mode = ?, note = ?,
                     commission_pct = ?, commission = ?, vat_amount = ?, updated_at = ?
-             WHERE org_id = ? AND id = ? AND deleted_at IS NULL`,
+             WHERE org_id = ? AND id = ? AND deleted_at IS NULL AND updated_at = ?`,
           )
-          .bind(e.day, e.barber.id, ...cust.binds, e.customer_label, e.amount, e.payment_mode, e.note, e.commission_pct, e.commission, e.vat_amount, at, orgId, old.id),
-        db.prepare("DELETE FROM sale_items WHERE org_id = ? AND sale_id = ?").bind(orgId, old.id),
+          .bind(e.day, e.barber.id, ...cust.binds, e.customer_label, e.amount, e.payment_mode, e.note, e.commission_pct, e.commission, e.vat_amount, at, orgId, old.id, old.updated_at),
+        db.prepare(`DELETE FROM sale_items WHERE org_id = ? AND sale_id = ? AND ${g.sql}`).bind(orgId, old.id, ...g.binds),
         ...e.items.map((i) =>
           db
-            .prepare("INSERT INTO sale_items (org_id, sale_id, service_id, name, price, qty) VALUES (?, ?, ?, ?, ?, ?)")
-            .bind(orgId, old.id, i.service_id, i.name, i.price, i.qty),
+            .prepare(`INSERT INTO sale_items (org_id, sale_id, service_id, name, price, qty) SELECT ?, ?, ?, ?, ?, ? WHERE ${g.sql}`)
+            .bind(orgId, old.id, i.service_id, i.name, i.price, i.qty, ...g.binds),
         ),
-        audit.stmt({ actor, entity: "sale", entityId: old.id, ref: old.bill_no, action: "update", before: saleSnapshot(old), after: saleSnapshot(next) }),
+        audit.stmt({ actor, entity: "sale", entityId: old.id, ref: old.bill_no, action: "update", when: g, before: saleSnapshot(prev), after: saleSnapshot(next) }),
       );
       if (needsRepost(oldLines, newLines)) {
-        stmts.push(...ledger.reverseStmts("sale", old.id, actor.id), ...ledger.postStmts("sale", old.id, old.bill_no, actor.id, newLines));
+        stmts.push(...ledger.reverseStmts("sale", old.id, actor.id, g), ...ledger.postStmts("sale", old.id, old.bill_no, actor.id, newLines, g));
       }
-      await db.batch(stmts);
+      const res = await db.batch(stmts);
+      return (res[updIdx]!.meta.changes ?? 0) > 0;
     },
 
-    /** FM DELETE /sales/:id: soft delete, audit, and every live ledger line reversed, in one batch. */
-    async remove(old: Sale, actor: AuditInput["actor"]): Promise<void> {
-      const at = Date.now();
-      await db.batch([
-        db.prepare("UPDATE sales SET deleted_at = ?, updated_at = ? WHERE org_id = ? AND id = ? AND deleted_at IS NULL").bind(at, at, orgId, old.id),
-        audit.stmt({ actor, entity: "sale", entityId: old.id, ref: old.bill_no, action: "delete", before: saleSnapshot(old), after: null }),
-        ...ledger.reverseStmts("sale", old.id, actor.id),
+    /** FM DELETE /sales/:id: soft delete from the version read, then audit and reversal gated on it, in one batch. False when the race was lost. */
+    async remove(old: VersionedSale, actor: AuditInput["actor"]): Promise<boolean> {
+      const at = Math.max(Date.now(), old.updated_at + 1);
+      const g: Cond = { sql: "EXISTS (SELECT 1 FROM sales WHERE org_id = ? AND id = ? AND deleted_at = ? AND updated_at = ?)", binds: [orgId, old.id, at, at] };
+      const { updated_at: _v, ...prev } = old;
+      const res = await db.batch([
+        db
+          .prepare("UPDATE sales SET deleted_at = ?, updated_at = ? WHERE org_id = ? AND id = ? AND deleted_at IS NULL AND updated_at = ?")
+          .bind(at, at, orgId, old.id, old.updated_at),
+        audit.stmt({ actor, entity: "sale", entityId: old.id, ref: old.bill_no, action: "delete", when: g, before: saleSnapshot(prev), after: null }),
+        ...ledger.reverseStmts("sale", old.id, actor.id, g),
       ]);
+      return (res[0]!.meta.changes ?? 0) > 0;
     },
 
     /** Writes the bill, its items, the customer upsert, the audit row and the ledger lines in one batch. */

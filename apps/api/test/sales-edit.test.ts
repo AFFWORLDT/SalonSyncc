@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import app from "../src/index";
 import { businessDay, addDays } from "../src/lib/clock";
 import { makeOrg, makeUser, loginAs } from "./helpers";
+import { PUBLIC_LIMITS } from "../src/lib/limits";
 
 // waitUntil work (customer stats) is collected so tests can await it deterministically.
 const pending: Promise<unknown>[] = [];
@@ -28,10 +29,10 @@ const dubaiToday = () => businessDay(Date.now(), { timezone: "Asia/Dubai", daySt
 
 async function setup(slug: string) {
   const org = await makeOrg({ slug, plan: "pro_max" });
-  await makeUser(org.id, { username: "own", role: "owner" });
+  const own = await makeUser(org.id, { username: "own", role: "owner" });
   const b1 = await makeUser(org.id, { username: "b1", role: "barber" });
   const b2 = await makeUser(org.id, { username: "b2", role: "barber" });
-  return { org, b1, b2, ck: await loginAs(slug, "own"), k1: await loginAs(slug, "b1"), k2: await loginAs(slug, "b2") };
+  return { org, own, b1, b2, ck: await loginAs(slug, "own"), k1: await loginAs(slug, "b1"), k2: await loginAs(slug, "b2") };
 }
 const setSettings = (orgId: string, sql: string, ...binds: unknown[]) =>
   env.DB.prepare(`UPDATE org_settings SET ${sql} WHERE org_id = ?`).bind(...binds, orgId).run();
@@ -79,7 +80,7 @@ describe("PUT /api/sales/:id", () => {
     expect((await put(a.ck, old.id, { amount: 10, payment_mode: "bitcoin" })).status).toBe(400);
     expect((await put(a.ck, 999999, { amount: 10, payment_mode: "cash" })).status).toBe(404);
     const created = await env.DB.prepare("SELECT created_by FROM sales WHERE org_id = ? AND id = ?").bind(a.org.id, old.id).first<any>();
-    expect(created.created_by).not.toBe(a.b2.id);
+    expect(created.created_by).toBe(a.own.id);
   });
 
   it("recomputes commission (snapshot pct unless the barber changes) and VAT (snapshot rate); items replaced", async () => {
@@ -200,6 +201,88 @@ describe("DELETE /api/sales/:id", () => {
   });
 });
 
+describe("optimistic concurrency (a concurrent write lands between the read and the batch)", () => {
+  /** An env whose DB runs `race` once, right before the route's write batch. */
+  const racing = (race: () => Promise<unknown>) => {
+    let done = false;
+    const DB = new Proxy(env.DB, {
+      get(t, k) {
+        if (k === "batch")
+          return async (stmts: D1PreparedStatement[]) => {
+            if (!done) { done = true; await race(); }
+            return t.batch(stmts);
+          };
+        const v = (t as any)[k];
+        return typeof v === "function" ? v.bind(t) : v;
+      },
+    });
+    return { ...E, DB };
+  };
+  const callIn = (e: any, method: string, path: string, cookie: string, body?: unknown) =>
+    app.fetch(
+      new Request(`https://x.test/api${path}`, {
+        method,
+        headers: { cookie, ...(body !== undefined ? { "content-type": "application/json" } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }),
+      e,
+      ctx,
+    );
+  const auditCount = async (orgId: string, saleId: number, action?: string) =>
+    (await env.DB.prepare(`SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND entity = 'sale' AND entity_id = ?${action ? " AND action = ?" : ""}`)
+      .bind(orgId, saleId, ...(action ? [action] : [])).first<any>()).n;
+  const liveLines = async (orgId: string, saleId: number) =>
+    (await env.DB.prepare("SELECT book, account, amount FROM ledger_entries WHERE org_id = ? AND source = 'sale' AND source_id = ? AND reversed = 0 AND reverses_id IS NULL ORDER BY id")
+      .bind(orgId, saleId).all()).results;
+
+  it("edit vs edit: the stale PUT gets 409 and writes nothing; the ledger matches the winner", async () => {
+    const a = await setup("occ-ee");
+    await setSettings(a.org.id, "default_commission_pct = 20");
+    const s = await post(a.k1, { amount: 50, payment_mode: "cash" });
+    // The winner reposts to 80 card; the loser (read the 50 cash version) sends a note-only change.
+    const e = racing(() => put(a.ck, s.id, { amount: 80, payment_mode: "card" }));
+    const r = await callIn(e, "PUT", `/sales/${s.id}`, a.k1, { amount: 50, payment_mode: "cash", note: "stale" });
+    expect(r.status).toBe(409);
+    expect(await r.json()).toEqual({ error: "This sale was changed by someone else. Reload and try again.", code: "stale" });
+    const row = await env.DB.prepare("SELECT amount, payment_mode, note FROM sales WHERE org_id = ? AND id = ?").bind(a.org.id, s.id).first();
+    expect(row).toEqual({ amount: 8000, payment_mode: "card", note: null });
+    expect(await auditCount(a.org.id, s.id, "update")).toBe(1);
+    expect(await lineCount(a.org.id, s.id)).toBe(6);
+    expect(await liveLines(a.org.id, s.id)).toEqual([{ book: "shop", account: "bank", amount: 8000 }, { book: "barber", account: null, amount: 1600 }]);
+  });
+
+  it("edit vs delete: the PUT gets 404, posts no lines, and the deleted sale's lines net to 0", async () => {
+    const a = await setup("occ-ed");
+    await setSettings(a.org.id, "default_commission_pct = 20");
+    const s = await post(a.k1, { amount: 50, payment_mode: "cash", note: "x" });
+    const e = racing(() => del(a.ck, s.id));
+    const r = await callIn(e, "PUT", `/sales/${s.id}`, a.k1, { amount: 70, payment_mode: "card", items: [{ name: "Gel", price: 70 }] });
+    expect(r.status).toBe(404);
+    expect(await liveLines(a.org.id, s.id)).toEqual([]);
+    expect(await lineCount(a.org.id, s.id)).toBe(4);
+    for (const b of await balances(a.org.id)) expect(b.bal).toBe(0);
+    expect(await auditCount(a.org.id, s.id, "update")).toBe(0);
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM sale_items WHERE org_id = ? AND sale_id = ?").bind(a.org.id, s.id).first<any>()).n).toBe(0);
+  });
+
+  it("stale DELETE gets 409 and reverses nothing; double DELETE writes exactly one delete audit row", async () => {
+    const a = await setup("occ-del");
+    const s = await post(a.k1, { amount: 50, payment_mode: "cash" });
+    const r = await callIn(racing(() => put(a.ck, s.id, { amount: 60, payment_mode: "cash" })), "DELETE", `/sales/${s.id}`, a.k1);
+    expect(r.status).toBe(409);
+    expect(await r.json()).toMatchObject({ code: "stale" });
+    expect((await env.DB.prepare("SELECT deleted_at FROM sales WHERE org_id = ? AND id = ?").bind(a.org.id, s.id).first<any>()).deleted_at).toBeNull();
+    expect(await liveLines(a.org.id, s.id)).toEqual([{ book: "shop", account: "cash", amount: 6000 }]);
+    expect(await auditCount(a.org.id, s.id, "delete")).toBe(0);
+
+    const d = await callIn(racing(() => del(a.ck, s.id)), "DELETE", `/sales/${s.id}`, a.k1);
+    expect(d.status).toBe(404);
+    expect(await auditCount(a.org.id, s.id, "delete")).toBe(1);
+    expect(await liveLines(a.org.id, s.id)).toEqual([]);
+    expect(await lineCount(a.org.id, s.id)).toBe(4);
+  });
+});
+
 describe("GET /api/public/receipt/:token", () => {
   const ROOT = "salonstation.online";
   const getReceipt = (host: string, token: string, root = ROOT) =>
@@ -265,5 +348,11 @@ describe("GET /api/public/receipt/:token", () => {
     expect((await getReceipt("x.test", t.token, "")).status).toBe(404);
     await env.DB.prepare("UPDATE orgs SET status = 'deleted' WHERE id = ?").bind(a.org.id).run();
     expect((await getReceipt("x.test", t.token, "")).status).toBe(404);
+  });
+
+  it("is rate limited per IP (pub bucket)", async () => {
+    const hit = () => app.fetch(new Request("https://x.test/api/public/receipt/nope-nope-nope", { headers: { "CF-Connecting-IP": "6.6.6.6" } }), E, ctx);
+    for (let i = 0; i < PUBLIC_LIMITS.pub; i++) expect((await hit()).status, `hit ${i}`).toBe(404);
+    expect((await hit()).status).toBe(429);
   });
 });

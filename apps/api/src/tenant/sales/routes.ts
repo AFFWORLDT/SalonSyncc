@@ -4,7 +4,7 @@ import type { AppEnv } from "../../env";
 import { HttpError } from "../../core/errors";
 import { isAdmin } from "../../core/roles";
 import { requireFeature } from "../../core/pipeline";
-import { clockOf, customersRepo, salesRepo, settingsRepo, type SaleFilters } from "../../data/tenant";
+import { clockOf, customersRepo, salesRepo, settingsRepo, type SaleFilters, type VersionedSale } from "../../data/tenant";
 import { businessDay, dayStamp } from "../../lib/clock";
 import { DAY_RE, commissionOf, toMinor, vatOf } from "../../lib/money";
 import { canonicalPhone } from "../../lib/phone";
@@ -182,9 +182,9 @@ sales.post("/", async (c) => {
 });
 
 /** FM editableSale: barbers may change only their own sales, and only on today's business day. 404 for missing/deleted/other org. */
-async function editableSale(c: Context<AppEnv>, repo: ReturnType<typeof salesRepo>, saleId: number, settings: Settings): Promise<Sale> {
+async function editableSale(c: Context<AppEnv>, repo: ReturnType<typeof salesRepo>, saleId: number, settings: Settings): Promise<VersionedSale> {
   const me = c.var.tenant.user;
-  const sale = await repo.byId(saleId);
+  const sale = await repo.byIdVersioned(saleId);
   if (!sale) throw new HttpError(404, "Not found");
   if (!isAdmin(me)) {
     if (sale.barber_id !== me.id) throw new HttpError(403, "You don't have access to this");
@@ -194,6 +194,12 @@ async function editableSale(c: Context<AppEnv>, repo: ReturnType<typeof salesRep
 }
 
 const WALK_IN = /^Customer \d+$/;
+
+/** After a lost race (the guarded write changed nothing): 404 if the sale is gone, else 409 stale. */
+async function lostRace(repo: ReturnType<typeof salesRepo>, saleId: number): Promise<never> {
+  if (!(await repo.isLive(saleId))) throw new HttpError(404, "Not found");
+  throw new HttpError(409, "This sale was changed by someone else. Reload and try again.", "stale");
+}
 
 sales.put("/:id", async (c) => {
   const me = c.var.tenant.user;
@@ -225,7 +231,7 @@ sales.put("/:id", async (c) => {
   const label =
     name ?? existing?.name ?? (WALK_IN.test(sale.customer_label) ? sale.customer_label : `Customer ${await c.var.tenant.repo.nextSeq(`cust_${dayStamp(day)}`)}`);
 
-  await repo.update(
+  const applied = await repo.update(
     sale,
     {
       day,
@@ -242,8 +248,9 @@ sales.put("/:id", async (c) => {
     },
     { id: me.id, name: me.name },
   );
+  if (!applied) await lostRace(repo, sale.id);
   const updated = await repo.byId(sale.id);
-  if (!updated) throw new HttpError(404, "Not found"); // deleted concurrently
+  if (!updated) throw new HttpError(404, "Not found"); // deleted right after our write
   refreshStats(c, [updated.customer_id, updated.customer_id !== sale.customer_id ? sale.customer_id : null]);
   return c.json(updated);
 });
@@ -255,7 +262,7 @@ sales.delete("/:id", async (c) => {
   const saleId = id(c.req.param("id"));
   const repo = salesRepo(db, orgId);
   const sale = await editableSale(c, repo, saleId, await settingsRepo(db, orgId).get());
-  await repo.remove(sale, { id: me.id, name: me.name });
+  if (!(await repo.remove(sale, { id: me.id, name: me.name }))) await lostRace(repo, sale.id);
   refreshStats(c, [sale.customer_id]);
   return c.json({ ok: true });
 });
