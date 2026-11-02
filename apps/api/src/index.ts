@@ -8,6 +8,7 @@ import { auth } from "./platform/auth";
 import { publicApi } from "./core/public";
 import { settings } from "./tenant/settings/routes";
 import { staff, avatarPublic } from "./tenant/staff/routes";
+import { services, servicesPublic } from "./tenant/services/routes";
 
 const app = new Hono<AppEnv>();
 
@@ -17,6 +18,7 @@ app.route("/api/auth", auth);
 
 // Public (no session) routes, before the tenant router so its guard never sees them.
 publicApi.route("/avatar", avatarPublic);
+publicApi.route("/services", servicesPublic);
 app.route("/api/public", publicApi);
 
 // Tenant routes. FAIL-CLOSED: the router-level guard runs tenantAuth whenever a real (non-middleware) handler
@@ -51,6 +53,7 @@ tenantApi.post("/_probe/write", (c) =>
 registerMe(tenantApi);
 tenantApi.route("/settings", settings);
 tenantApi.route("/", staff);
+tenantApi.route("/services", services);
 app.route("/api", tenantApi);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

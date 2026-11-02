@@ -41,3 +41,21 @@ CASES.push(
   staffCase("PUT", "/api/users/:id/avatar", undefined),
   staffCase("DELETE", "/api/users/:id/avatar"),
 );
+
+// ---- Task 5: services ----
+const seedService = async (orgId: string): Promise<number> => {
+  const r = await env.DB.prepare("INSERT INTO services(org_id,uid,category,name,price,created_at,updated_at) VALUES(?,?,?,?,?,?,?) RETURNING id")
+    .bind(orgId, randomToken(9), "Haircuts", "Cut", 1000, 1, 1)
+    .first<{ id: number }>();
+  return r!.id;
+};
+const readService = (orgId: string, id: number) => env.DB.prepare("SELECT * FROM services WHERE org_id = ? AND id = ?").bind(orgId, id).first();
+const serviceCase = (method: string, body?: unknown): CrossOrgCase => ({
+  name: `${method} /api/services/:id`,
+  method,
+  path: (id) => `/api/services/${id}`,
+  body,
+  seed: seedService,
+  read: readService,
+});
+CASES.push(serviceCase("PUT", { category: "Pwned", name: "Pwned", price: 1 }), serviceCase("DELETE"));
