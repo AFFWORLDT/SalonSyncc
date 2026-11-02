@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
-import { aed, businessToday, monthShort, num } from "@/lib/format";
+import { money, businessToday, monthShort, num } from "@/lib/format";
 import { exportMonthly } from "@/lib/excel";
 import type { MonthlyReport, Totals } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -66,7 +66,7 @@ export default function MonthlyPage() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MoneyTile label={`Sales ${year}`} value={data ? yearTotals.sales : null} className="bg-primary/5" />
-        <MoneyTile label="Expense" value={data ? yearTotals.expense : null} hint={yearTotals.company ? `incl. ${aed(yearTotals.company)} company` : undefined} />
+        <MoneyTile label="Expense" value={data ? yearTotals.expense : null} hint={yearTotals.company ? `incl. ${money(yearTotals.company)} company` : undefined} />
         <MoneyTile label="Commission" value={data ? yearTotals.commission : null} />
         <MoneyTile label="Profit" value={data ? yearTotals.profit : null} tone="success" />
       </div>

@@ -14,9 +14,13 @@ import { watchKeyboard } from "@/lib/keyboard";
 import { PullToRefresh } from "@/components/app/pull-to-refresh";
 import { startPush } from "@/lib/push";
 import { toast } from "sonner";
+import { SubscriptionBanner, ExpiredScreen } from "@/components/app/subscription";
 
-const COLLAPSE_KEY = "fm_sidebar_collapsed";
-const COLLAPSE_EVENT = "fm-sidebar-collapsed";
+/** Pages an expired salon can still open (read-only: reports, exports, its account and plan). */
+const READONLY_OK = ["/sheet", "/monthly", "/ledger", "/bills", "/history", "/account", "/plan"];
+
+const COLLAPSE_KEY = "ss_sidebar_collapsed";
+const COLLAPSE_EVENT = "ss-sidebar-collapsed";
 
 function subscribeCollapsed(cb: () => void) {
   window.addEventListener("storage", cb);
@@ -37,7 +41,7 @@ function readCollapsed() {
 /** Pages that render without sign-in or the app frame. */
 const PUBLIC_PATHS = ["/login", "/r", "/rate"];
 /** Pages only the admin may open (barbers are sent home). */
-const ADMIN_PATHS = ["/services", "/sales", "/expenses", "/sheet", "/monthly", "/audit", "/ledger", "/barbers", "/customers", "/settings"];
+const ADMIN_PATHS = ["/services", "/sales", "/expenses", "/sheet", "/monthly", "/audit", "/ledger", "/barbers", "/customers", "/settings", "/ratings", "/plan"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -69,21 +73,22 @@ function FrameSkeleton() {
 }
 
 function Frame({ children }: { children: React.ReactNode }) {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, loading, has, readOnly } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   // Devices that allowed notifications re-register after sign-in; pushes that land while the app is open show as toasts.
   const userId = user?.id;
+  const push = has("push");
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !push) return;
     let stop = () => {};
     startPush((title, body) => toast(title, { description: body }))
       .then((s) => (stop = s))
       .catch(() => {});
     return () => stop();
-  }, [userId]);
+  }, [userId, push]);
   const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
   const blocked = !!user && !isAdmin && ADMIN_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
@@ -95,7 +100,7 @@ function Frame({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!loading && !user) router.replace("/login");
+    if (!loading && !user) router.replace("/login/");
     else if (blocked) router.replace("/");
   }, [loading, user, blocked, router]);
 
@@ -113,7 +118,7 @@ function Frame({ children }: { children: React.ReactNode }) {
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetContent side="left" showCloseButton={false} className="gap-0 p-0 data-[side=left]:w-72 lg:hidden">
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
-                <SheetDescription className="sr-only">FM Salon pages</SheetDescription>
+                <SheetDescription className="sr-only">Pages</SheetDescription>
                 <AppSidebar onNavigate={() => setMobileOpen(false)} key={pathname} />
               </SheetContent>
             </Sheet>
@@ -121,10 +126,11 @@ function Frame({ children }: { children: React.ReactNode }) {
 
           <div className="flex h-full min-w-0 flex-1 flex-col">
             <TopBar onOpenMobileNav={() => setMobileOpen(true)} onToggleCollapsed={toggleCollapsed} />
+            <SubscriptionBanner />
             <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
               <PullToRefresh scrollRef={mainRef} />
               <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-6 sm:p-6 lg:p-8">
-                <div className="mx-auto w-full max-w-6xl">{children}</div>
+                <div className="mx-auto w-full max-w-6xl">{readOnly && !READONLY_OK.some((p) => pathname === p || pathname.startsWith(p + "/")) ? <ExpiredScreen /> : children}</div>
               </main>
             </div>
             <BottomBar />

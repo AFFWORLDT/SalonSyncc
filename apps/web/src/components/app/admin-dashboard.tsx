@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Check, Minus, Plus } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
 import { qs } from "@/lib/api";
-import { aed, dateLabel, businessToday, monthShort, num } from "@/lib/format";
+import { money, dateLabel, businessToday, monthShort, num } from "@/lib/format";
 import type { Overview } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -132,7 +132,7 @@ export function AdminDashboard() {
         <MoneyTile
           label={`Expense ${word}`}
           value={t?.expense ?? null}
-          hint={t?.company_expense ? `incl. ${aed(t.company_expense)} company` : undefined}
+          hint={t?.company_expense ? `incl. ${money(t.company_expense)} company` : undefined}
           action={
             <Button size="icon-sm" variant="outline" aria-label="Add company expense" className="-my-1.5 -mr-1.5 rounded-full" onClick={() => setAddExpense(true)}>
               <Plus />
@@ -229,7 +229,7 @@ export function AdminDashboard() {
       {data && data.series.length > 1 && (
         <ChartCard
           title={data.series_by === "month" ? "By month" : "By day"}
-          description={t ? `${aed(t.sales)} sales, ${aed(t.profit)} profit` : undefined}
+          description={t ? `${money(t.sales)} sales, ${money(t.profit)} profit` : undefined}
           kind="area"
           data={data.series.map((d) => ({
             label: data.series_by === "month" ? monthShort(d.key) : d.key.slice(8),

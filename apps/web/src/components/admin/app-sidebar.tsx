@@ -16,21 +16,21 @@ export function AppSidebar({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { me, settings } = useAuth();
   return (
     <div className="flex h-full min-h-0 flex-col bg-card text-card-foreground">
       <div className={cn("flex h-14 shrink-0 items-center gap-3 border-b border-border px-4", collapsed && "justify-center px-0")}>
-        <LogoMark size={30} />
+        <LogoMark size={30} src={settings?.logo_url} />
         {!collapsed && (
           <div className="min-w-0">
-            <p className="truncate text-base font-semibold leading-tight tracking-tight">FM Salon</p>
-            <p className="font-mono truncate text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Gents salon · Dubai</p>
+            <p className="truncate text-base font-semibold leading-tight tracking-tight">{settings?.display_name}</p>
+            {settings?.tagline && <p className="font-mono truncate text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{settings.tagline}</p>}
           </div>
         )}
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-3" aria-label="Main">
-        {navFor(user?.role).map((group) => (
+        {navFor(me).map((group) => (
           <div key={group.label} className="mb-4 last:mb-0">
             {collapsed ? (
               <div className="mx-3 mb-1 h-px bg-border" />

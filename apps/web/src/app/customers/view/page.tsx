@@ -8,7 +8,7 @@ import { notifyDataChanged, useApi } from "@/hooks/use-api";
 import { api, errorMessage, qs } from "@/lib/api";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { aed, businessDay, dateLabel, dateTimeLabel, phoneLabel, whatsappDigits } from "@/lib/format";
+import { money, businessDay, dateLabel, dateTimeLabel, phoneLabel, whatsappDigits } from "@/lib/format";
 import type { CustomerDetail, Paged, Sale } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -130,7 +130,7 @@ function Profile({ id }: { id: string }) {
       <Card className="gap-0 p-0">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <p className="text-sm font-semibold">Visit history</p>
-          {list && <p className="num text-sm text-muted-foreground">{list.total} bills · {aed(list.sum ?? 0)}</p>}
+          {list && <p className="num text-sm text-muted-foreground">{list.total} bills · {money(list.sum ?? 0)}</p>}
         </div>
         {visits.error && !list ? (
           <ErrorState message={visits.error} onRetry={visits.reload} />

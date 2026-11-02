@@ -5,7 +5,7 @@ import { Eye, EyeOff, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { notifyDataChanged, useApi } from "@/hooks/use-api";
-import { aed, toInput } from "@/lib/format";
+import { money, toInput } from "@/lib/format";
 import type { Service } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,7 +97,7 @@ export default function ServicesPage() {
                       </p>
                       {s.description && <p className="truncate text-xs text-muted-foreground">{s.description}</p>}
                     </button>
-                    <p className="num text-sm font-semibold">{aed(s.price)}</p>
+                    <p className="num text-sm font-semibold">{money(s.price)}</p>
                     <DropdownMenu>
                       <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label={`Actions for ${s.name}`} />}>
                         <MoreVertical />

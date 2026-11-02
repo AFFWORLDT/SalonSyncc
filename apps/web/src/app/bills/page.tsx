@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ReceiptText, Search, X } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
 import { qs } from "@/lib/api";
-import { aed, dateTimeLabel, businessToday } from "@/lib/format";
+import { money, dateTimeLabel, businessToday } from "@/lib/format";
 import type { Paged, Sale } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -60,7 +60,7 @@ export default function BillsPage() {
       <Card className="gap-0 p-0">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <p className="text-sm font-semibold">{shown ? `${shown.total} bill${shown.total === 1 ? "" : "s"}` : "Bills"}</p>
-          {shown && <p className="num text-sm font-semibold">{aed(shown.sum ?? 0)}</p>}
+          {shown && <p className="num text-sm font-semibold">{money(shown.sum ?? 0)}</p>}
         </div>
         {error && !shown ? (
           <ErrorState message={error} onRetry={reload} />
@@ -82,7 +82,7 @@ export default function BillsPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="num text-sm font-semibold">{aed(s.amount)}</p>
+                    <p className="num text-sm font-semibold">{money(s.amount)}</p>
                     <p className="text-xs text-muted-foreground">{s.payment_mode === "cash" ? "Cash" : "Card"}</p>
                   </div>
                 </button>

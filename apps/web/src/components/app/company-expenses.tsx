@@ -5,7 +5,7 @@ import { Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { notifyDataChanged, useApi } from "@/hooks/use-api";
-import { aed, dayLabel, businessToday, toInput } from "@/lib/format";
+import { money, dayLabel, businessToday, toInput } from "@/lib/format";
 import type { CompanyExpense } from "@/lib/types";
 import { haptic } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ export function CompanyExpenses({ month, adding, onAddingChange }: { month: stri
       <Card className="gap-0 p-0">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <p className="text-sm font-semibold">Company expenses</p>
-          {data && <p className="num text-sm font-semibold">{aed(total)}</p>}
+          {data && <p className="num text-sm font-semibold">{money(total)}</p>}
         </div>
         {error && !data ? (
           <ErrorState message={error} onRetry={reload} />
@@ -55,7 +55,7 @@ export function CompanyExpenses({ month, adding, onAddingChange }: { month: stri
                       {dayLabel(e.day)} · {e.paid_from === "bank" ? "Bank" : "Cash"}
                     </p>
                   </div>
-                  <p className="num text-sm font-semibold">{aed(e.amount)}</p>
+                  <p className="num text-sm font-semibold">{money(e.amount)}</p>
                 </button>
               </li>
             ))}

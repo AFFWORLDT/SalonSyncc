@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronRight, Search } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
 import { qs } from "@/lib/api";
-import { aed, dateTimeLabel, phoneLabel, whatsappDigits } from "@/lib/format";
+import { money, dateTimeLabel, phoneLabel, whatsappDigits } from "@/lib/format";
 import type { Customer, Paged } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -61,7 +61,7 @@ export default function CustomersPage() {
                       {c.last_visit_at ? ` · last ${dateTimeLabel(c.last_visit_at)}` : ""}
                     </p>
                   </div>
-                  <p className="num text-sm font-semibold">{aed(c.spent)}</p>
+                  <p className="num text-sm font-semibold">{money(c.spent)}</p>
                   <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
                 </Link>
                 {c.phone && (

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
-import { aed, dayLabel, businessToday } from "@/lib/format";
+import { money, dayLabel, businessToday } from "@/lib/format";
 import type { Expense, User } from "@/lib/types";
 import { qs } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -72,7 +72,7 @@ export default function ExpensesPage() {
         <Card className="gap-0 p-0">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <p className="text-sm font-semibold">Expenses</p>
-            {data && <p className="num text-sm font-semibold">{aed(total)}</p>}
+            {data && <p className="num text-sm font-semibold">{money(total)}</p>}
           </div>
           {error && !data ? (
             <ErrorState message={error} onRetry={reload} />
@@ -105,7 +105,7 @@ export default function ExpensesPage() {
                         {e.note ? ` · ${e.note}` : ""}
                       </p>
                     </div>
-                    <p className="num text-sm font-semibold">{aed(e.amount)}</p>
+                    <p className="num text-sm font-semibold">{money(e.amount)}</p>
                   </button>
                 </li>
               ))}

@@ -44,7 +44,7 @@ export default function AccountPage() {
         <CardHeader>
           <CardTitle>{user?.name}</CardTitle>
           <CardDescription>
-            @{user?.username} · {isAdmin ? "Admin" : "Barber"}
+            @{user?.username} · {user?.role === "owner" ? "Owner" : isAdmin ? "Admin" : "Barber"}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -87,9 +87,9 @@ export default function AccountPage() {
               <Input id="cur" type="password" autoComplete="current-password" required value={current} onChange={(e) => setCurrent(e.target.value)} className="h-11" />
             </Field>
             <Field label="New password" htmlFor="new" hint="At least 4 characters">
-              <Input id="new" type="password" autoComplete="new-password" required minLength={4} value={next} onChange={(e) => setNext(e.target.value)} className="h-11" />
+              <Input id="new" type="password" autoComplete="new-password" required minLength={6} value={next} onChange={(e) => setNext(e.target.value)} className="h-11" />
             </Field>
-            <Button type="submit" className="h-11 self-start" disabled={saving || !current || next.length < 4}>
+            <Button type="submit" className="h-11 self-start" disabled={saving || !current || next.length < 6}>
               {saving ? "Saving…" : "Change password"}
             </Button>
           </form>

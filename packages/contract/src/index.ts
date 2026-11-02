@@ -138,6 +138,21 @@ export interface Settings {
 /** PUT /api/settings body: every editable field is required (full replace, like FM). */
 export type SettingsInput = Omit<Settings, "currency_minor" | "logo_url" | "brand_color">;
 
+/** Every key PUT /api/settings requires, so clients can build a complete body. The type check below keeps it in step with SettingsInput. */
+export const SETTINGS_INPUT_KEYS = [
+  "display_name", "salon_name_ar", "tagline", "address", "phone", "licence_no", "trn", "vat_enabled", "vat_rate",
+  "default_commission_pct", "quick_amounts", "thank_you_text", "receipt_footer", "notify_sales", "notify_sale_min",
+  "notify_summary", "summary_hour", "notify_reminder", "reminder_hour", "notify_barber_changes", "google_review_url",
+  "instagram_url", "timezone", "day_start_hour", "currency", "locale", "phone_country", "bill_prefix", "wa_bill_auto",
+  "wa_bill_template", "wa_bill_pdf_template", "wa_reminder_enabled", "wa_reminder_days", "wa_reminder_hour",
+  "wa_reminder_template", "wa_language", "wa_feedback_enabled", "wa_feedback_delay_min", "wa_feedback_template",
+  "wa_feedback_reminder_min", "wa_feedback_reminder_template", "wa_rating_image_url", "wa_rating_reminder_image_url",
+  "wa_fresh_cut_image_url",
+] as const satisfies readonly (keyof SettingsInput)[];
+type _MissingSettingsKeys = Exclude<keyof SettingsInput, (typeof SETTINGS_INPUT_KEYS)[number]>;
+const _settingsKeysComplete: [_MissingSettingsKeys] extends [never] ? true : _MissingSettingsKeys = true;
+void _settingsKeysComplete;
+
 /** GET/PUT /api/settings response: the settings plus whether WhatsApp can send (feature on and a number connected). */
 export type SettingsResponse = Settings & { wa_ready: boolean };
 

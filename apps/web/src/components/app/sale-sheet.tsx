@@ -6,8 +6,8 @@ import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useApi, notifyDataChanged } from "@/hooks/use-api";
-import { aed, checkPhone, businessToday, splitPhone, toInput } from "@/lib/format";
-import type { PaymentMode, Sale, Service, Settings, User } from "@/lib/types";
+import { money, checkPhone, businessToday, splitPhone, toInput } from "@/lib/format";
+import type { PaymentMode, Sale, Service, Settings, SettingsResponse, User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -295,7 +295,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
   const canCustomer = canServices && total > 0;
   const steps: { key: Step; label: string; value: string; enabled: boolean }[] = [
     ...(isAdmin ? [{ key: "barber" as const, label: "Barber", value: barberName, enabled: true }] : []),
-    { key: "services", label: "Services", value: total ? aed(total) : "", enabled: canServices },
+    { key: "services", label: "Services", value: total ? money(total) : "", enabled: canServices },
     { key: "customer", label: "Customer", value: name.trim() || (phone ? "Mobile added" : ""), enabled: canCustomer },
   ];
   const go = (to: Step) => {
@@ -426,7 +426,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
             <div className="mb-2 flex items-end justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Total</p>
-                <p className="num text-2xl leading-tight font-semibold">{aed(total)}</p>
+                <p className="num text-2xl leading-tight font-semibold">{money(total)}</p>
               </div>
               <p className="truncate pb-1 text-xs text-primary">{target ? `Typing: ${targetLabel}` : targetLabel}</p>
             </div>
@@ -441,7 +441,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
                   className="flex flex-1 flex-col items-center justify-center rounded-xl bg-primary text-primary-foreground active:scale-[0.97] disabled:opacity-40"
                 >
                   <span className="text-base font-semibold">Next →</span>
-                  {total > 0 && <span className="num text-xs opacity-80">{aed(total)}</span>}
+                  {total > 0 && <span className="num text-xs opacity-80">{money(total)}</span>}
                 </button>
               }
             />
@@ -514,7 +514,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
                           {l.name}
                           {l.qty > 1 ? ` × ${l.qty}` : ""}
                         </span>
-                        <span className="num">{aed(l.price * l.qty)}</span>
+                        <span className="num">{money(l.price * l.qty)}</span>
                       </li>
                     ))
                   ) : (
@@ -523,7 +523,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
                 </ul>
                 <div className="flex justify-between gap-3 text-base font-semibold">
                   <span>Total</span>
-                  <span className="num">{aed(total)}</span>
+                  <span className="num">{money(total)}</span>
                 </div>
               </div>
 
@@ -561,7 +561,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
               disabled={saving || !total || !barberId || (phoneTouched && !!phoneCheck.error)}
               onPointerDown={() => haptic("tap")}
             >
-              {saving ? "Saving…" : `${editing ? "Save changes" : "Save bill"} · ${aed(total)}`}
+              {saving ? "Saving…" : `${editing ? "Save changes" : "Save bill"} · ${money(total)}`}
             </Button>
           </div>
         </>
@@ -580,7 +580,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
   );
 }
 
-function SavedView({ sale, settings, onDone, onAnother }: { sale: Sale; settings: Settings | null; onDone: () => void; onAnother: () => void }) {
+function SavedView({ sale, settings, onDone, onAnother }: { sale: Sale; settings: SettingsResponse | null; onDone: () => void; onAnother: () => void }) {
   return (
     <div className="flex flex-col gap-4 p-4 sm:p-5">
       <div className="flex items-center gap-3 rounded-xl bg-success/10 p-3">
@@ -590,7 +590,7 @@ function SavedView({ sale, settings, onDone, onAnother }: { sale: Sale; settings
         <div className="min-w-0">
           <SheetTitle className="text-base">Congrats! Bill generated</SheetTitle>
           <SheetDescription className="truncate">
-            {sale.id ? `${sale.bill_no} · ${aed(sale.amount)} · saved under Bills` : `${aed(sale.amount)} · saving…`}
+            {sale.id ? `${sale.bill_no} · ${money(sale.amount)} · saved under Bills` : `${money(sale.amount)} · saving…`}
           </SheetDescription>
         </div>
       </div>

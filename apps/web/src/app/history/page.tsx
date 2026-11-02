@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useApi } from "@/hooks/use-api";
-import { aed, dayLabel, businessToday, num } from "@/lib/format";
+import { money, dayLabel, businessToday, num } from "@/lib/format";
 import type { MyReport } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -62,7 +62,7 @@ export default function HistoryPage() {
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">Nothing recorded in this month.</p>
             )}
             {data && data.days.length > 0 && (
-              <p className="border-t px-4 py-2.5 text-right text-xs text-muted-foreground">All amounts in AED · month total {aed(data.totals.sales)}</p>
+              <p className="border-t px-4 py-2.5 text-right text-xs text-muted-foreground">All amounts in AED · month total {money(data.totals.sales)}</p>
             )}
           </Card>
         </>

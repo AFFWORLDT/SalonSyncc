@@ -2,7 +2,7 @@
 
 import { Banknote, CreditCard, ReceiptText } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { aed, dayLabel, phoneLabel, timeLabel } from "@/lib/format";
+import { money, dayLabel, phoneLabel, timeLabel } from "@/lib/format";
 import type { Sale } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -38,7 +38,7 @@ export function SaleRow({ sale, editable, showBarber, showDay }: { sale: Sale; e
           {what ? ` · ${what}` : ""}
         </p>
       </div>
-      <p className="num shrink-0 text-sm font-semibold">{aed(sale.amount)}</p>
+      <p className="num shrink-0 text-sm font-semibold">{money(sale.amount)}</p>
     </>
   );
   return (

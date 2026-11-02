@@ -1,7 +1,7 @@
 "use client";
 
 import { useApi } from "@/hooks/use-api";
-import { aed, dateTimeLabel, dayLabel, pctLabel, phoneLabel } from "@/lib/format";
+import { money, dateTimeLabel, dayLabel, pctLabel, phoneLabel } from "@/lib/format";
 import type { AuditEntry } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -43,7 +43,7 @@ export function fieldLabel(key: string): string {
 
 function show(key: string, v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
-  if (MONEY.has(key) && typeof v === "number") return aed(v);
+  if (MONEY.has(key) && typeof v === "number") return money(v);
   if (key === "commission_pct" || key === "default_commission_pct") return pctLabel(Number(v));
   if (key === "vat_rate") return `${Math.round(Number(v) * 100)}%`;
   if (key === "day" && typeof v === "string") return dayLabel(v);
@@ -51,7 +51,7 @@ function show(key: string, v: unknown): string {
   if (key === "payment_mode") return String(v).toUpperCase();
   if (typeof v === "boolean") return v ? "Yes" : "No";
   if (key === "items" && Array.isArray(v)) {
-    return v.length ? v.map((i: { name: string; qty: number; price: number }) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ""} ${aed(i.price)}`).join(", ") : "—";
+    return v.length ? v.map((i: { name: string; qty: number; price: number }) => `${i.name}${i.qty > 1 ? ` ×${i.qty}` : ""} ${money(i.price)}`).join(", ") : "—";
   }
   if (Array.isArray(v)) return v.join(", ");
   return String(v);

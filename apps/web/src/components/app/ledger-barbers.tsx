@@ -5,7 +5,7 @@ import { ArrowLeft, HandCoins } from "lucide-react";
 import { toast } from "sonner";
 import { notifyDataChanged, useApi } from "@/hooks/use-api";
 import { api, errorMessage, qs } from "@/lib/api";
-import { aed, dayLabel, businessToday, num, timeLabel, toInput } from "@/lib/format";
+import { money, dayLabel, businessToday, num, timeLabel, toInput } from "@/lib/format";
 import type { BarberBalance, BarberLedger, LedgerLine, MoneyAccount, Payout } from "@/lib/types";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -158,7 +158,7 @@ function Statement({
           <>
             <div className="flex items-center justify-between bg-muted/40 px-4 py-3 text-sm font-semibold">
               <span>Owed on {dayLabel(data.from)}</span>
-              <span className="num">{aed(data.opening)}</span>
+              <span className="num">{money(data.opening)}</span>
             </div>
             {data.lines.length ? (
               <ul className="divide-y border-y">
@@ -243,7 +243,7 @@ function PayoutForm({ barberId, current, barbers, onDone }: { barberId: number |
         <DialogTitle>{current ? "Edit payout" : "Pay barber"}</DialogTitle>
         <DialogDescription>Money given to a barber: commission, salary or an advance. It comes out of the cash drawer or the bank.</DialogDescription>
       </DialogHeader>
-      <Field label="Barber" htmlFor="po-barber" hint={owed !== undefined ? `Owed now: ${aed(owed)}` : undefined}>
+      <Field label="Barber" htmlFor="po-barber" hint={owed !== undefined ? `Owed now: ${money(owed)}` : undefined}>
         <SimpleSelect
           id="po-barber"
           label="Barber"

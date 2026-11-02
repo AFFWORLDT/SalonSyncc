@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Minus, Plus, X } from "lucide-react";
-import { aed } from "@/lib/format";
+import { money } from "@/lib/format";
 import type { Service } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -123,7 +123,7 @@ export function ServicePicker({
               )}
             >
               <span className="text-sm leading-tight font-medium">{s.name}</span>
-              <span className="num text-xs text-muted-foreground">{aed(s.price)}</span>
+              <span className="num text-xs text-muted-foreground">{money(s.price)}</span>
               {qty > 0 && (
                 <span className="num absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
                   {qty}
@@ -154,7 +154,7 @@ export function ServicePicker({
                     <span className="mr-1 text-xs text-muted-foreground">AED</span>
                     {target === priceTarget(l) ? activeText || <span className="text-muted-foreground">{l.price / 100}</span> : l.price / 100}
                   </button>
-                  {l.qty > 1 ? <span>× {l.qty} = {aed(l.price * l.qty)}</span> : null}
+                  {l.qty > 1 ? <span>× {l.qty} = {money(l.price * l.qty)}</span> : null}
                 </div>
               </div>
               <Button type="button" variant="ghost" size="icon-sm" onClick={() => {

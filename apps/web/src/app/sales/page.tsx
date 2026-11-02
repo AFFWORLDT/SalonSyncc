@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
-import { aed, dateLabel, businessToday } from "@/lib/format";
+import { money, dateLabel, businessToday } from "@/lib/format";
 import type { Paged, Sale, User } from "@/lib/types";
 import { qs } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -78,7 +78,7 @@ export default function SalesPage() {
           <p className="text-sm font-semibold">{day ? dateLabel(day) : "All days"}</p>
           {shown && (
             <p className="num text-sm text-muted-foreground">
-              {shown.total} sales · <span className="font-semibold text-foreground">{aed(shown.sum ?? 0)}</span>
+              {shown.total} sales · <span className="font-semibold text-foreground">{money(shown.sum ?? 0)}</span>
             </p>
           )}
         </div>

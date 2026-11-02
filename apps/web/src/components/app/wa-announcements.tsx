@@ -8,6 +8,7 @@ import { useApi } from "@/hooks/use-api";
 import { useAuth } from "@/lib/auth-context";
 import { dateTimeLabel } from "@/lib/format";
 import type {
+  WaConfigView,
   WaCampaign,
   WaMessage,
   WaParam,
@@ -35,6 +36,7 @@ import { ErrorState } from "@/components/admin/states";
 import { Field } from "./field";
 import { SimpleSelect } from "./simple-select";
 import { WhatsAppIcon } from "./whatsapp-icon";
+import { UpgradeCard } from "./upgrade-card";
 
 const SAMPLE_NAME = "Naveed";
 type Blank = {
@@ -63,34 +65,32 @@ const STATUS_TONE: Record<
 
 /** WhatsApp announcements to customers: pick an approved template, fill its blanks, test, then send to everyone. */
 export function WaAnnouncements() {
-  const { settings } = useAuth();
-  const templates = useApi<WaTemplate[]>(
-    settings?.wa_ready ? "/api/wa/templates" : null,
-  );
-  const audience = useApi<{ customers: number }>(
-    settings?.wa_ready ? "/api/wa/audience" : null,
-  );
-  const campaigns = useApi<WaCampaign[]>(
-    settings?.wa_ready ? "/api/wa/campaigns" : null,
-  );
+  const { settings, has } = useAuth();
+  // Campaigns need the campaigns feature, WhatsApp itself and a connected number (the API answers 403/409 otherwise).
+  const ready = has("whatsapp_campaigns") && has("whatsapp") && !!settings?.wa_ready;
+  const templates = useApi<WaTemplate[]>(ready ? "/api/wa/templates" : null);
+  const config = useApi<WaConfigView>(ready ? "/api/whatsapp/config" : null);
+  const testNumbers = config.data?.test_numbers ?? [];
+  const audience = useApi<{ customers: number }>(ready ? "/api/wa/audience" : null);
+  const campaigns = useApi<WaCampaign[]>(ready ? "/api/wa/campaigns" : null);
   const [creating, setCreating] = useState(false);
 
   if (!settings) return <Skeleton className="h-64 rounded-xl" />;
+  if (!has("whatsapp_campaigns") || !has("whatsapp")) return <UpgradeCard feature="whatsapp_campaigns" />;
   if (!settings.wa_ready)
     return (
       <Card className="items-center gap-1 p-8 text-center">
         <WhatsAppIcon className="size-8" />
-        <p className="text-sm font-medium">
-          WhatsApp isn&apos;t connected on this server
-        </p>
+        <p className="text-sm font-medium">Connect WhatsApp in Settings</p>
+        <p className="text-xs text-muted-foreground">Add your WhatsApp Business number under Settings → WhatsApp to send announcements.</p>
       </Card>
     );
 
   return (
     <div className="flex flex-col gap-5">
-      {settings.wa_test_numbers && (
+      {testNumbers.length > 0 && (
         <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-          Test mode: only {settings.wa_test_numbers} gets messages here. Every
+          Test mode: only {testNumbers.join(", ")} gets messages here. Every
           other customer is skipped.
         </p>
       )}
@@ -103,7 +103,7 @@ export function WaAnnouncements() {
         <Compose
           templates={templates.data}
           audience={audience.data?.customers ?? null}
-          testDefault={settings.wa_test_numbers?.split(",")[0]?.trim() ?? ""}
+          testDefault={testNumbers[0] ?? ""}
           onSent={() => campaigns.reload()}
         />
       )}

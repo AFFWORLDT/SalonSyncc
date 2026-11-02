@@ -20,20 +20,22 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LogoMark } from "@/components/logo";
 import { titleForPath } from "./nav";
+import { BRAND_NAME } from "@/lib/brand";
 import { useSaleSheet } from "@/components/app/sale-sheet";
 
 export function TopBar({ onOpenMobileNav, onToggleCollapsed }: { onOpenMobileNav: () => void; onToggleCollapsed: () => void }) {
-  const { user, isAdmin, logout } = useAuth();
+  const { me, user, settings, isAdmin, readOnly, logout, has } = useAuth();
   const { resolved, setAppearance } = useAppTheme();
   const { openNew } = useSaleSheet();
   const router = useRouter();
   const pathname = usePathname();
   const initial = user?.name?.trim()?.[0]?.toUpperCase() || "?";
-  const title = titleForPath(user?.role, pathname);
+  const salon = settings?.display_name ?? "";
+  const title = titleForPath(me, pathname, salon);
 
   useEffect(() => {
-    document.title = title === "FM Salon" ? title : `${title} — FM Salon`;
-  }, [title]);
+    document.title = title && title !== salon ? `${title} · ${salon}` : salon || BRAND_NAME;
+  }, [title, salon]);
 
   return (
     <header className="box-content flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top)] sm:px-4 lg:px-6">
@@ -42,17 +44,17 @@ export function TopBar({ onOpenMobileNav, onToggleCollapsed }: { onOpenMobileNav
           <Menu />
         </Button>
       ) : (
-        <LogoMark size={28} className="lg:hidden" />
+        <LogoMark size={28} className="lg:hidden" src={settings?.logo_url} />
       )}
       <Button variant="ghost" size="icon" className="hidden lg:inline-flex" onClick={onToggleCollapsed} aria-label="Toggle sidebar">
         <PanelLeft />
       </Button>
       <p className="min-w-0 flex-1 truncate text-base font-semibold">{title}</p>
-      <Button size="sm" className="hidden lg:inline-flex" onClick={() => openNew()}>
+      <Button size="sm" className="hidden lg:inline-flex" onClick={() => openNew()} disabled={readOnly}>
         <Plus />
         New sale
       </Button>
-      <NotificationBell />
+      {has("push") && <NotificationBell />}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Account menu" />}>
           <UserAvatar name={user?.name ?? initial} url={user?.avatar_url} size={30} />
@@ -62,7 +64,7 @@ export function TopBar({ onOpenMobileNav, onToggleCollapsed }: { onOpenMobileNav
             <DropdownMenuLabel className="flex flex-col">
               <span className="truncate text-sm font-medium text-foreground">{user?.name}</span>
               <span className="truncate text-xs font-normal text-muted-foreground">
-                @{user?.username} · {isAdmin ? "Admin" : "Barber"}
+                @{user?.username} · {user?.role === "owner" ? "Owner" : isAdmin ? "Admin" : "Barber"}
               </span>
             </DropdownMenuLabel>
           </DropdownMenuGroup>

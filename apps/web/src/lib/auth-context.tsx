@@ -1,76 +1,114 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type { FeatureKey } from "@ss/features";
 import { clearApiCache } from "@/hooks/use-api";
-import { api } from "./api";
-import type { Me, Settings } from "./types";
+import { api, clearSessionCaches, onApiEvent, SESSION_CACHE_PREFIX } from "./api";
+import { setFormat } from "./format";
+import type { MeResponse, Settings } from "./types";
 import { forgetPushToken } from "@/lib/push";
 
-interface Session {
-  user: Me;
-  settings: Settings;
-  today: string;
-}
+/** Org statuses in which the salon can still change data (the API's write guard, WRITE_OK). */
+const WRITABLE = new Set(["trial", "active", "grace", "past_due"]);
+const LAST_ORG = "ss_last_org";
 
 interface AuthValue {
-  user: Me | null;
-  settings: Settings | null;
+  me: MeResponse | null;
+  user: MeResponse["user"] | null;
+  settings: (Settings & { wa_ready: boolean }) | null;
+  org: MeResponse["org"] | null;
+  features: string[];
+  /** True when the salon's plan (plus overrides) includes the feature. */
+  has: (f: FeatureKey) => boolean;
+  /** Owner or admin. */
   isAdmin: boolean;
+  /** The subscription has lapsed: reads only (the API answers writes with 402). */
+  readOnly: boolean;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  /** `org` is the salon ID (slug); needed when the host isn't the salon's own subdomain. */
+  login: (org: string | undefined, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
-const CACHE_KEY = "fm_session_cache";
 
-/** Last /auth/me answer, so a returning user sees their screen instantly while it revalidates. */
-function readCache(): Session | null {
+function cacheKey(slug: string) {
+  return `${SESSION_CACHE_PREFIX}${slug}`;
+}
+/** Last /api/me answer for the last salon signed in on this browser, so a returning user sees their screen at once. */
+function readCache(): MeResponse | null {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as Session) : null;
+    const slug = localStorage.getItem(LAST_ORG);
+    const raw = slug ? localStorage.getItem(cacheKey(slug)) : null;
+    return raw ? (JSON.parse(raw) as MeResponse) : null;
   } catch {
     return null;
   }
 }
-function writeCache(s: Session | null) {
+function writeCache(m: MeResponse | null) {
   try {
-    if (s) localStorage.setItem(CACHE_KEY, JSON.stringify(s));
-    else localStorage.removeItem(CACHE_KEY);
+    if (m) {
+      localStorage.setItem(cacheKey(m.org.slug), JSON.stringify(m));
+      localStorage.setItem(LAST_ORG, m.org.slug);
+    } else clearSessionCaches();
   } catch {}
 }
 
+export function lastOrg(): string {
+  try {
+    return localStorage.getItem(LAST_ORG) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
+  const [me, setMe] = useState<MeResponse | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const apply = useCallback((m: MeResponse | null) => {
+    setFormat(m?.settings ?? null);
+    setMe(m);
+    writeCache(m);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
-      const d = await api<Session>("/api/auth/me", { redirectOn401: false });
-      setSession(d);
-      writeCache(d);
+      apply(await api<MeResponse>("/api/me", { redirectOn401: false }));
     } catch {
-      setSession(null);
-      writeCache(null);
+      apply(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [apply]);
 
   useEffect(() => {
     const cached = readCache();
     if (cached) {
+      setFormat(cached.settings);
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSession(cached);
+      setMe(cached);
       setLoading(false);
     }
     refresh();
   }, [refresh]);
 
+  // The plan or subscription changed while the app was open: reload /api/me so menus and gates follow.
+  useEffect(
+    () =>
+      onApiEvent((k) => {
+        if (k === "feature_disabled" || k === "subscription_inactive") refresh();
+      }),
+    [refresh]
+  );
+
   const login = useCallback(
-    async (username: string, password: string) => {
-      await api("/api/auth/login", { body: { username, password }, redirectOn401: false });
+    async (org: string | undefined, username: string, password: string) => {
+      const body: Record<string, string> = { username, password };
+      if (org) body.org = org.trim().toLowerCase();
+      await api("/api/auth/login", { body, redirectOn401: false });
+      clearApiCache();
       await refresh();
     },
     [refresh]
@@ -82,24 +120,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await forgetPushToken();
       await api("/api/auth/logout", { method: "POST", redirectOn401: false });
     } finally {
-      setSession(null);
-      writeCache(null);
+      setFormat(null);
+      setMe(null);
+      clearSessionCaches();
       clearApiCache();
     }
   }, []);
 
-  const value = useMemo(
-    () => ({
-      user: session?.user ?? null,
-      settings: session?.settings ?? null,
-      isAdmin: session?.user.role === "admin",
+  const value = useMemo<AuthValue>(() => {
+    const features = me?.features ?? [];
+    const role = me?.user.role;
+    return {
+      me,
+      user: me?.user ?? null,
+      settings: me?.settings ?? null,
+      org: me?.org ?? null,
+      features,
+      has: (f: FeatureKey) => features.includes(f),
+      isAdmin: role === "owner" || role === "admin",
+      readOnly: !!me && !WRITABLE.has(me.org.status),
       loading,
       login,
       logout,
       refresh,
-    }),
-    [session, loading, login, logout, refresh]
-  );
+    };
+  }, [me, loading, login, logout, refresh]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
@@ -108,3 +153,5 @@ export function useAuth(): AuthValue {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
+/** Plan name for the session hook. */
+export const useSession = useAuth;

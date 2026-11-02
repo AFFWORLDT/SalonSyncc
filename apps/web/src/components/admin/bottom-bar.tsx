@@ -13,13 +13,13 @@ const SHORT: Record<string, string> = { Dashboard: "Home", "Daily sheet": "Sheet
 
 /** Phone navigation: tabs on both sides of a big "+" (new sale) button. Hidden on desktop. */
 export function BottomBar() {
-  const { user } = useAuth();
+  const { me } = useAuth();
   const { openNew } = useSaleSheet();
   const pathname = usePathname();
-  const tabs = navFor(user?.role)
+  const tabs = navFor(me)
     .flatMap((g) => g.items)
     .filter((i) => i.tab);
-  const account = navFor(user?.role)
+  const account = navFor(me)
     .flatMap((g) => g.items)
     .find((i) => i.href === "/account");
   const all = account && !tabs.includes(account) ? [...tabs, account] : tabs;

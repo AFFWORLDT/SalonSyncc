@@ -1,31 +1,31 @@
 import { cn } from "@/lib/utils";
 
-/** FM Salon mark: the bearded face from the logo, on a white disc. */
-export function LogoMark({ size = 28, className }: { size?: number; className?: string }) {
+/** The salon's logo (settings.logo_url) on a white disc, or the product mark when the salon has none. */
+export function LogoMark({ size = 28, className, src }: { size?: number; className?: string; src?: string | null }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src="/logo-mark.png"
+      src={src || "/icon.svg"}
       alt=""
       aria-hidden
       width={size}
       height={size}
-      className={cn("shrink-0 rounded-full bg-white ring-1 ring-black/10 dark:ring-white/15", className)}
+      className={cn("shrink-0 rounded-full bg-white object-contain ring-1 ring-black/10 dark:ring-white/15", className)}
       style={{ width: size, height: size }}
     />
   );
 }
 
-/** The full round badge ("Faizan Mohammed · Hair Cuts · Gents Salon"). */
-export function LogoBadge({ size = 96, className }: { size?: number; className?: string }) {
+/** The large round badge for the login screen. */
+export function LogoBadge({ size = 96, className, src, alt = "" }: { size?: number; className?: string; src?: string | null; alt?: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src="/logo.png"
-      alt="Faizan Mohammed Gents Salon"
+      src={src || "/icon.svg"}
+      alt={alt}
       width={size}
       height={size}
-      className={cn("shrink-0 rounded-full bg-white ring-1 ring-black/10 dark:ring-white/15", className)}
+      className={cn("shrink-0 rounded-full bg-white object-contain ring-1 ring-black/10 dark:ring-white/15", className)}
       style={{ width: size, height: size }}
     />
   );

@@ -7,7 +7,7 @@ import { api, errorMessage } from "@/lib/api";
 const cache = new Map<string, unknown>();
 
 /** Event fired after any change (sale, expense, user, settings); open screens refetch. */
-export const DATA_CHANGED = "fm:data-changed";
+export const DATA_CHANGED = "ss:data-changed";
 
 export function notifyDataChanged() {
   window.dispatchEvent(new Event(DATA_CHANGED));

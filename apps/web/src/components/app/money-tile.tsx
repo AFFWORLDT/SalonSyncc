@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { aed } from "@/lib/format";
+import { money } from "@/lib/format";
 
 /** A labelled AED figure. `tone` colours the value; `hint` is a small line under it; `action` sits at the top right. */
 export function MoneyTile({
@@ -39,7 +39,7 @@ export function MoneyTile({
             tone === "primary" && "text-primary"
           )}
         >
-          {aed(value)}
+          {money(value)}
         </p>
       )}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}

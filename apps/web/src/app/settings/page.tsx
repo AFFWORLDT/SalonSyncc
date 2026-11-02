@@ -5,8 +5,9 @@ import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { notifyDataChanged } from "@/hooks/use-api";
-import { aed, fillTemplate } from "@/lib/format";
-import type { Settings, WaReminderRun } from "@/lib/types";
+import { money, currencyCode, fillTemplate, fromInput, toInput } from "@/lib/format";
+import type { Settings, SettingsResponse, WaReminderRun } from "@/lib/types";
+import { settingsBody } from "@/lib/settings-body";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,18 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/app/field";
 import { SimpleSelect } from "@/components/app/simple-select";
+import { WhatsAppConnect } from "@/components/app/whatsapp-connect";
+import { LogoUpload } from "@/components/app/logo-upload";
+import { usesUaeTrn } from "@/lib/phone-countries";
+
+
+const ZONES: string[] = (() => {
+  try {
+    return (Intl as unknown as { supportedValuesOf(k: string): string[] }).supportedValuesOf("timeZone");
+  } catch {
+    return [];
+  }
+})();
 
 export default function SettingsPage() {
   const { settings } = useAuth();
@@ -30,32 +43,34 @@ export default function SettingsPage() {
   return <SettingsForm initial={settings} />;
 }
 
-function SettingsForm({ initial }: { initial: Settings }) {
-  const { refresh } = useAuth();
+function SettingsForm({ initial }: { initial: SettingsResponse }) {
+  const { refresh, has } = useAuth();
   const [s, setS] = useState(initial);
   const [quick, setQuick] = useState(initial.quick_amounts.join(", "));
-  const [vatPct, setVatPct] = useState(String(Math.round(initial.vat_rate * 10000) / 100));
-  const [saleMin, setSaleMin] = useState(initial.notify_sale_min ? String(initial.notify_sale_min / 100) : "");
+  const [vatPct, setVatPct] = useState(String(initial.vat_rate)); // a percent (5 = 5%)
+  const [saleMin, setSaleMin] = useState(initial.notify_sale_min ? toInput(initial.notify_sale_min) : "");
   const [saving, setSaving] = useState(false);
   const [waDays, setWaDays] = useState(String(initial.wa_reminder_days));
   const [running, setRunning] = useState(false);
   const [askingFeedback, setAskingFeedback] = useState(false);
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setS((p) => ({ ...p, [k]: v }));
+  // The API requires a 15-digit TRN only for UAE salons; elsewhere it is free text.
+  const uaeTrn = usesUaeTrn(s.phone_country);
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     try {
-      const body = {
+      const body = settingsBody({
         ...s,
-        vat_rate: Number(vatPct) / 100,
-        notify_sale_min: Math.round((Number(saleMin) || 0) * 100),
+        vat_rate: Number(vatPct) || 0,
+        notify_sale_min: saleMin ? fromInput(saleMin) || 0 : 0,
         wa_reminder_days: Number(waDays) || 0,
         quick_amounts: quick
           .split(/[,\s]+/)
           .map(Number)
           .filter((n) => n > 0),
-      };
+      });
       await api("/api/settings", { method: "PUT", body });
       await refresh();
       notifyDataChanged();
@@ -67,7 +82,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
     }
   }
 
-  const preview = fillTemplate(s.thank_you_text, { name: "Ali", amount: aed(2500), salon: s.salon_name, barber: "Sonu", link: `${typeof window !== "undefined" ? window.location.origin : ""}/r/?t=…` });
+  const preview = fillTemplate(s.thank_you_text, { name: "Ali", amount: money(2500), salon: s.display_name, barber: "Sonu", link: `${typeof window !== "undefined" ? window.location.origin : ""}/r/?t=…` });
 
   return (
     <form onSubmit={save} className="flex max-w-2xl flex-col gap-5 pb-20">
@@ -88,7 +103,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
               className="h-11 max-w-32"
             />
           </Field>
-          <Field label="Quick amounts (AED)" htmlFor="s-quick" hint="Buttons on the New sale screen, separated by commas.">
+          <Field label={`Quick amounts (${currencyCode()})`} htmlFor="s-quick" hint="Buttons on the New sale screen, separated by commas.">
             <Input id="s-quick" value={quick} onChange={(e) => setQuick(e.target.value)} className="h-11" />
           </Field>
           <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
@@ -105,30 +120,35 @@ function SettingsForm({ initial }: { initial: Settings }) {
               <Field label="VAT %" htmlFor="s-vatpct">
                 <Input id="s-vatpct" inputMode="decimal" value={vatPct} onChange={(e) => setVatPct(e.target.value.replace(/[^\d.]/g, ""))} className="h-11" />
               </Field>
-              <Field label="TRN (15 digits)" htmlFor="s-trn">
-                <Input id="s-trn" inputMode="numeric" value={s.trn ?? ""} onChange={(e) => set("trn", e.target.value.replace(/\D/g, "").slice(0, 15) || null)} className="h-11" />
-              </Field>
+              {uaeTrn ? (
+                <Field label="TRN (15 digits)" htmlFor="s-trn">
+                  <Input id="s-trn" inputMode="numeric" value={s.trn ?? ""} onChange={(e) => set("trn", e.target.value.replace(/\D/g, "").slice(0, 15) || null)} className="h-11" />
+                </Field>
+              ) : (
+                <Field label="Tax registration no." htmlFor="s-trn">
+                  <Input id="s-trn" value={s.trn ?? ""} onChange={(e) => set("trn", e.target.value.slice(0, 40) || null)} className="h-11" />
+                </Field>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
+      {has("whatsapp") && (
       <Card>
         <CardHeader>
           <CardTitle>WhatsApp Business</CardTitle>
           <CardDescription>
             {s.wa_ready
               ? "Messages go from the salon's WhatsApp number using templates approved by Meta. Save to apply changes."
-              : "Not connected on this server yet."}
+              : "Connect the salon's WhatsApp Business number to send bills, reminders and rating requests."}
           </CardDescription>
         </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <WhatsAppConnect />
+        </CardContent>
         {s.wa_ready && (
           <CardContent className="flex flex-col gap-3">
-            {s.wa_test_numbers && (
-              <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-                Test mode: only {s.wa_test_numbers} gets messages here. Everyone else is skipped.
-              </p>
-            )}
             <NotifyRow
               id="wa-bill"
               label="Send bills on WhatsApp"
@@ -169,6 +189,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
                 </Button>
               </div>
             </NotifyRow>
+            {has("ratings") && (
             <NotifyRow
               id="wa-feedback"
               label="Ask for a rating"
@@ -218,17 +239,53 @@ function SettingsForm({ initial }: { initial: Settings }) {
                 </Button>
               </div>
             </NotifyRow>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
+              {has("ratings") && (
               <Field label="Google review link" htmlFor="s-google" hint="Where “Rate your visit” in WhatsApp takes the customer">
                 <Input id="s-google" inputMode="url" placeholder="https://search.google.com/local/writereview?placeid=…" value={s.google_review_url ?? ""} onChange={(e) => set("google_review_url", e.target.value.trim() || null)} className="h-11" />
               </Field>
+              )}
               <Field label="Instagram link" htmlFor="s-insta" hint="On the PDF bill">
                 <Input id="s-insta" inputMode="url" placeholder="https://www.instagram.com/…" value={s.instagram_url ?? ""} onChange={(e) => set("instagram_url", e.target.value.trim() || null)} className="h-11" />
               </Field>
             </div>
+            <details className="rounded-lg border p-3">
+              <summary className="cursor-pointer text-sm font-medium">Message templates (advanced)</summary>
+              <p className="mt-1 text-xs text-muted-foreground">Names of your templates approved by Meta, and their language.</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {TEMPLATE_FIELDS.map(([k, label]) => (
+                  <Field key={k} label={label} htmlFor={`s-${k}`}>
+                    <Input id={`s-${k}`} value={s[k]} onChange={(e) => set(k, e.target.value.trim().toLowerCase())} className="h-11 font-mono" />
+                  </Field>
+                ))}
+                <Field label="Template language" htmlFor="s-wa-lang" hint="Meta code, e.g. en, en_US, ar">
+                  <Input id="s-wa-lang" value={s.wa_language} onChange={(e) => set("wa_language", e.target.value.trim())} className="h-11 font-mono" />
+                </Field>
+                {IMAGE_FIELDS.map(([k, label]) => (
+                  <Field key={k} label={label} htmlFor={`s-${k}`} hint="https link; empty uses the standard picture">
+                    <Input id={`s-${k}`} inputMode="url" value={s[k] ?? ""} onChange={(e) => set(k, e.target.value.trim() || null)} className="h-11" />
+                  </Field>
+                ))}
+              </div>
+            </details>
           </CardContent>
         )}
       </Card>
+      )}
+      {!has("whatsapp") && has("ratings") && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Reviews</CardTitle>
+            <CardDescription>Customers who rate you 4 or 5 stars are invited to review you on Google.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Field label="Google review link" htmlFor="s-google2">
+              <Input id="s-google2" inputMode="url" value={s.google_review_url ?? ""} onChange={(e) => set("google_review_url", e.target.value.trim() || null)} className="h-11" />
+            </Field>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -236,12 +293,6 @@ function SettingsForm({ initial }: { initial: Settings }) {
           <CardDescription>After a sale with a mobile number, the barber taps “Send on WhatsApp” and the message opens ready to send.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-4 rounded-lg border p-3">
-            <Label htmlFor="s-wa" className="text-sm font-medium">
-              Show the WhatsApp button
-            </Label>
-            <Switch id="s-wa" checked={s.whatsapp_mode === "link"} onCheckedChange={(v) => set("whatsapp_mode", v ? "link" : "off")} />
-          </div>
           <Field label="Message" htmlFor="s-thanks" hint="You can use {name} {amount} {salon} {barber} {link}">
             <Textarea id="s-thanks" rows={4} value={s.thank_you_text} onChange={(e) => set("thank_you_text", e.target.value)} />
           </Field>
@@ -252,14 +303,15 @@ function SettingsForm({ initial }: { initial: Settings }) {
         </CardContent>
       </Card>
 
+      {has("push") && (
       <Card>
         <CardHeader>
           <CardTitle>Notifications</CardTitle>
-          <CardDescription>Sent to phones that turned notifications on in My account. Times are Dubai time.</CardDescription>
+          <CardDescription>Sent to phones that turned notifications on in My account. Times are in the salon&apos;s time zone ({s.timezone}).</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <NotifyRow id="n-sales" label="New bill created" hint="A push to the admin whenever any bill is rung up." checked={s.notify_sales} onChange={(v) => set("notify_sales", v)}>
-            <Field label="Only sales of at least (AED)" htmlFor="n-min" hint="Leave empty for every sale">
+            <Field label={`Only sales of at least (${currencyCode()})`} htmlFor="n-min" hint="Leave empty for every sale">
               <Input id="n-min" inputMode="decimal" placeholder="Every sale" value={saleMin} onChange={(e) => setSaleMin(e.target.value.replace(/[^\d.]/g, ""))} className="h-11 sm:w-48" />
             </Field>
           </NotifyRow>
@@ -272,6 +324,46 @@ function SettingsForm({ initial }: { initial: Settings }) {
           <NotifyRow id="n-changes" label="Tell a barber when you change or delete their sale" checked={s.notify_barber_changes} onChange={(v) => set("notify_barber_changes", v)} />
         </CardContent>
       </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Region</CardTitle>
+          <CardDescription>Time zone, money and phone numbers for this salon.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <Field label="Time zone" htmlFor="s-tz">
+            <Input id="s-tz" list="s-tz-list" value={s.timezone} onChange={(e) => set("timezone", e.target.value.trim())} className="h-11" />
+            <datalist id="s-tz-list">
+              {ZONES.map((z) => (
+                <option key={z} value={z} />
+              ))}
+            </datalist>
+          </Field>
+          <Field label="Day starts at" htmlFor="s-daystart" hint="Bills before this hour count for the previous day.">
+            <SimpleSelect
+              id="s-daystart"
+              label="Day starts at"
+              value={String(s.day_start_hour)}
+              onChange={(v) => set("day_start_hour", Number(v))}
+              options={Array.from({ length: 13 }, (_, h) => ({ value: String(h), label: hourLabel(h) }))}
+              className="h-11 w-full"
+            />
+          </Field>
+          <Field label="Currency" htmlFor="s-cur" hint="3-letter code, e.g. AED, INR, KWD">
+            <Input id="s-cur" value={s.currency} maxLength={3} onChange={(e) => set("currency", e.target.value.toUpperCase().replace(/[^A-Z]/g, ""))} className="h-11 font-mono" />
+          </Field>
+          <Field label="Number format" htmlFor="s-locale" hint="e.g. en-AE, en-IN, ar-AE">
+            <Input id="s-locale" value={s.locale} onChange={(e) => set("locale", e.target.value.trim())} className="h-11 font-mono" />
+          </Field>
+          <Field label="Phone country code" htmlFor="s-cc" hint="Digits only, e.g. 91 for India">
+            <Input id="s-cc" inputMode="numeric" value={s.phone_country} onChange={(e) => set("phone_country", e.target.value.replace(/\D/g, "").slice(0, 4))} className="h-11 font-mono" />
+          </Field>
+          <Field label="Bill number prefix" htmlFor="s-prefix" hint="1-6 letters or digits">
+            <Input id="s-prefix" value={s.bill_prefix} onChange={(e) => set("bill_prefix", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6))} className="h-11 font-mono" />
+          </Field>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -279,8 +371,9 @@ function SettingsForm({ initial }: { initial: Settings }) {
           <CardDescription>Shown on receipts.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
+          <LogoUpload />
           <Field label="Salon name" htmlFor="s-name">
-            <Input id="s-name" required value={s.salon_name} onChange={(e) => set("salon_name", e.target.value)} className="h-11" />
+            <Input id="s-name" required value={s.display_name} onChange={(e) => set("display_name", e.target.value)} className="h-11" />
           </Field>
           <Field label="Name in Arabic" htmlFor="s-ar">
             <Input id="s-ar" dir="rtl" value={s.salon_name_ar ?? ""} onChange={(e) => set("salon_name_ar", e.target.value || null)} className="h-11" />
@@ -313,6 +406,19 @@ function SettingsForm({ initial }: { initial: Settings }) {
     </form>
   );
 }
+
+const TEMPLATE_FIELDS = [
+  ["wa_bill_template", "Bill"],
+  ["wa_bill_pdf_template", "Bill with PDF"],
+  ["wa_reminder_template", "Visit reminder"],
+  ["wa_feedback_template", "Rating request"],
+  ["wa_feedback_reminder_template", "Rating reminder"],
+] as const;
+const IMAGE_FIELDS = [
+  ["wa_rating_image_url", "Rating picture"],
+  ["wa_rating_reminder_image_url", "Rating reminder picture"],
+  ["wa_fresh_cut_image_url", "Visit reminder picture"],
+] as const;
 
 const FEEDBACK_DELAYS = [
   { value: "0", label: "Right after the bill" },

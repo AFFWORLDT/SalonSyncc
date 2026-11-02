@@ -5,7 +5,7 @@ import { ArrowLeftRight, Download, Scale } from "lucide-react";
 import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { api, qs } from "@/lib/api";
-import { aed, dayLabel, businessToday, num, timeLabel } from "@/lib/format";
+import { money, dayLabel, businessToday, num, timeLabel } from "@/lib/format";
 import { exportShopLedger } from "@/lib/excel";
 import type { Balances, LedgerLine, ShopLedger, Transfer } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -154,7 +154,7 @@ function Row({ label, sub, balance, strong }: { label: string; sub: string; bala
         <p className="text-sm font-semibold">{label}</p>
         <p className="text-xs text-muted-foreground">{sub}</p>
       </div>
-      <p className="num text-sm font-semibold">{aed(balance)}</p>
+      <p className="num text-sm font-semibold">{money(balance)}</p>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Pencil, Plus, Wallet } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useApi } from "@/hooks/use-api";
-import { aed, dateLabel, businessToday } from "@/lib/format";
+import { money, dateLabel, businessToday } from "@/lib/format";
 import type { MyReport, Paged, Sale } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -58,7 +58,7 @@ export function BarberToday() {
               <p className="truncate text-xs text-muted-foreground">
                 {t
                   ? t.expense
-                    ? `${aed(t.expense)}${t.expense_note ? ` · ${t.expense_note}` : ""}`
+                    ? `${money(t.expense)}${t.expense_note ? ` · ${t.expense_note}` : ""}`
                     : canAddExpense
                       ? "Not added yet — add it before you leave"
                       : "None — the admin adds expenses"
@@ -83,7 +83,7 @@ export function BarberToday() {
       <Card className="gap-0 p-0">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <p className="text-sm font-semibold">Today&apos;s sales</p>
-          {sales.data && <p className="num text-sm text-muted-foreground">{aed(sales.data.sum ?? 0)}</p>}
+          {sales.data && <p className="num text-sm text-muted-foreground">{money(sales.data.sum ?? 0)}</p>}
         </div>
         {sales.loading && !sales.data ? (
           <SaleListSkeleton rows={4} />

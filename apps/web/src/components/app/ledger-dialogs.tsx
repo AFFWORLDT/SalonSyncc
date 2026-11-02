@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { notifyDataChanged } from "@/hooks/use-api";
-import { aed, businessToday, toInput } from "@/lib/format";
+import { money, businessToday, toInput } from "@/lib/format";
 import type { Balances, MoneyAccount, Transfer } from "@/lib/types";
 import { haptic } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
@@ -134,10 +134,10 @@ function BalancesForm({ balances, onDone }: { balances: Balances; onDone: () => 
           Count the cash in the drawer and check the bank, then enter what is really there. The difference is recorded as a &quot;Balance set&quot; line.
         </DialogDescription>
       </DialogHeader>
-      <Field label="Cash drawer (AED)" htmlFor="bal-cash" hint={`The ledger says ${aed(balances.cash)}`}>
+      <Field label="Cash drawer (AED)" htmlFor="bal-cash" hint={`The ledger says ${money(balances.cash)}`}>
         <Input id="bal-cash" inputMode="decimal" autoComplete="off" required value={cash} onChange={(e) => setCash(clean(e.target.value))} className="num h-11" />
       </Field>
-      <Field label="Bank (AED)" htmlFor="bal-bank" hint={`The ledger says ${aed(balances.bank)}`}>
+      <Field label="Bank (AED)" htmlFor="bal-bank" hint={`The ledger says ${money(balances.bank)}`}>
         <Input id="bal-bank" inputMode="decimal" autoComplete="off" required value={bank} onChange={(e) => setBank(clean(e.target.value))} className="num h-11" />
       </Field>
       <DialogFooter>

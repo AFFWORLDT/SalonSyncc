@@ -1,41 +1,120 @@
-/** Formatting for the UI. Money arrives as integer fils (AED x 100); days as Dubai YYYY-MM-DD. */
+/**
+ * Formatting for the UI, per salon. Money arrives as integer minor units of the salon's currency
+ * (settings.currency_minor per major unit); days are YYYY-MM-DD in the salon's time zone.
+ * AuthProvider calls setFormat(settings) after every /api/me, so plain calls like money(x) use the signed-in salon.
+ */
+import { COUNTRIES, type Country } from "./phone-countries";
 
-const aedFmt = new Intl.NumberFormat("en-AE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-const aed2Fmt = new Intl.NumberFormat("en-AE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export interface FormatConfig {
+  currency: string; // ISO 4217, e.g. "AED"
+  minor: number; // minor units per major unit: 100, 1000, 1
+  locale: string;
+  timezone: string; // IANA
+  dayStartHour: number; // the business day starts at this local hour
+  phoneCountry: string; // calling code digits
+}
 
-/** 2500 -> "AED 25", 2550 -> "AED 25.50". */
-export function aed(fils: number): string {
-  const v = fils / 100;
-  return `AED ${Number.isInteger(v) ? aedFmt.format(v) : aed2Fmt.format(v)}`;
+type SettingsLike = { currency: string; currency_minor: number; locale: string; timezone: string; day_start_hour: number; phone_country: string };
+
+const DEFAULT: FormatConfig = { currency: "", minor: 100, locale: "en-GB", timezone: "UTC", dayStartHour: 0, phoneCountry: "" };
+let cfg: FormatConfig = DEFAULT;
+let nf: { whole: Intl.NumberFormat; frac: Intl.NumberFormat } | null = null;
+
+export function setFormat(s: SettingsLike | FormatConfig | null): void {
+  if (!s) cfg = DEFAULT;
+  else if ("currency_minor" in s)
+    cfg = { currency: s.currency, minor: s.currency_minor || 1, locale: s.locale || "en-GB", timezone: s.timezone || "UTC", dayStartHour: s.day_start_hour ?? 0, phoneCountry: s.phone_country ?? "" };
+  else cfg = s;
+  nf = null;
+}
+export function getFormat(): FormatConfig {
+  return cfg;
+}
+
+/** Decimal places of the salon currency: 100 -> 2, 1000 -> 3, 1 -> 0. */
+export function minorDigits(minor = cfg.minor): number {
+  return Math.max(0, Math.round(Math.log10(minor || 1)));
+}
+
+function fmts() {
+  if (!nf) {
+    const d = minorDigits();
+    let locale = cfg.locale;
+    try {
+      new Intl.NumberFormat(locale);
+    } catch {
+      locale = "en-GB";
+    }
+    nf = {
+      whole: new Intl.NumberFormat(locale, { minimumFractionDigits: 0, maximumFractionDigits: d }),
+      frac: new Intl.NumberFormat(locale, { minimumFractionDigits: d, maximumFractionDigits: d }),
+    };
+  }
+  return nf;
+}
+
+/** 2500 -> "AED 25", 2550 -> "AED 25.50" (for a 2-decimal currency). */
+export function money(minorUnits: number): string {
+  const v = minorUnits / cfg.minor;
+  const body = Number.isInteger(v) ? fmts().whole.format(v) : fmts().frac.format(v);
+  return cfg.currency ? `${cfg.currency} ${body}` : body;
+}
+
+/** The currency code for labels ("Price (AED)"). */
+export function currencyCode(): string {
+  return cfg.currency;
 }
 
 /** Bare number for dense tables: 2500 -> "25", 2550 -> "25.5". 0 -> "–" when `dash`. */
-export function num(fils: number, dash = false): string {
-  if (dash && !fils) return "–";
-  return aedFmt.format(fils / 100);
+export function num(minorUnits: number, dash = false): string {
+  if (dash && !minorUnits) return "–";
+  return fmts().whole.format(minorUnits / cfg.minor);
 }
 
-/** AED value for a form field: 2550 -> "25.5". */
-export function toInput(fils: number): string {
-  return String(fils / 100);
+/** Fixed decimals, no grouping or code, for bill tables: 2550 -> "25.50". */
+export function fixed(minorUnits: number): string {
+  return (minorUnits / cfg.minor).toFixed(minorDigits());
 }
 
-const DUBAI = "Asia/Dubai";
-
-/** Dubai YYYY-MM-DD for a moment (ms). */
-export function dubaiDay(ms: number): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: DUBAI }).format(new Date(ms));
+/** Major-unit value for a form field: 2550 -> "25.5". */
+export function toInput(minorUnits: number): string {
+  return String(minorUnits / cfg.minor);
 }
 
-/** The salon's day starts at 4 AM: a bill at 2 AM on the 27th belongs to the 26th (same rule as the API). */
-export const DAY_START_HOUR = 4;
+/** A typed major-unit amount -> integer minor units ("25.5" -> 2550). NaN when not a number. */
+export function fromInput(text: string): number {
+  const v = Number(String(text).trim());
+  return Number.isFinite(v) ? Math.round(v * cfg.minor) : NaN;
+}
 
-/** The business day a moment belongs to: the Dubai date 4 hours earlier. */
+/** Wall-clock parts of an instant in the salon zone. */
+function wall(ms: number, tz = cfg.timezone) {
+  const p = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" }).formatToParts(new Date(ms));
+  const get = (t: string) => p.find((x) => x.type === t)!.value;
+  return { day: `${get("year")}-${get("month")}-${get("day")}`, hour: Number(get("hour")) };
+}
+
+/** Calendar YYYY-MM-DD of an instant in the salon zone. */
+export function zoneDay(ms: number): string {
+  return wall(ms).day;
+}
+
+function prevDay(day: string): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * The business day an instant belongs to (same rule as the API's clock): before day_start_hour local wall time it is
+ * still the previous date. Wall-time based, so DST changes don't shift the boundary.
+ */
 export function businessDay(ms: number): string {
-  return dubaiDay(ms - DAY_START_HOUR * 3_600_000);
+  const w = wall(ms);
+  return w.hour < cfg.dayStartHour ? prevDay(w.day) : w.day;
 }
 
-/** Today as the salon counts it (until 4 AM it is still yesterday). */
+/** Today as the salon counts it. */
 export function businessToday(): string {
   return businessDay(Date.now());
 }
@@ -64,14 +143,14 @@ export function monthShort(month: string): string {
   return utcDate(`${month}-01`).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
 }
 
-/** Dubai clock time "14:05" for an epoch-ms instant. */
+/** Salon clock time "14:05" for an epoch-ms instant. */
 export function timeLabel(ms: number): string {
-  return new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: DUBAI });
+  return new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: cfg.timezone });
 }
 
-/** Dubai date-time "21 Oct 2026, 14:05". */
+/** Salon date-time "21 Oct 2026, 14:05". */
 export function dateTimeLabel(ms: number): string {
-  return new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: DUBAI });
+  return new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: cfg.timezone });
 }
 
 export function shiftMonth(month: string, delta: number): string {
@@ -80,16 +159,16 @@ export function shiftMonth(month: string, delta: number): string {
   return d.toISOString().slice(0, 7);
 }
 
-/** "0501234567" -> "050 123 4567". */
+/** "0501234567" -> "050 123 4567" (local numbers the API keeps for some countries); others unchanged. */
 export function phoneLabel(p: string | null): string {
   if (!p) return "";
   if (/^05\d{8}$/.test(p)) return `${p.slice(0, 3)} ${p.slice(3, 6)} ${p.slice(6)}`;
   return p;
 }
 
-/** Canonical phone -> digits for wa.me (UAE local numbers get 971). */
+/** Canonical phone -> digits for wa.me. Local numbers ("0…") belong to the salon's own country. */
 export function whatsappDigits(phone: string): string {
-  return phone.startsWith("+") ? phone.slice(1) : `971${phone.slice(1)}`;
+  return phone.startsWith("+") ? phone.slice(1) : `${cfg.phoneCountry}${phone.replace(/^0/, "")}`;
 }
 
 /** Fills {name} {amount} {salon} {link} {barber} in the thank-you template. */
@@ -103,33 +182,7 @@ export function pctLabel(p: number): string {
 
 // ---------- phone input ----------
 
-export interface Country {
-  code: string; // dial code without +
-  label: string;
-  /** Validates the national number (digits only, no leading 0). */
-  test: (n: string) => boolean;
-  example: string;
-}
-
-/** UAE first (default), then the countries most customers come from. */
-export const COUNTRIES: Country[] = [
-  { code: "971", label: "UAE +971", test: (n) => /^5\d{8}$/.test(n) || /^[234679]\d{7}$/.test(n), example: "50 123 4567" },
-  { code: "91", label: "India +91", test: (n) => /^[6-9]\d{9}$/.test(n), example: "98765 43210" },
-  { code: "92", label: "Pakistan +92", test: (n) => /^3\d{9}$/.test(n), example: "300 1234567" },
-  { code: "880", label: "Bangladesh +880", test: (n) => /^1\d{9}$/.test(n), example: "1712 345678" },
-  { code: "977", label: "Nepal +977", test: (n) => /^9\d{9}$/.test(n), example: "984 1234567" },
-  { code: "94", label: "Sri Lanka +94", test: (n) => /^7\d{8}$/.test(n), example: "71 234 5678" },
-  { code: "63", label: "Philippines +63", test: (n) => /^9\d{9}$/.test(n), example: "917 123 4567" },
-  { code: "20", label: "Egypt +20", test: (n) => /^1\d{9}$/.test(n), example: "100 123 4567" },
-  { code: "966", label: "Saudi +966", test: (n) => /^5\d{8}$/.test(n), example: "50 123 4567" },
-  { code: "968", label: "Oman +968", test: (n) => /^[79]\d{7}$/.test(n), example: "9123 4567" },
-  { code: "974", label: "Qatar +974", test: (n) => /^[3567]\d{7}$/.test(n), example: "3312 3456" },
-  { code: "965", label: "Kuwait +965", test: (n) => /^[569]\d{7}$/.test(n), example: "5012 3456" },
-  { code: "973", label: "Bahrain +973", test: (n) => /^3\d{7}$/.test(n), example: "3600 1234" },
-  { code: "44", label: "UK +44", test: (n) => /^7\d{9}$/.test(n), example: "7700 900123" },
-  { code: "1", label: "USA/Canada +1", test: (n) => /^[2-9]\d{9}$/.test(n), example: "212 555 0123" },
-  { code: "", label: "Other (type +code)", test: (n) => /^\d{8,15}$/.test(n), example: "+44 7700 900123" },
-];
+export { COUNTRIES, countriesFor, type Country } from "./phone-countries";
 
 /** Digits of what was typed, without a leading national 0. */
 function nationalDigits(raw: string) {
@@ -138,11 +191,11 @@ function nationalDigits(raw: string) {
 
 /**
  * Checks a phone typed into the field. Empty is fine (the phone is optional).
- * Returns the full international number to send ("+971501234567") or an error to show.
+ * Returns the full international number to send ("+919876543210") or an error to show.
  */
 export function checkPhone(cc: string, raw: string): { value: string | null; error: string | null } {
   if (!raw.trim()) return { value: null, error: null };
-  const country = COUNTRIES.find((c) => c.code === cc) ?? COUNTRIES[COUNTRIES.length - 1];
+  const country: Country = COUNTRIES.find((c) => c.code === cc) ?? COUNTRIES[COUNTRIES.length - 1];
   let n = nationalDigits(raw);
   if (country.code) {
     // People often paste the full number: drop a repeated country code.
@@ -154,10 +207,10 @@ export function checkPhone(cc: string, raw: string): { value: string | null; err
   return { value: `+${n}`, error: null };
 }
 
-/** Canonical stored phone ("0501234567" or "+919876543210") -> country code + national digits for the field. */
+/** Canonical stored phone ("0501234567" local, or "+919876543210") -> country code + national digits for the field. */
 export function splitPhone(p: string | null): { cc: string; local: string } {
-  if (!p) return { cc: "971", local: "" };
-  if (p.startsWith("0")) return { cc: "971", local: p.slice(1) };
+  if (!p) return { cc: cfg.phoneCountry, local: "" };
+  if (p.startsWith("0")) return { cc: cfg.phoneCountry, local: p.slice(1) };
   const digits = p.replace(/\D/g, "");
   const country = COUNTRIES.filter((c) => c.code && digits.startsWith(c.code)).sort((a, b) => b.code.length - a.code.length)[0];
   return country ? { cc: country.code, local: digits.slice(country.code.length) } : { cc: "", local: digits };

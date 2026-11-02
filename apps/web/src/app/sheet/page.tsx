@@ -6,7 +6,7 @@ import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { useAuth } from "@/lib/auth-context";
-import { aed, dayLabel, businessToday, num } from "@/lib/format";
+import { money, dayLabel, businessToday, num } from "@/lib/format";
 import { exportDailySheet } from "@/lib/excel";
 import type { DailySheet } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,7 @@ export default function SheetPage() {
     if (!data) return;
     setExporting(true);
     try {
-      await exportDailySheet(data, settings?.salon_name ?? "FM Salon");
+      await exportDailySheet(data, settings?.display_name ?? "");
     } catch {
       toast.error("Couldn't create the Excel file");
     } finally {
@@ -69,7 +69,7 @@ export default function SheetPage() {
         <MoneyTile
           label="Expense"
           value={data?.totals.expense ?? null}
-          hint={data?.totals.company_expense ? `incl. ${aed(data.totals.company_expense)} company` : undefined}
+          hint={data?.totals.company_expense ? `incl. ${money(data.totals.company_expense)} company` : undefined}
         />
         <MoneyTile label="Total commission" value={data?.totals.commission ?? null} />
         <MoneyTile label="Total profit" value={data?.totals.profit ?? null} tone="success" />
