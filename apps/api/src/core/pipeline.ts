@@ -6,6 +6,8 @@ import { slugFromHost } from "./tenant";
 import { platformRepo } from "../data/platform";
 import { featuresFor } from "./features-cache";
 import { tenantRepo } from "../data/tenant";
+import type { OrgStatus } from "../data/platform";
+import type { FeatureKey } from "@ss/features";
 
 /**
  * Binds the request to exactly one org, taken ONLY from the signed session (and checked against the host).
@@ -34,5 +36,30 @@ export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
 
   const { features, limits } = await featuresFor(c.env.DB, org);
   c.set("tenant", { org, user, repo, features, limits });
+  await next();
+};
+
+/** Per-route: 403 unless the org's plan includes the feature. Must run after tenantAuth (the tenant guard). */
+export const requireFeature =
+  (key: FeatureKey): MiddlewareHandler<AppEnv> =>
+  async (c, next) => {
+    if (!c.var.tenant.features.includes(key)) {
+      throw new HttpError(403, "This feature isn't in your plan", "feature_disabled");
+    }
+    await next();
+  };
+
+export const WRITE_OK: OrgStatus[] = ["trial", "active", "grace", "past_due"];
+
+const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+const WRITE_ALLOW_PREFIXES = ["/api/auth/", "/api/billing/"];
+const isWriteAllowed = (path: string) =>
+  WRITE_ALLOW_PREFIXES.some((p) => path.startsWith(p)) || path === "/api/me" || path.startsWith("/api/me/");
+
+/** Blocks writes for orgs whose subscription is inactive. Reads/exports always pass. Runs after tenantAuth. */
+export const writeGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (WRITE_METHODS.has(c.req.method) && !WRITE_OK.includes(c.var.tenant.org.status) && !isWriteAllowed(new URL(c.req.url).pathname)) {
+    throw new HttpError(402, "Your subscription is inactive. Upgrade to continue.", "subscription_inactive");
+  }
   await next();
 };

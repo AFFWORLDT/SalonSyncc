@@ -2,7 +2,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { matchedRoutes } from "hono/route";
 import type { AppEnv } from "./env";
 import { HttpError } from "./core/errors";
-import { tenantAuth } from "./core/pipeline";
+import { tenantAuth, writeGuard, requireFeature } from "./core/pipeline";
 import { registerMe } from "./platform/me";
 import { auth } from "./platform/auth";
 
@@ -19,7 +19,9 @@ const tenantApi = new Hono<AppEnv>();
 export const tenantGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
   // Any matched handler other than this guard (including method ALL) counts as a real tenant route.
   if (!matchedRoutes(c).some((r) => r.handler !== tenantGuard)) return next();
-  return tenantAuth(c, next);
+  return tenantAuth(c, async () => {
+    await writeGuard(c, next);
+  });
 };
 tenantApi.use("*", tenantGuard);
 
@@ -28,6 +30,12 @@ tenantApi.get("/_whoami", (c) =>
   c.env.ENVIRONMENT === "test"
     ? c.json({ orgId: c.var.tenant.org.id, uid: c.var.tenant.user.id })
     : c.json({ error: "Not found" }, 404),
+);
+tenantApi.get("/_probe/ledger", requireFeature("ledger"), (c) =>
+  c.env.ENVIRONMENT === "test" ? c.json({ ok: true }) : c.json({ error: "Not found" }, 404),
+);
+tenantApi.post("/_probe/write", (c) =>
+  c.env.ENVIRONMENT === "test" ? c.json({ ok: true }) : c.json({ error: "Not found" }, 404),
 );
 registerMe(tenantApi);
 app.route("/api", tenantApi);
