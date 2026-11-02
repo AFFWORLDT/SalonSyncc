@@ -1,4 +1,11 @@
 -- Local demo data: orgs alpha (free/active) and bravo (pro_max/trial), owner / pass1234. Re-runnable.
+UPDATE orgs SET owner_user_id = NULL WHERE id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM counters WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM login_failures WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM org_feature_overrides WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM email_log WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM support_sessions WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM platform_audit WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM users WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM org_settings WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM subscriptions WHERE org_id IN ('org_demo_alpha','org_demo_bravo');

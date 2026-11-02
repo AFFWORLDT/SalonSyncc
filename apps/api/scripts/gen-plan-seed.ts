@@ -1,3 +1,5 @@
+// NOTE: migrations/0003_seed_plans.sql is an APPLIED migration and is frozen. Do not regenerate over it.
+// Future plan/price/feature changes go in a new numbered migration or the super-admin UI.
 // Generates migrations/0003_seed_plans.sql from PLAN_DEFAULTS.
 // Usage: node --experimental-strip-types scripts/gen-plan-seed.ts > migrations/0003_seed_plans.sql
 import { PLAN_DEFAULTS } from "../../../packages/features/src/index.ts";

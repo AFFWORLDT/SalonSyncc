@@ -186,12 +186,9 @@ describe("auth", () => {
 
   it("fail-closed: every registered /api route except health, auth and the guard requires a session", async () => {
     const api = app.routes.filter((r) => r.path.startsWith("/api"));
-    // The only ALL-method route under /api is the guard itself.
-    const all = api.filter((r) => r.method === "ALL");
-    expect(all.map((r) => r.path)).toEqual(["/api/*"]);
-    const guard = all[0].handler;
+    const guard = api.find((r) => r.method === "ALL" && r.path === "/api/*")!.handler;
     const guarded = api.filter(
-      (r) => r.handler !== guard && r.path !== "/api/health" && !r.path.startsWith("/api/auth"),
+      (r) => r.handler !== guard && r.path !== "/api/health" && !r.path.startsWith("/api/auth/"),
     );
     expect(guarded.map((r) => r.path)).toContain("/api/_whoami");
     for (const r of guarded) {
@@ -215,6 +212,83 @@ describe("auth", () => {
     const res = await a.fetch(new Request("https://x.test/api/open", { method: "POST" }), env, ctx);
     expect(res.status).toBe(401);
     expect((await a.fetch(new Request("https://x.test/api/none"), env, ctx)).status).toBe(404);
+  });
+
+  it("module-level r.use('*', requireFeature) behind the tenant guard: 401 / 403 / 200", async () => {
+    const { Hono } = await import("hono");
+    const { tenantGuard } = await import("../src/index");
+    const { requireFeature } = await import("../src/core/pipeline");
+    const r = new Hono<any>();
+    r.use("*", requireFeature("ledger"));
+    r.get("/x", (c) => c.json({ ok: true }));
+    const t = new Hono<any>();
+    t.use("*", tenantGuard);
+    t.route("/m", r);
+    const a = new Hono<any>();
+    a.route("/api", t);
+    a.onError((err, c) => c.json({ error: err.message, code: (err as any).code }, (err as any).status ?? 500));
+    const hit = (cookie?: string) =>
+      a.fetch(new Request("https://x.test/api/m/x", { headers: cookie ? { cookie } : {} }), { ...env, ROOT_DOMAIN: "" }, ctx);
+    expect((await hit()).status).toBe(401);
+    const free = await makeOrg({ slug: "mod-free", plan: "free" });
+    await makeUser(free.id, { username: "sam" });
+    const r403 = await hit(await loginAs("mod-free", "sam"));
+    expect(r403.status).toBe(403);
+    expect((await r403.json() as any).code).toBe("feature_disabled");
+    const pm = await makeOrg({ slug: "mod-pm", plan: "pro_max" });
+    await makeUser(pm.id, { username: "sam" });
+    expect((await hit(await loginAs("mod-pm", "sam"))).status).toBe(200);
+  });
+
+  describe("cross-site write protection", () => {
+    const writeProbe = (cookie: string, headers: Record<string, string>, method = "POST") =>
+      call("https://x.test/api/_probe/write", { method, headers: { cookie, ...headers } });
+    const BAD = { error: "Cross-site request blocked", code: "bad_origin" };
+
+    it("blocks foreign / null Origin and non-same-origin Sec-Fetch-Site on writes", async () => {
+      const o = await makeOrg({ slug: "csrf-a" });
+      await makeUser(o.id, { username: "sam" });
+      const cookie = await loginAs("csrf-a", "sam");
+      const r = await writeProbe(cookie, { origin: "https://evil.salonstation.online" });
+      expect(r.status).toBe(403);
+      expect(await r.json()).toEqual(BAD);
+      expect((await writeProbe(cookie, { origin: "null" })).status).toBe(403);
+      expect((await writeProbe(cookie, { "sec-fetch-site": "same-site" })).status).toBe(403);
+      expect((await writeProbe(cookie, { "sec-fetch-site": "cross-site" })).status).toBe(403);
+      expect((await writeProbe(cookie, { origin: "https://evil.test" }, "post")).status).toBe(403);
+    });
+
+    it("allows same-host Origin, Sec-Fetch-Site same-origin/none, and no headers", async () => {
+      const o = await makeOrg({ slug: "csrf-b" });
+      await makeUser(o.id, { username: "sam" });
+      const cookie = await loginAs("csrf-b", "sam");
+      expect((await writeProbe(cookie, { origin: "https://x.test" })).status).toBe(200);
+      expect((await writeProbe(cookie, { "sec-fetch-site": "same-origin" })).status).toBe(200);
+      expect((await writeProbe(cookie, { "sec-fetch-site": "none" })).status).toBe(200);
+      expect((await writeProbe(cookie, {})).status).toBe(200);
+    });
+
+    it("does not block reads with a foreign Origin", async () => {
+      const o = await makeOrg({ slug: "csrf-c" });
+      await makeUser(o.id, { username: "sam" });
+      const cookie = await loginAs("csrf-c", "sam");
+      expect((await whoami(cookie, "x.test", "", { origin: "https://evil.test" })).status).toBe(200);
+    });
+
+    it("login and logout reject a foreign Origin", async () => {
+      const o = await makeOrg({ slug: "csrf-d" });
+      await makeUser(o.id, { username: "sam" });
+      const res = await call("https://x.test/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: "https://evil.test" },
+        body: JSON.stringify({ org: "csrf-d", username: "sam", password: "pass1234" }),
+      });
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual(BAD);
+      expect(res.headers.get("set-cookie")).toBeNull();
+      const out = await call("https://x.test/api/auth/logout", { method: "POST", headers: { origin: "https://evil.test" } });
+      expect(out.status).toBe(403);
+    });
   });
 
   it("unknown /api paths stay JSON 404 when unauthenticated, health stays public", async () => {

@@ -2,7 +2,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { matchedRoutes } from "hono/route";
 import type { AppEnv } from "./env";
 import { HttpError } from "./core/errors";
-import { tenantAuth, writeGuard, requireFeature } from "./core/pipeline";
+import { tenantAuth, writeGuard, requireFeature, originGuard, WRITE_METHODS } from "./core/pipeline";
 import { registerMe } from "./platform/me";
 import { auth } from "./platform/auth";
 
@@ -16,12 +16,16 @@ app.route("/api/auth", auth);
 // matched this request, so a route added here without its own auth is still protected. Paths that match no
 // tenant handler fall through (next) to the JSON 404 instead of 401.
 const tenantApi = new Hono<AppEnv>();
+// NOTE: do not add tenantApi.onError(...). Hono wraps every handler when a sub-app has onError, so the identity
+// check below would treat every path as matched (fails closed: unknown paths would become 401 instead of 404).
 export const tenantGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
   // Any matched handler other than this guard (including method ALL) counts as a real tenant route.
   if (!matchedRoutes(c).some((r) => r.handler !== tenantGuard)) return next();
-  return tenantAuth(c, async () => {
-    await writeGuard(c, next);
-  });
+  const run = () => tenantAuth(c, async () => { await writeGuard(c, next); });
+  const runGuarded = async () => { await run(); };
+  // origin check (writes only) -> tenantAuth -> writeGuard -> handler
+  if (WRITE_METHODS.has(c.req.method.toUpperCase())) return originGuard(c, runGuarded);
+  return run();
 };
 tenantApi.use("*", tenantGuard);
 

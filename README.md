@@ -29,6 +29,10 @@ npm test
 npm run typecheck
 ```
 
+## Plan seed
+
+`apps/api/migrations/0003_seed_plans.sql` is an applied migration and is frozen. Future plan or price changes go in a new numbered migration or the super-admin UI, not by regenerating it with `scripts/gen-plan-seed.ts`.
+
 ## Docs
 
 - Spec: [docs/superpowers/specs/2026-11-02-salonsync-saas-design.md](docs/superpowers/specs/2026-11-02-salonsync-saas-design.md)

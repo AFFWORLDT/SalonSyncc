@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { HttpError } from "../core/errors";
 import { checkPassword, hashPassword } from "../core/crypto";
+import { originGuard } from "../core/pipeline";
 import { clearSession, issueSession } from "../core/session";
 import { normalizeSlug, slugFromHost } from "../core/tenant";
 import { platformRepo } from "../data/platform";
@@ -14,6 +15,8 @@ let dummy: Promise<string> | null = null;
 const dummyHash = () => (dummy ??= hashPassword(crypto.randomUUID()));
 
 export const auth = new Hono<AppEnv>();
+auth.use("/login", originGuard);
+auth.use("/logout", originGuard);
 
 auth.post("/login", async (c) => {
   let body: { org?: unknown; username?: unknown; password?: unknown } = {};

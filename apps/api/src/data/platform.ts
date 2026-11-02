@@ -57,7 +57,14 @@ export function platformRepo(db: D1Database) {
         .prepare("SELECT limits_json FROM plans WHERE id = ?")
         .bind(planId)
         .first<{ limits_json: string }>();
-      return r ? JSON.parse(r.limits_json) : { max_staff: null };
+      if (!r) return { max_staff: 0 }; // fail closed: unknown plan allows no staff
+      let v: unknown;
+      try {
+        v = (JSON.parse(r.limits_json) as { max_staff?: unknown } | null)?.max_staff;
+      } catch {
+        v = undefined;
+      }
+      return { max_staff: typeof v === "number" ? v : null };
     },
     async overrides(orgId: string): Promise<{ feature_key: string; enabled: 0 | 1 }[]> {
       const { results } = await db

@@ -64,6 +64,25 @@ describe("/api/me", () => {
     expect((await featuresFor(env.DB, org)).features).toContain("ledger");
   });
 
+  it("features cache is a miss when org status or plan changed", async () => {
+    const org = await makeOrg({ slug: "me-fresh", plan: "pro_max", status: "trial" });
+    const trial = await featuresFor(env.DB, org);
+    expect(trial.features).not.toContain("whatsapp");
+    const now = await featuresFor(env.DB, { ...org, status: "active", planId: "free" });
+    expect(now.features).not.toContain("ledger");
+    expect(now.features).toEqual(["core_sales", ...now.features.filter((f) => f !== "core_sales")]);
+    expect(now.limits).toEqual({ max_staff: 2 });
+    const upgraded = await featuresFor(env.DB, { ...org, status: "active", planId: "pro_max" });
+    expect(upgraded.features).toContain("whatsapp");
+  });
+
+  it("cached features and limits are frozen", async () => {
+    const org = await makeOrg({ slug: "me-frozen" });
+    const v = await featuresFor(env.DB, org);
+    expect(Object.isFrozen(v.features)).toBe(true);
+    expect(Object.isFrozen(v.limits)).toBe(true);
+  });
+
   it("me never leaks password_hash", async () => {
     const { cookie } = await setup("me-leak");
     const text = await (await me(cookie)).text();

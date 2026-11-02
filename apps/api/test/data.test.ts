@@ -42,6 +42,11 @@ it("platformRepo reads orgs, plans and overrides", async () => {
   expect(await p.planFeatures("free")).toContain("core_sales");
   expect(await p.planLimits("free")).toEqual({ max_staff: 2 });
   expect(await p.planLimits("pro_max")).toEqual({ max_staff: null });
+  // fail closed: unknown plan -> no staff; junk keys dropped, non-numeric -> null
+  expect(await p.planLimits("no_such_plan")).toEqual({ max_staff: 0 });
+  await env.DB.prepare("INSERT INTO plans(id,name,price_monthly,currency,limits_json,active,sort) VALUES('junk','J',0,'AED',?,1,9)")
+    .bind(JSON.stringify({ max_staff: "5", extra: 1 })).run();
+  expect(await p.planLimits("junk")).toEqual({ max_staff: null });
   await env.DB.prepare("INSERT INTO org_feature_overrides(org_id,feature_key,enabled,set_at) VALUES(?,?,?,?)")
     .bind(o.id, "ledger", 1, Date.now()).run();
   expect(await p.overrides(o.id)).toEqual([{ feature_key: "ledger", enabled: 1 }]);

@@ -8,7 +8,7 @@ export interface OrgFeatures {
 }
 
 const TTL_MS = 60_000;
-const cache = new Map<string, { at: number; value: OrgFeatures }>();
+const cache = new Map<string, { at: number; status: string; planId: string; value: OrgFeatures }>();
 
 export function invalidateFeatures(orgId: string): void {
   cache.delete(orgId);
@@ -16,7 +16,7 @@ export function invalidateFeatures(orgId: string): void {
 
 export async function featuresFor(db: D1Database, org: Org): Promise<OrgFeatures> {
   const hit = cache.get(org.id);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit.value;
+  if (hit && Date.now() - hit.at < TTL_MS && hit.status === org.status && hit.planId === org.planId) return hit.value;
 
   const platform = platformRepo(db);
   let planFeatures: string[];
@@ -24,12 +24,15 @@ export async function featuresFor(db: D1Database, org: Org): Promise<OrgFeatures
   if (org.status === "trial") {
     const trial = PLAN_DEFAULTS[TRIAL_PLAN];
     planFeatures = trial.features.filter((f) => !TRIAL_EXCLUDED.includes(f));
-    limits = trial.limits;
+    limits = { ...trial.limits };
   } else {
     [planFeatures, limits] = await Promise.all([platform.planFeatures(org.planId), platform.planLimits(org.planId)]);
   }
   const overrides = await platform.overrides(org.id);
-  const value = { features: effectiveFeatures(planFeatures, overrides), limits };
-  cache.set(org.id, { at: Date.now(), value });
+  const value: OrgFeatures = {
+    features: Object.freeze(effectiveFeatures(planFeatures, overrides)) as FeatureKey[],
+    limits: Object.freeze(limits),
+  };
+  cache.set(org.id, { at: Date.now(), status: org.status, planId: org.planId, value });
   return value;
 }

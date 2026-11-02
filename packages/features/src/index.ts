@@ -62,11 +62,11 @@ export const PLAN_DEFAULTS: Record<
   },
 };
 
-export const ALWAYS_ON: FeatureKey[] = ["core_sales"];
+export const ALWAYS_ON: readonly FeatureKey[] = Object.freeze(["core_sales"] as FeatureKey[]);
 
 export const TRIAL_PLAN: PlanId = "pro_max";
 
-export const TRIAL_EXCLUDED: FeatureKey[] = ["whatsapp", "whatsapp_campaigns"];
+export const TRIAL_EXCLUDED: readonly FeatureKey[] = Object.freeze(["whatsapp", "whatsapp_campaigns"] as FeatureKey[]);
 
 export function effectiveFeatures(
   planFeatures: string[],
