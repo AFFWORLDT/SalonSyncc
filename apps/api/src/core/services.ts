@@ -130,11 +130,44 @@ const resendMail: MailClient = {
   },
 };
 
+/** Stripe's REST API (1 subrequest per call), pinned to one API version. Throws StripeError on a non-2xx answer. */
+export interface StripeClient {
+  post<T = Record<string, unknown>>(env: Env, path: string, params: Record<string, string>, opts?: { idempotencyKey?: string }): Promise<T>;
+  get<T = Record<string, unknown>>(env: Env, path: string): Promise<T>;
+}
+export class StripeError extends Error {
+  constructor(message: string, public status = 0) {
+    super(message);
+  }
+}
+/** The Stripe API version every request uses (subscription.current_period_end and invoice.subscription at top level). */
+export const STRIPE_VERSION = "2024-06-20";
+
+async function stripeCall<T>(env: Env, method: "GET" | "POST", path: string, params?: Record<string, string>, idem?: string): Promise<T> {
+  if (!env.STRIPE_SECRET_KEY) throw new StripeError("Stripe is not set up");
+  const headers: Record<string, string> = { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "Stripe-Version": STRIPE_VERSION };
+  if (params) headers["Content-Type"] = "application/x-www-form-urlencoded";
+  if (idem) headers["Idempotency-Key"] = idem;
+  const r = await fetch(`https://api.stripe.com/v1${path}`, { method, headers, body: params ? new URLSearchParams(params).toString() : undefined });
+  const j = (await r.json().catch(() => ({}))) as { error?: { message?: string } };
+  if (!r.ok) {
+    console.error("stripe failed", method, path, r.status, j.error?.message);
+    throw new StripeError(j.error?.message ?? `Stripe answered ${r.status}`, r.status);
+  }
+  return j as T;
+}
+
+const stripeApi: StripeClient = {
+  post: (env, path, params, opts) => stripeCall(env, "POST", path, params, opts?.idempotencyKey),
+  get: (env, path) => stripeCall(env, "GET", path),
+};
+
 export interface Services {
   wa: WaClient;
   push: PushClient;
   turnstile: TurnstileClient;
   mail: MailClient;
+  stripe: StripeClient;
 }
 
 /** Real clients: Meta Graph (v21.0) and FCM v1. */
@@ -143,6 +176,7 @@ const REAL: Services = {
   push: fcmPush,
   turnstile: cfTurnstile,
   mail: resendMail,
+  stripe: stripeApi,
 };
 
 let override: ((env: Env) => Services) | null = null;

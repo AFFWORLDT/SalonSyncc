@@ -173,3 +173,29 @@ XDG_CONFIG_HOME=~/.wrangler-affworld npx wrangler d1 execute salonkit-db --remot
 ```
 
 Running it again for the same email resets the password and signs that person out everywhere.
+
+## Billing (Stripe)
+
+Online payment stays **off** until the two Stripe secrets are set. Until then the Plan page says "contact us" and the
+super admin marks salons as paid by hand (Salon detail → Mark as paid).
+
+To switch it on (test mode first):
+
+1. In Stripe, create a product for each paid plan with a monthly price in AED. In the admin panel (Plans) paste each
+   price ID (`price_…`) into **Stripe price ID** and save.
+2. In Stripe → Developers → Webhooks, add the endpoint `https://salonkit.online/api/stripe/webhook` with the events
+   `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`,
+   `customer.subscription.deleted`, `invoice.paid` and `invoice.payment_failed`.
+3. Turn on the Billing Portal (Stripe → Settings → Billing → Customer portal) so salons can change cards and cancel.
+4. Set the secrets (never commit them):
+
+```sh
+cd apps/api
+XDG_CONFIG_HOME=~/.wrangler-affworld npx wrangler secret put STRIPE_SECRET_KEY      # sk_test_… then sk_live_…
+XDG_CONFIG_HOME=~/.wrangler-affworld npx wrangler secret put STRIPE_WEBHOOK_SECRET  # whsec_… from step 2
+```
+
+What happens then: a salon picks a plan on its Plan page → Stripe Checkout → back on `/plan/?paid=1`. The webhook marks
+it active on that plan. A failed payment gives 7 days as "payment due" (then expired, by the lifecycle cron). A
+cancelled subscription expires the salon. Every change is in the admin panel's Audit as `stripe`. A salon the super
+admin deactivated is never switched back on by a payment.

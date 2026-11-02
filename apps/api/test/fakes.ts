@@ -1,5 +1,5 @@
 import type { Env } from "../src/env";
-import { setServicesForTest, type Push, type SendResult, type Services, type WaConfig, type WaTemplateInfo, type WaValue } from "../src/core/services";
+import { setServicesForTest, StripeError, type Push, type SendResult, type Services, type WaConfig, type WaTemplateInfo, type WaValue } from "../src/core/services";
 
 export interface WaSend {
   cfg: WaConfig;
@@ -28,6 +28,8 @@ export function fakeServices(
     turnstileOk?: (token: string) => boolean;
     /** Whether the fake mail provider accepts mail (default true). */
     mailOk?: boolean;
+    /** Stripe's answer per call (default: { id, url }). */
+    stripe?: (path: string, params: Record<string, string>) => unknown;
   } = {},
 ) {
   const wa: WaSend[] = [];
@@ -36,6 +38,9 @@ export function fakeServices(
   const pushes: PushSend[] = [];
   const numberChecks: WaConfig[] = [];
   const mails: { to: string; subject: string; html: string; text: string }[] = [];
+  const stripeCalls: { path: string; params: Record<string, string>; idempotencyKey?: string }[] = [];
+  /** Live Stripe subscriptions by id, as GET /subscriptions/:id answers (tests set them). */
+  const stripeSubs: Record<string, Record<string, unknown>> = {};
   let n = 0;
   const svc: Services = {
     wa: {
@@ -66,6 +71,19 @@ export function fakeServices(
         return opts.mailOk ?? true;
       },
     },
+    stripe: {
+      async post(_env: Env, path: string, params: Record<string, string>, o?: { idempotencyKey?: string }) {
+        stripeCalls.push({ path, params, idempotencyKey: o?.idempotencyKey });
+        if (opts.stripe) return (await opts.stripe(path, params)) as never;
+        return { id: `stripe_fake${++n}_${Math.random().toString(36).slice(2, 10)}`, url: `https://stripe.test${path}/${n}` } as never;
+      },
+      async get(_env: Env, path: string) {
+        stripeCalls.push({ path, params: {} });
+        const id = path.split("/").pop() ?? "";
+        if (!stripeSubs[id]) throw new StripeError("No such subscription", 404);
+        return stripeSubs[id] as never;
+      },
+    },
     turnstile: {
       async verify(_secret: string, token: string) {
         return opts.turnstileOk ? opts.turnstileOk(token) : true;
@@ -85,6 +103,8 @@ export function fakeServices(
     pushes,
     numberChecks,
     mails,
+    stripeCalls,
+    stripeSubs,
     services: svc,
     install() {
       setServicesForTest(() => svc);

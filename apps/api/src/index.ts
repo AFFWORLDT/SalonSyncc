@@ -25,6 +25,8 @@ import { ratings } from "./tenant/ratings/routes";
 import { whatsapp } from "./tenant/whatsapp/routes";
 import { campaigns } from "./tenant/campaigns/routes";
 import { waWebhook } from "./integrations/wa-webhook";
+import { stripeWebhook } from "./integrations/stripe-webhook";
+import { billing } from "./tenant/billing/routes";
 import { hourly } from "./jobs/hourly";
 import type { Env } from "./env";
 
@@ -47,6 +49,8 @@ app.route("/api/public", publicApi);
 // Meta's WhatsApp webhook: no session (signature-checked), not behind the public rate limiter; the org comes from each
 // change's phone_number_id. Registered before the tenant router so its guard never sees it.
 app.route("/api/wa/webhook", waWebhook);
+// Stripe's webhook: no session (signature-checked), before the tenant router.
+app.route("/api/stripe/webhook", stripeWebhook);
 
 // Tenant routes. FAIL-CLOSED: the router-level guard runs tenantAuth whenever a real (non-middleware) handler
 // matched this request, so a route added here without its own auth is still protected. Paths that match no
@@ -79,6 +83,8 @@ tenantApi.post("/_probe/write", (c) =>
 );
 registerMe(tenantApi);
 tenantApi.route("/settings", settings);
+// /billing (admin): plan page data, Stripe Checkout / Portal, choose Free.
+tenantApi.route("/billing", billing);
 tenantApi.route("/", staff);
 tenantApi.route("/services", services);
 tenantApi.route("/sales", sales);

@@ -207,6 +207,8 @@ describe("auth", () => {
       "POST /api/wa/webhook",
       // The super admin panel signs out without a session (it only clears its cookie); its other routes need ss_platform.
       "POST /api/platform/logout",
+      // Stripe's webhook: signature-checked, no session.
+      "POST /api/stripe/webhook",
     ]);
     const key = (r: (typeof api)[number]) => `${r.method} ${r.path}`;
     const registered = new Set(api.map(key));
