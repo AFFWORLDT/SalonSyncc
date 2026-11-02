@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { lastOrg, useAuth } from "@/lib/auth-context";
 import { salonFromHost } from "@/lib/host";
 import { BRAND_NAME } from "@/lib/brand";
-import { api, errorMessage } from "@/lib/api";
+import { api, clearSessionCaches, errorMessage } from "@/lib/api";
 import { BrandLogo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,9 +27,11 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // A sign-in link in the address bar is checked first; a cached session must not skip past its outcome.
+  const [handingOff, setHandingOff] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("handoff"));
   useEffect(() => {
-    if (!authLoading && user) router.replace("/");
-  }, [authLoading, user, router]);
+    if (!authLoading && user && !handingOff) router.replace("/");
+  }, [authLoading, user, router, handingOff]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -43,7 +45,11 @@ export default function LoginPage() {
       api("/api/auth/handoff", { body: { token: handoff, org: q.get("org") ?? undefined }, redirectOn401: false })
         .then(() => refresh())
         .then(() => router.replace("/"))
-        .catch((e) => {
+        .catch(async (e) => {
+          // The link is spent or expired: whatever session this browser cached is not trustworthy now.
+          clearSessionCaches();
+          await refresh();
+          setHandingOff(false);
           window.history.replaceState(null, "", window.location.pathname + (q.get("org") ? `?org=${encodeURIComponent(q.get("org")!)}` : ""));
           setError(errorMessage(e, "This sign-in link has expired. Sign in with your password."));
           setLoading(false);
