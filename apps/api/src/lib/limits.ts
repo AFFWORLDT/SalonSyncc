@@ -16,6 +16,13 @@ export function loginLimits(orgId: string, username: string, ip: string): { key:
   ];
 }
 
+/** Login throttle as wired: the device (rate_hits `login-ip:<ip>`) and the username within an org (login_failures rows). */
+export const LOGIN_IP_MAX = 20;
+export const LOGIN_USER_MAX = 8;
+export const loginIpKey = (ip: string) => `login-ip:${ip}`;
+export const loginUserKey = (username: string) => `u:${username}`;
+export const loginWindow = (at: number) => Math.floor(at / LOGIN_WINDOW_MS);
+
 /** Requests per minute per IP on the public links; the PDF costs CPU to draw, so it gets fewer. */
 export const PUBLIC_LIMITS = { pub: 60, pdf: 10 } as const;
 

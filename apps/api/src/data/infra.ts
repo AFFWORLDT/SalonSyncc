@@ -12,3 +12,9 @@ export async function rateHit(db: D1Database, key: string, window: number): Prom
     .first<{ n: number }>();
   return r?.n ?? 0;
 }
+
+/** Current count for `key` inside fixed window `window` (0 if none or the stored window is older). Does not count a hit. */
+export async function rateCount(db: D1Database, key: string, window: number): Promise<number> {
+  const r = await db.prepare("SELECT n FROM rate_hits WHERE key = ? AND window = ?").bind(key, window).first<{ n: number }>();
+  return r?.n ?? 0;
+}

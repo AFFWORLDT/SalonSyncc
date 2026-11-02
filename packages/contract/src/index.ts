@@ -47,39 +47,42 @@
 export type Role = "owner" | "admin" | "barber";
 export type PaymentMode = "cash" | "card";
 
-export interface Me {
+/** The signed-in user as /api/me returns it. */
+export interface MeUser {
   id: number;
   name: string;
   username: string;
   role: Role;
-  commission_pct: number; // effective (own or the org default)
-  avatar_url: string | null;
-  can_add_expense: boolean; // may add or change their own day's expense (admins always can)
-  org: { id: string; slug: string; name: string; status: string; planId: string };
-  features: string[]; // enabled feature keys for the org's plan
-  limits: { max_staff: number | null };
 }
 
 /** GET /api/me */
 export interface MeResponse {
-  user: Me;
+  user: MeUser;
+  org: { id: string; slug: string; name: string; status: string; planId: string };
   settings: Settings;
-  today: string; // business day in the org timezone
+  features: string[]; // enabled feature keys for the org's plan
+  limits: { max_staff: number | null };
+  subscription: { status: string; planId: string; trialEndsAt: number | null; graceEndsAt: number | null };
+  brand: { name: string };
+  today: string; // business day (YYYY-MM-DD) in the org timezone
 }
 
+/**
+ * GET/PUT /api/settings. snake_case like FM; rates are percents (5 = 5%); money in minor units.
+ * WhatsApp settings (whatsapp_mode, wa_*) return with the WhatsApp plan.
+ */
 export interface Settings {
-  salon_name: string;
+  display_name: string;
   salon_name_ar: string | null;
   tagline: string | null;
   address: string | null;
   phone: string | null;
   licence_no: string | null;
-  trn: string | null;
+  trn: string | null; // exactly 15 digits when phone_country is 971, else free text up to 40
   vat_enabled: boolean;
   vat_rate: number; // percent, 5 = 5%
-  default_commission_pct: number;
+  default_commission_pct: number; // percent, 20 = 20%
   quick_amounts: number[]; // major units, as typed by the user
-  whatsapp_mode: "off" | "link";
   thank_you_text: string;
   receipt_footer: string | null;
   // Push notifications (hours are org timezone, 0-23).
@@ -90,19 +93,23 @@ export interface Settings {
   notify_reminder: boolean; // barbers with no sale yet at reminder_hour
   reminder_hour: number;
   notify_barber_changes: boolean; // barber: the admin edited or deleted their sale
-  // WhatsApp Cloud API (read-only flags come from the server's config).
-  wa_ready: boolean; // token and phone number configured
-  wa_test_numbers: string | null; // staging: only these numbers get messages
-  wa_bill_auto: boolean; // send the bill template after each sale with a mobile
-  wa_reminder_enabled: boolean;
-  wa_reminder_days: number; // remind customers this many days after their last visit
-  wa_reminder_hour: number; // org-timezone hour, 0-23
-  wa_feedback_enabled: boolean; // ask for a rating on WhatsApp after a visit
-  wa_feedback_delay_min: number; // minutes after the sale
-  wa_feedback_reminder_min: number; // one reminder this long after the request if still not rated; 0 = none
   google_review_url: string | null; // shown after a 4-5 star rating
   instagram_url: string | null;
+  // Regional.
+  timezone: string; // IANA
+  day_start_hour: number; // 0-12; the business day starts at this local hour
+  currency: string; // ISO 4217, 3 capitals
+  locale: string;
+  phone_country: string; // calling code digits, e.g. "971"
+  bill_prefix: string; // 1-6 of A-Z 0-9
+  // Read-only (ignored on PUT).
+  currency_minor: number; // minor units per major unit
+  logo_url: string | null;
+  brand_color: string | null;
 }
+
+/** PUT /api/settings body: every editable field is required (full replace, like FM). */
+export type SettingsInput = Omit<Settings, "currency_minor" | "logo_url" | "brand_color">;
 
 /** POST/DELETE /api/push/tokens: this device's FCM registration token. */
 export interface PushTokenInput {
@@ -242,7 +249,7 @@ export interface SaleInput {
 
 export interface Receipt {
   sale: Pick<Sale, "bill_no" | "day" | "barber_name" | "customer_label" | "customer_phone" | "amount" | "payment_mode" | "vat_rate" | "vat_amount" | "created_at" | "items" | "note">;
-  salon: Pick<Settings, "salon_name" | "salon_name_ar" | "tagline" | "address" | "phone" | "trn" | "receipt_footer">;
+  salon: { salon_name: string } & Pick<Settings, "salon_name_ar" | "tagline" | "address" | "phone" | "trn" | "receipt_footer">;
 }
 
 export interface Expense {

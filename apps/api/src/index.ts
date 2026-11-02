@@ -6,6 +6,7 @@ import { tenantAuth, writeGuard, requireFeature, originGuard, WRITE_METHODS } fr
 import { registerMe } from "./platform/me";
 import { auth } from "./platform/auth";
 import { publicApi } from "./core/public";
+import { settings } from "./tenant/settings/routes";
 
 const app = new Hono<AppEnv>();
 
@@ -46,6 +47,7 @@ tenantApi.post("/_probe/write", (c) =>
   c.env.ENVIRONMENT === "test" ? c.json({ ok: true }) : c.json({ error: "Not found" }, 404),
 );
 registerMe(tenantApi);
+tenantApi.route("/settings", settings);
 app.route("/api", tenantApi);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

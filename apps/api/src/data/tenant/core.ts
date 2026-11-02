@@ -81,6 +81,34 @@ export function tenantRepo(db: D1Database, orgId: string) {
         googleReviewUrl: r.google_review_url,
       };
     },
+    /** Sets a new password hash, bumps session_version (signs out every other device) and returns the new version. */
+    async setPassword(userId: number, hash: string, at: number): Promise<number> {
+      const r = await db
+        .prepare(
+          "UPDATE users SET password_hash = ?, session_version = session_version + 1, updated_at = ? WHERE org_id = ? AND id = ? RETURNING session_version",
+        )
+        .bind(hash, at, orgId, userId)
+        .first<{ session_version: number }>();
+      return r!.session_version;
+    },
+    /** Failed logins for a username key at or after `since` (ms). */
+    async loginFailureCount(key: string, since: number): Promise<number> {
+      const r = await db
+        .prepare("SELECT COUNT(*) AS n FROM login_failures WHERE org_id = ? AND key = ? AND at >= ?")
+        .bind(orgId, key, since)
+        .first<{ n: number }>();
+      return r?.n ?? 0;
+    },
+    /** Records one failure and drops this key's rows that are older than `prune` (ms), in one batch. */
+    async recordLoginFailure(key: string, at: number, prune: number): Promise<void> {
+      await db.batch([
+        db.prepare("INSERT INTO login_failures (org_id, key, at) VALUES (?, ?, ?)").bind(orgId, key, at),
+        db.prepare("DELETE FROM login_failures WHERE org_id = ? AND key = ? AND at < ?").bind(orgId, key, prune),
+      ]);
+    },
+    async clearLoginFailures(key: string): Promise<void> {
+      await db.prepare("DELETE FROM login_failures WHERE org_id = ? AND key = ?").bind(orgId, key).run();
+    },
     async nextSeq(name: string): Promise<number> {
       const r = await db
         .prepare(

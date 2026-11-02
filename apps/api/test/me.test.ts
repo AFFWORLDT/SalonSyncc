@@ -30,9 +30,8 @@ describe("/api/me", () => {
     expect(b.limits).toEqual(PLAN_DEFAULTS.free.limits);
     expect(b.org).toMatchObject({ id: org.id, slug: "me-free", status: "active", planId: "free" });
     expect(b.user).toMatchObject({ username: "sam", role: "owner" });
-    expect(Object.keys(b.settings).sort()).toEqual(
-      ["brandColor", "currency", "displayName", "locale", "logoUrl", "timezone"],
-    );
+    expect(b.settings).toMatchObject({ display_name: "me-free", currency: "AED", locale: "en-AE", timezone: "Asia/Dubai", logo_url: null, brand_color: null });
+    expect(typeof b.today).toBe("string");
     expect(b.subscription).toEqual({ status: "active", planId: "free", trialEndsAt: null, graceEndsAt: null });
   });
 
