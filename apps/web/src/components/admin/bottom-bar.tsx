@@ -48,7 +48,7 @@ export function BottomBar() {
   return (
     <nav
       aria-label="Tabs"
-      className="flex shrink-0 items-stretch border-t border-border bg-background/95 px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden [html[data-kb=open]_&]:hidden"
+      className="flex shrink-0 items-stretch border-t border-border bg-card px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden [html[data-kb=open]_&]:hidden"
     >
       {all.slice(0, half).map(tab)}
       <div className="flex flex-1 items-center justify-center">

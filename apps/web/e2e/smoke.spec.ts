@@ -12,7 +12,7 @@ async function login(page: Page, org: string) {
   await page.goto("/login/");
   await page.getByLabel("Salon ID").fill(org);
   await page.getByLabel("Username").fill("owner");
-  await page.getByLabel("Password").fill("pass1234");
+  await page.getByLabel("Password", { exact: true }).fill("pass1234");
   await page.getByRole("button", { name: "Sign in" }).click();
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
 }

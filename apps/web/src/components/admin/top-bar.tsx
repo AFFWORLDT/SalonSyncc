@@ -38,7 +38,7 @@ export function TopBar({ onOpenMobileNav, onToggleCollapsed }: { onOpenMobileNav
   }, [title, salon]);
 
   return (
-    <header className="box-content flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-3 pt-[env(safe-area-inset-top)] sm:px-4 lg:px-6">
+    <header className="box-content flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card px-3 pt-[env(safe-area-inset-top)] sm:px-4 lg:px-6">
       {isAdmin ? (
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={onOpenMobileNav} aria-label="Open navigation">
           <Menu />

@@ -114,6 +114,16 @@ const PALETTE = {
   },
 } as const;
 
+/** "#RRGGBB" + alpha -> "rgb(r g b / a)" (glass surfaces are see-through over the tinted background). */
+export function withAlpha(hex: string, a: number): string {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  return `rgb(${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255} / ${a})`;
+}
+
+/** How see-through glass surfaces are: cards and bars, and the more solid popovers/menus/dialogs (readability). */
+const GLASS = { light: { card: 0.62, popover: 0.86, border: 0.55 }, dark: { card: 0.5, popover: 0.82, border: 0.5 } } as const;
+
 /** The shadcn variable set for a resolved mode and accent. */
 export function themeVars(mode: "light" | "dark", accent: string): Record<string, string> {
   const p = PALETTE[mode];
@@ -122,9 +132,9 @@ export function themeVars(mode: "light" | "dark", accent: string): Record<string
   return {
     "--background": p.bg,
     "--foreground": p.fg,
-    "--card": p.card,
+    "--card": withAlpha(p.card, GLASS[mode].card),
     "--card-foreground": p.fg,
-    "--popover": p.card,
+    "--popover": withAlpha(p.card, GLASS[mode].popover),
     "--popover-foreground": p.fg,
     "--primary": a,
     "--primary-foreground": onA,
@@ -135,7 +145,8 @@ export function themeVars(mode: "light" | "dark", accent: string): Record<string
     "--accent": p.muted,
     "--accent-foreground": p.fg,
     "--destructive": p.destructive,
-    "--border": p.border,
+    "--border": withAlpha(p.border, GLASS[mode].border),
+    "--glass-highlight": mode === "light" ? "rgb(255 255 255 / 0.55)" : "rgb(255 255 255 / 0.08)",
     "--input": p.border,
     "--ring": a,
     "--faint": p.faint,

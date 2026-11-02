@@ -53,7 +53,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 /** Frame-shaped placeholder while the session loads (first visit only; later visits use the cached session). */
 function FrameSkeleton() {
   return (
-    <div className="fixed inset-0 flex flex-col bg-background" aria-busy="true" aria-label="Loading">
+    <div className="fixed inset-0 flex flex-col" aria-busy="true" aria-label="Loading">
       <div className="flex h-14 items-center gap-3 border-b px-4">
         <Skeleton className="size-8 rounded-full" />
         <Skeleton className="h-5 w-32" />
@@ -110,7 +110,7 @@ function Frame({ children }: { children: React.ReactNode }) {
   return (
     <TooltipProvider>
       <SaleSheetProvider>
-        <div className="flex h-full overflow-hidden bg-background text-foreground">
+        <div className="flex h-full overflow-hidden bg-transparent text-foreground">
           <aside className={`hidden h-full shrink-0 border-r border-border transition-[width] duration-200 ease-out lg:block ${collapsed ? "w-16" : "w-64"}`}>
             <AppSidebar collapsed={collapsed} />
           </aside>
