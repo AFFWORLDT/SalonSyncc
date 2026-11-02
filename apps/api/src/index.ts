@@ -5,12 +5,16 @@ import { HttpError } from "./core/errors";
 import { tenantAuth, writeGuard, requireFeature, originGuard, WRITE_METHODS } from "./core/pipeline";
 import { registerMe } from "./platform/me";
 import { auth } from "./platform/auth";
+import { publicApi } from "./core/public";
 
 const app = new Hono<AppEnv>();
 
 app.get("/api/health", (c) => c.json({ ok: true, brand: c.env.BRAND_NAME }));
 
 app.route("/api/auth", auth);
+
+// Public (no session) routes, before the tenant router so its guard never sees them.
+app.route("/api/public", publicApi);
 
 // Tenant routes. FAIL-CLOSED: the router-level guard runs tenantAuth whenever a real (non-middleware) handler
 // matched this request, so a route added here without its own auth is still protected. Paths that match no

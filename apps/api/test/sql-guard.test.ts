@@ -1,17 +1,35 @@
 import { it, expect } from "vitest";
-import src from "../src/data/tenant.ts?raw";
+import infraSrc from "../src/data/infra.ts?raw";
 import { TENANT_TABLES } from "../src/data/tenant";
 import { checkStatement, scanSource, tenantStatements } from "./sql-guard";
 
-it("every tenant SQL statement is scoped by org_id", () => {
-  const { checked, violations } = scanSource(src);
-  expect(checked).toBeGreaterThan(0);
-  const stmts = tenantStatements(src);
+// Every .ts under src/data/tenant/ is scanned, each must hold at least one checked statement.
+const files = import.meta.glob("../src/data/tenant/*.ts", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+
+it("scans every file under src/data/tenant/ and each has checked statements", () => {
+  const names = Object.keys(files);
+  expect(names.some((n) => n.endsWith("/core.ts"))).toBe(true);
+  for (const [name, code] of Object.entries(files)) {
+    const { checked, violations } = scanSource(code);
+    expect(checked, `${name} has no checked statement`).toBeGreaterThan(0);
+    expect(violations, name).toEqual([]);
+  }
+});
+
+it("infra.ts (rate_hits) is global and not flagged", () => {
+  expect(infraSrc).toMatch(/rate_hits/);
+  expect(scanSource(infraSrc)).toEqual({ checked: 0, violations: [] });
+  expect(TENANT_TABLES).not.toContain("rate_hits");
+});
+
+it("every tenant table has a checked statement somewhere", () => {
+  const stmts = Object.values(files).flatMap((code) => tenantStatements(code));
   // login_failures has no repo statement yet (added with the login rate limiter); add it here then.
-  for (const t of TENANT_TABLES.filter((t) => t !== "login_failures")) {
+  // Tables added by later tasks get their repo statements in their own task; they are listed here as they gain one.
+  const pending = ["login_failures", "services", "audit_log"];
+  for (const t of TENANT_TABLES.filter((t) => !pending.includes(t))) {
     expect(stmts.some((s) => new RegExp(`\\b${t}\\b`, "i").test(s)), `no statement checked for ${t}`).toBe(true);
   }
-  expect(violations).toEqual([]);
 });
 
 it("the guard flags unscoped statements", () => {

@@ -47,3 +47,30 @@ it("reserved slugs are seeded", async () => {
     ["admin","www","api","app","platform","mail","support","help","billing","status","static","assets","login","signup"].sort(),
   );
 });
+
+it("0004: users (org_id,id) unique index, services uid unique per org, rate_hits, audit_log", async () => {
+  const idx = await env.DB.prepare("SELECT name, \"unique\" AS u FROM pragma_index_list('users')").all();
+  expect(idx.results.find((r) => r.name === "users_org_id")?.u).toBe(1);
+  const cols = (await env.DB.prepare("SELECT name FROM pragma_table_info('rate_hits')").all()).results.map((r) => r.name);
+  expect(cols).toEqual(["key", "window", "n"]);
+  const rs = (await env.DB.prepare("SELECT name FROM pragma_table_info('org_settings')").all()).results.map((r) => r.name);
+  for (const c of ["salon_name_ar", "tagline", "default_commission_pct", "quick_amounts", "thank_you_text", "summary_hour", "updated_at"]) expect(rs).toContain(c);
+  const us = (await env.DB.prepare("SELECT name FROM pragma_table_info('users')").all()).results.map((r) => r.name);
+  for (const c of ["phone", "commission_pct", "sort_order", "avatar", "avatar_type", "avatar_v", "can_add_expense"]) expect(us).toContain(c);
+  const ac = (await env.DB.prepare("SELECT name FROM pragma_table_info('audit_log')").all()).results.map((r) => r.name);
+  expect(ac).toEqual(["id", "org_id", "at", "actor_id", "actor_name", "entity", "entity_id", "ref", "action", "before", "after"]);
+  const fks = (await env.DB.prepare("SELECT \"from\" FROM pragma_foreign_key_list('audit_log')").all()).results.map((r) => r.from);
+  expect(fks).toEqual(["org_id"]);
+});
+
+it("services uid is unique per org, not globally; price >= 0", async () => {
+  await mkOrg("org_s1", "s1-salon");
+  await mkOrg("org_s2", "s2-salon");
+  const ins = (org: string, uid: string, price = 10) =>
+    env.DB.prepare("INSERT INTO services(org_id,uid,category,name,price,created_at,updated_at) VALUES(?,?,?,?,?,?,?)")
+      .bind(org, uid, "Hair", "Cut", price, now, now).run();
+  await ins("org_s1", "u1");
+  await ins("org_s2", "u1");
+  await expect(ins("org_s1", "u1")).rejects.toThrow(/UNIQUE/);
+  await expect(ins("org_s1", "u2", -1)).rejects.toThrow(/CHECK/);
+});
