@@ -1,4 +1,12 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Page } from "@playwright/test";
+
+/** The first-login tour would cover the page: e2e runs with it off. */
+const test = base.extend({
+  page: async ({ page }, use) => {
+    await page.addInitScript(() => localStorage.setItem("ss_tour_off", "1"));
+    await use(page);
+  },
+});
 import { execSync } from "node:child_process";
 
 const sql = (q: string) =>

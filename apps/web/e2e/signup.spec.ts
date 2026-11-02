@@ -1,4 +1,12 @@
-import { test, expect } from "@playwright/test";
+import { test as base, expect } from "@playwright/test";
+
+/** The first-login tour would cover the page: e2e runs with it off. */
+const test = base.extend({
+  page: async ({ page }, use) => {
+    await page.addInitScript(() => localStorage.setItem("ss_tour_off", "1"));
+    await use(page);
+  },
+});
 
 /** A new salon signs up (same-origin POST, as the site does), follows its handoff link and lands signed in. */
 test("signup to signed-in dashboard, link single-use", async ({ page }) => {

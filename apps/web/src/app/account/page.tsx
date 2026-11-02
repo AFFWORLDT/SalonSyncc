@@ -6,6 +6,8 @@ import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useAppTheme } from "@/components/theme/theme-provider";
 import type { Appearance } from "@/components/theme/theme";
+import { START_TOUR } from "@/components/app/product-tour";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +20,7 @@ import { cn } from "@/lib/utils";
 export default function AccountPage() {
   const { user, isAdmin, refresh, has, readOnly } = useAuth();
   const { appearance, setAppearance } = useAppTheme();
+  const router = useRouter();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [saving, setSaving] = useState(false);
@@ -55,7 +58,25 @@ export default function AccountPage() {
       {has("push") && !readOnly && <NotificationsCard />}
 
       <Card>
+        <Card>
         <CardHeader>
+          <CardTitle>Getting started</CardTitle>
+          <CardDescription>A one-minute tour of where everything lives.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="outline"
+            onClick={() => {
+              router.push("/");
+              setTimeout(() => window.dispatchEvent(new Event(START_TOUR)), 700);
+            }}
+          >
+            Replay the tour
+          </Button>
+        </CardContent>
+      </Card>
+
+      <CardHeader>
           <CardTitle>Appearance</CardTitle>
         </CardHeader>
         <CardContent>

@@ -47,7 +47,7 @@ export function SetupChecklist() {
   const done = steps.filter((s) => data[s.key]).length;
   if (done === steps.length) return null;
   return (
-    <Card data-testid="setup-checklist" className="gap-3 p-5">
+    <Card data-testid="setup-checklist" data-tour="setup" className="gap-3 p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-base font-semibold">Get your salon ready</p>

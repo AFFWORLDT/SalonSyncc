@@ -32,6 +32,7 @@ export function BottomBar() {
       <Link
         key={item.href}
         href={item.href}
+        data-tour={`tab-${item.href.replace(/\//g, "") || "home"}`}
         onClick={() => haptic("tap")}
         aria-current={active ? "page" : undefined}
         className={cn(
@@ -59,6 +60,7 @@ export function BottomBar() {
             openNew();
           }}
           aria-label="New sale"
+          data-tour="tab-new-sale"
           className="-mt-5 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition-transform active:scale-95"
         >
           <Plus className="size-7" />

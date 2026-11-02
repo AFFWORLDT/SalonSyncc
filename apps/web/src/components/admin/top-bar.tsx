@@ -50,7 +50,7 @@ export function TopBar({ onOpenMobileNav, onToggleCollapsed }: { onOpenMobileNav
         <PanelLeft />
       </Button>
       <p className="min-w-0 flex-1 truncate text-base font-semibold">{title}</p>
-      <Button size="sm" className="hidden lg:inline-flex" onClick={() => openNew()} disabled={readOnly}>
+      <Button size="sm" data-tour="new-sale" className="hidden lg:inline-flex" onClick={() => openNew()} disabled={readOnly}>
         <Plus />
         New sale
       </Button>

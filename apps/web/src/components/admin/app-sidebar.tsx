@@ -45,6 +45,7 @@ export function AppSidebar({
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      data-tour={`nav-${item.href.replace(/\//g, "") || "home"}`}
                       onClick={onNavigate}
                       title={collapsed ? item.label : undefined}
                       aria-current={active ? "page" : undefined}

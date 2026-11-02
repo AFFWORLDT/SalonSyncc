@@ -15,6 +15,7 @@ import { PullToRefresh } from "@/components/app/pull-to-refresh";
 import { startPush } from "@/lib/push";
 import { toast } from "sonner";
 import { SubscriptionBanner, ExpiredScreen } from "@/components/app/subscription";
+import { ProductTour } from "@/components/app/product-tour";
 
 /** Pages an expired salon can still open (read-only: reports, exports, its account and plan). */
 const READONLY_OK = ["/sheet", "/monthly", "/ledger", "/bills", "/history", "/account", "/plan"];
@@ -128,6 +129,7 @@ function Frame({ children }: { children: React.ReactNode }) {
           <div className="flex h-full min-w-0 flex-1 flex-col">
             <TopBar onOpenMobileNav={() => setMobileOpen(true)} onToggleCollapsed={toggleCollapsed} />
             <SubscriptionBanner />
+            <ProductTour />
             <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
               <PullToRefresh scrollRef={mainRef} />
               <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-6 sm:p-6 lg:p-8">
