@@ -1,5 +1,7 @@
 "use client";
 
+import { FeatureGate } from "@/components/app/feature-gate";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Search } from "lucide-react";
@@ -14,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/admin/states";
 import { WhatsAppIcon } from "@/components/app/whatsapp-icon";
 
-export default function CustomersPage() {
+function CustomersPageInner() {
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
   const [pages, setPages] = useState(1);
@@ -90,5 +92,14 @@ export default function CustomersPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+/** Gated by the salon's plan: without "customers_crm" the page shows the Upgrade card and makes no API calls. */
+export default function CustomersPage() {
+  return (
+    <FeatureGate feature="customers_crm">
+      <CustomersPageInner />
+    </FeatureGate>
   );
 }

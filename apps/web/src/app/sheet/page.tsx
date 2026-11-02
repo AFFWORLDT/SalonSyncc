@@ -1,12 +1,14 @@
 "use client";
 
+import { FeatureGate } from "@/components/app/feature-gate";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { useAuth } from "@/lib/auth-context";
-import { money, dayLabel, businessToday, num } from "@/lib/format";
+import { money, dayLabel, businessToday, num, currencyCode } from "@/lib/format";
 import { exportDailySheet } from "@/lib/excel";
 import type { DailySheet } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -22,8 +24,8 @@ import { cn } from "@/lib/utils";
 const th = "px-2 py-2 text-right font-medium whitespace-nowrap";
 const td = "num px-2 py-2 text-right whitespace-nowrap";
 
-export default function SheetPage() {
-  const { settings } = useAuth();
+function SheetPageInner() {
+  const { settings, has } = useAuth();
   const today = businessToday();
   const [month, setMonth] = useState(today.slice(0, 7));
   const [showExp, setShowExp] = useState(false);
@@ -57,10 +59,12 @@ export default function SheetPage() {
         <h1 className="text-2xl">Daily sheet</h1>
         <div className="flex flex-wrap items-center gap-2">
           <MonthPicker month={month} onChange={setMonth} />
-          <Button variant="outline" onClick={download} disabled={!data || exporting}>
-            <Download />
-            {exporting ? "Preparing…" : "Excel"}
-          </Button>
+          {has("excel_export") && (
+            <Button variant="outline" onClick={download} disabled={!data || exporting}>
+              <Download />
+              {exporting ? "Preparing…" : "Excel"}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -161,7 +165,7 @@ export default function SheetPage() {
           </div>
         </Card>
       )}
-      <p className="text-xs text-muted-foreground">All amounts in AED. Shop expense includes company expenses. Profit = sale − expense − commission. Tap a date to see its sales.</p>
+      <p className="text-xs text-muted-foreground">All amounts in {currencyCode()}. Shop expense includes company expenses. Profit = sale − expense − commission. Tap a date to see its sales.</p>
     </div>
   );
 }
@@ -184,5 +188,14 @@ function Cells({ showExp, sales, commission, expense, foot }: { showExp: boolean
       <td className={cn(td, b, !foot && "text-muted-foreground")}>{num(commission, true)}</td>
       {showExp && <td className={cn(td, b, !foot && "text-muted-foreground")}>{num(expense, true)}</td>}
     </>
+  );
+}
+
+/** Gated by the salon's plan: without "daily_sheet" the page shows the Upgrade card and makes no API calls. */
+export default function SheetPage() {
+  return (
+    <FeatureGate feature="daily_sheet">
+      <SheetPageInner />
+    </FeatureGate>
   );
 }

@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { api, errorMessage } from "@/lib/api";
+import { api, errorMessage, isStale } from "@/lib/api";
 import { notifyDataChanged } from "@/hooks/use-api";
-import { dayLabel, toInput } from "@/lib/format";
+import { dayLabel, toInput, currencyCode } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -64,6 +64,8 @@ function ExpenseForm({
     } catch (err) {
       haptic("error");
       toast.error(errorMessage(err));
+      // Changed by someone else at the same moment: reload what is on screen; the dialog stays open to retry.
+      if (isStale(err)) notifyDataChanged();
     } finally {
       setSaving(false);
     }
@@ -84,7 +86,7 @@ function ExpenseForm({
           {day ? dayLabel(day) : "Today"} — one entry per day. Enter the total.
         </DialogDescription>
       </DialogHeader>
-      <Field label="Amount (AED)" htmlFor="exp-amount">
+      <Field label={`Amount (${currencyCode()})`} htmlFor="exp-amount">
         <Input
           id="exp-amount"
           inputMode="decimal"

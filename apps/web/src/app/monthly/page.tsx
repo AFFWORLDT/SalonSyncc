@@ -1,11 +1,15 @@
 "use client";
 
+import { useAuth } from "@/lib/auth-context";
+
+import { FeatureGate } from "@/components/app/feature-gate";
+
 import { useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
-import { money, businessToday, monthShort, num } from "@/lib/format";
+import { money, businessToday, monthShort, num, currencyCode } from "@/lib/format";
 import { exportMonthly } from "@/lib/excel";
 import type { MonthlyReport, Totals } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -17,7 +21,8 @@ import { cn } from "@/lib/utils";
 
 const td = "num px-2 py-2.5 text-right whitespace-nowrap";
 
-export default function MonthlyPage() {
+function MonthlyPageInner() {
+  const { has, settings } = useAuth();
   const thisYear = businessToday().slice(0, 4);
   const [year, setYear] = useState(thisYear);
   const { data, error, reload } = useApi<MonthlyReport>(`/api/reports/monthly?year=${year}`);
@@ -53,14 +58,16 @@ export default function MonthlyPage() {
               <ChevronRight />
             </Button>
           </div>
-          <Button
-            variant="outline"
-            disabled={!data}
-            onClick={() => data && exportMonthly(data).catch(() => toast.error("Couldn't create the Excel file"))}
-          >
-            <Download />
-            Excel
-          </Button>
+          {has("excel_export") && (
+            <Button
+              variant="outline"
+              disabled={!data}
+              onClick={() => data && exportMonthly(data, settings?.display_name ?? "").catch(() => toast.error("Couldn't create the Excel file"))}
+            >
+              <Download />
+              Excel
+            </Button>
+          )}
         </div>
       </div>
 
@@ -159,7 +166,16 @@ export default function MonthlyPage() {
           </Card>
         </>
       )}
-      <p className="text-xs text-muted-foreground">All amounts in AED. Barber columns show sales.</p>
+      <p className="text-xs text-muted-foreground">All amounts in {currencyCode()}. Barber columns show sales.</p>
     </div>
+  );
+}
+
+/** Gated by the salon's plan: without "reports_advanced" the page shows the Upgrade card and makes no API calls. */
+export default function MonthlyPage() {
+  return (
+    <FeatureGate feature="reports_advanced">
+      <MonthlyPageInner />
+    </FeatureGate>
   );
 }

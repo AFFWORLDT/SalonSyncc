@@ -1,11 +1,13 @@
 "use client";
 
+import { useAuth } from "@/lib/auth-context";
+
 import { useState } from "react";
 import { ArrowLeftRight, Download, Scale } from "lucide-react";
 import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
 import { api, qs } from "@/lib/api";
-import { money, dayLabel, businessToday, num, timeLabel } from "@/lib/format";
+import { money, dayLabel, businessToday, num, timeLabel, currencyCode } from "@/lib/format";
 import { exportShopLedger } from "@/lib/excel";
 import type { Balances, LedgerLine, ShopLedger, Transfer } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -26,6 +28,7 @@ const VIEW = [
 
 /** The shop book: balances now, then every line in a range with a running balance. */
 export function LedgerShop() {
+  const { has, settings } = useAuth();
   const today = businessToday();
   const [from, setFrom] = useState(`${today.slice(0, 7)}-01`);
   const [to, setTo] = useState(today);
@@ -64,14 +67,16 @@ export function LedgerShop() {
           <Scale />
           Set balances
         </Button>
-        <Button
-          variant="outline"
-          disabled={!data}
-          onClick={() => data && exportShopLedger(data).catch(() => toast.error("Couldn't create the Excel file"))}
-        >
-          <Download />
-          Excel
-        </Button>
+        {has("excel_export") && (
+          <Button
+            variant="outline"
+            disabled={!data}
+            onClick={() => data && exportShopLedger(data, settings?.display_name ?? "").catch(() => toast.error("Couldn't create the Excel file"))}
+          >
+            <Download />
+            Excel
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -137,7 +142,7 @@ export function LedgerShop() {
         )}
       </Card>
       <p className="text-xs text-muted-foreground">
-        Every line stays forever. An edited bill shows its old line struck through, a reversal, then the new line. Amounts in AED; the last column is
+        Every line stays forever. An edited bill shows its old line struck through, a reversal, then the new line. Amounts in {currencyCode()}; the last column is
         the running balance.
       </p>
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { FeatureGate } from "@/components/app/feature-gate";
+
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
@@ -19,7 +21,7 @@ import { Field } from "@/components/app/field";
 import { MonthPicker } from "@/components/app/month-picker";
 import { SimpleSelect } from "@/components/app/simple-select";
 
-export default function ExpensesPage() {
+function ExpensesPageInner() {
   const [month, setMonth] = useState(businessToday().slice(0, 7));
   const [barber, setBarber] = useState("all");
   const users = useApi<User[]>("/api/users");
@@ -184,5 +186,14 @@ function PickDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Gated by the salon's plan: without "expenses" the page shows the Upgrade card and makes no API calls. */
+export default function ExpensesPage() {
+  return (
+    <FeatureGate feature="expenses">
+      <ExpensesPageInner />
+    </FeatureGate>
   );
 }

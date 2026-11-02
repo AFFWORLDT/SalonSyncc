@@ -4,8 +4,8 @@ import { useState } from "react";
 import { ArrowLeft, HandCoins } from "lucide-react";
 import { toast } from "sonner";
 import { notifyDataChanged, useApi } from "@/hooks/use-api";
-import { api, errorMessage, qs } from "@/lib/api";
-import { money, dayLabel, businessToday, num, timeLabel, toInput } from "@/lib/format";
+import { api, errorMessage, qs, isStale } from "@/lib/api";
+import { money, dayLabel, businessToday, num, timeLabel, toInput, currencyCode } from "@/lib/format";
 import type { BarberBalance, BarberLedger, LedgerLine, MoneyAccount, Payout } from "@/lib/types";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
@@ -85,7 +85,7 @@ export function LedgerBarbers() {
           </ul>
         )}
       </Card>
-      <p className="text-xs text-muted-foreground">Amounts in AED. A negative &quot;owed&quot; means the barber was paid ahead (an advance).</p>
+      <p className="text-xs text-muted-foreground">Amounts in {currencyCode()}. A negative &quot;owed&quot; means the barber was paid ahead (an advance).</p>
       <PayoutDialog state={paying} barbers={data ?? []} onClose={() => setPaying(null)} />
     </div>
   );
@@ -225,6 +225,8 @@ function PayoutForm({ barberId, current, barbers, onDone }: { barberId: number |
     } catch (err) {
       haptic("error");
       toast.error(errorMessage(err));
+      // Changed by someone else at the same moment: reload what is on screen; the dialog stays open to retry.
+      if (isStale(err)) notifyDataChanged();
     } finally {
       setSaving(false);
     }
@@ -254,7 +256,7 @@ function PayoutForm({ barberId, current, barbers, onDone }: { barberId: number |
           className="h-11 w-full"
         />
       </Field>
-      <Field label="Amount (AED)" htmlFor="po-amount">
+      <Field label={`Amount (${currencyCode()})`} htmlFor="po-amount">
         <Input
           id="po-amount"
           inputMode="decimal"

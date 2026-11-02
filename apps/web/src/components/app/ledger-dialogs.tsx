@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { api, errorMessage } from "@/lib/api";
+import { api, errorMessage, isStale } from "@/lib/api";
 import { notifyDataChanged } from "@/hooks/use-api";
-import { money, businessToday, toInput } from "@/lib/format";
+import { money, businessToday, toInput, currencyCode } from "@/lib/format";
 import type { Balances, MoneyAccount, Transfer } from "@/lib/types";
 import { haptic } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,8 @@ async function run(setSaving: (b: boolean) => void, work: () => Promise<unknown>
   } catch (err) {
     haptic("error");
     toast.error(errorMessage(err));
+    // Changed by someone else at the same moment: reload what is on screen; the dialog stays open to retry.
+    if (isStale(err)) notifyDataChanged();
   } finally {
     setSaving(false);
   }
@@ -70,7 +72,7 @@ function TransferForm({ current, onDone }: { current: Transfer | null; onDone: (
         <DialogTitle>{current ? "Edit money move" : "Move money"}</DialogTitle>
         <DialogDescription>For example, depositing drawer cash into the bank. The shop total stays the same.</DialogDescription>
       </DialogHeader>
-      <Field label="Amount (AED)" htmlFor="tr-amount">
+      <Field label={`Amount (${currencyCode()})`} htmlFor="tr-amount">
         <Input
           id="tr-amount"
           inputMode="decimal"
@@ -134,10 +136,10 @@ function BalancesForm({ balances, onDone }: { balances: Balances; onDone: () => 
           Count the cash in the drawer and check the bank, then enter what is really there. The difference is recorded as a &quot;Balance set&quot; line.
         </DialogDescription>
       </DialogHeader>
-      <Field label="Cash drawer (AED)" htmlFor="bal-cash" hint={`The ledger says ${money(balances.cash)}`}>
+      <Field label={`Cash drawer (${currencyCode()})`} htmlFor="bal-cash" hint={`The ledger says ${money(balances.cash)}`}>
         <Input id="bal-cash" inputMode="decimal" autoComplete="off" required value={cash} onChange={(e) => setCash(clean(e.target.value))} className="num h-11" />
       </Field>
-      <Field label="Bank (AED)" htmlFor="bal-bank" hint={`The ledger says ${money(balances.bank)}`}>
+      <Field label={`Bank (${currencyCode()})`} htmlFor="bal-bank" hint={`The ledger says ${money(balances.bank)}`}>
         <Input id="bal-bank" inputMode="decimal" autoComplete="off" required value={bank} onChange={(e) => setBank(clean(e.target.value))} className="num h-11" />
       </Field>
       <DialogFooter>

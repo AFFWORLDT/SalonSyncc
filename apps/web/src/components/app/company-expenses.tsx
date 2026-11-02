@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { Building2 } from "lucide-react";
 import { toast } from "sonner";
-import { api, errorMessage } from "@/lib/api";
+import { api, errorMessage, isStale } from "@/lib/api";
 import { notifyDataChanged, useApi } from "@/hooks/use-api";
-import { money, dayLabel, businessToday, toInput } from "@/lib/format";
+import { money, dayLabel, businessToday, toInput, currencyCode } from "@/lib/format";
 import type { CompanyExpense } from "@/lib/types";
 import { haptic } from "@/lib/haptics";
 import { Button } from "@/components/ui/button";
@@ -109,6 +109,8 @@ function CompanyExpenseForm({ current, onDone }: { current: CompanyExpense | nul
     } catch (err) {
       haptic("error");
       toast.error(errorMessage(err));
+      // Changed by someone else at the same moment: reload what is on screen; the dialog stays open to retry.
+      if (isStale(err)) notifyDataChanged();
     } finally {
       setSaving(false);
     }
@@ -130,7 +132,7 @@ function CompanyExpenseForm({ current, onDone }: { current: CompanyExpense | nul
         <DialogTitle>{current ? "Edit company expense" : "Add company expense"}</DialogTitle>
         <DialogDescription>Shop costs like rent, electricity or supplies. They come off the shop profit.</DialogDescription>
       </DialogHeader>
-      <Field label="Amount (AED)" htmlFor="cexp-amount">
+      <Field label={`Amount (${currencyCode()})`} htmlFor="cexp-amount">
         <Input
           id="cexp-amount"
           inputMode="decimal"

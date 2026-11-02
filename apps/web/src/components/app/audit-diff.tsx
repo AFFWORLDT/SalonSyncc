@@ -30,6 +30,17 @@ const LABELS: Record<string, string> = {
   description: "Description",
   price: "Price",
   default_commission_pct: "Default commission %",
+  display_name: "Salon name",
+  timezone: "Time zone",
+  day_start_hour: "Day starts at",
+  currency: "Currency",
+  locale: "Number format",
+  phone_country: "Phone country code",
+  bill_prefix: "Bill prefix",
+  phone_number_id: "WhatsApp phone number ID",
+  waba_id: "WhatsApp Business account ID",
+  test_numbers: "Test numbers",
+  wa_language: "Template language",
   quick_amounts: "Quick amounts",
 };
 
@@ -45,7 +56,7 @@ function show(key: string, v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
   if (MONEY.has(key) && typeof v === "number") return money(v);
   if (key === "commission_pct" || key === "default_commission_pct") return pctLabel(Number(v));
-  if (key === "vat_rate") return `${Math.round(Number(v) * 100)}%`;
+  if (key === "vat_rate") return pctLabel(Number(v)); // a percent (5 = 5%)
   if (key === "day" && typeof v === "string") return dayLabel(v);
   if ((key === "customer_phone" || key === "phone") && typeof v === "string") return phoneLabel(v);
   if (key === "payment_mode") return String(v).toUpperCase();
@@ -57,7 +68,7 @@ function show(key: string, v: unknown): string {
   return String(v);
 }
 
-const VERB: Record<string, string> = { create: "Created", update: "Edited", delete: "Deleted", password_reset: "Password reset" };
+const VERB: Record<string, string> = { create: "Created", update: "Edited", delete: "Deleted", password_reset: "Password reset", starter: "Added the starter list of" };
 export const actionVerb = (a: string) => VERB[a] ?? a;
 
 /** Edits show old → new per changed field; creates and deletes show the record itself. */

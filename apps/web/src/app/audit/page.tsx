@@ -1,5 +1,7 @@
 "use client";
 
+import { FeatureGate } from "@/components/app/feature-gate";
+
 import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
@@ -24,9 +26,10 @@ const TYPES = [
   { value: "payout", label: "Barber payouts" },
   { value: "transfer", label: "Money moves" },
   { value: "opening", label: "Opening balances" },
-  { value: "user", label: "Barbers & users" },
+  { value: "user", label: "Staff & users" },
   { value: "service", label: "Services" },
   { value: "settings", label: "Settings" },
+  { value: "whatsapp", label: "WhatsApp connection" },
 ];
 const TYPE_NOUN: Record<string, string> = {
   sale: "bill",
@@ -38,6 +41,7 @@ const TYPE_NOUN: Record<string, string> = {
   user: "user",
   service: "service",
   settings: "settings",
+  whatsapp: "WhatsApp connection",
 };
 
 /** "edited bill", "reset the password of" … (the ref follows). */
@@ -47,7 +51,7 @@ function summary(e: AuditEntry): string {
 }
 
 /** Every change anyone made, newest first (admin only). */
-export default function AuditPage() {
+function AuditPageInner() {
   const today = businessToday();
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
@@ -163,5 +167,14 @@ export default function AuditPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/** Gated by the salon's plan: without "audit_log" the page shows the Upgrade card and makes no API calls. */
+export default function AuditPage() {
+  return (
+    <FeatureGate feature="audit_log">
+      <AuditPageInner />
+    </FeatureGate>
   );
 }

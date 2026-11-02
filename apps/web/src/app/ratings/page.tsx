@@ -1,5 +1,7 @@
 "use client";
 
+import { FeatureGate } from "@/components/app/feature-gate";
+
 import { useState } from "react";
 import { Star } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
@@ -35,7 +37,7 @@ const pct = (part: number, whole: number) => (whole ? `${Math.round((part / whol
  * After a visit, WhatsApp's "Rate your visit" sends the customer to Google reviews: how many were asked and how
  * many tapped through, overall and per barber. Star ratings from the old in-app page show below when there are any.
  */
-export default function RatingsPage() {
+function RatingsPageInner() {
   const today = businessToday();
   const [from, setFrom] = useState(`${today.slice(0, 7)}-01`);
   const [to, setTo] = useState(today);
@@ -144,5 +146,14 @@ export default function RatingsPage() {
         </>
       )}
     </div>
+  );
+}
+
+/** Gated by the salon's plan: without "ratings" the page shows the Upgrade card and makes no API calls. */
+export default function RatingsPage() {
+  return (
+    <FeatureGate feature="ratings">
+      <RatingsPageInner />
+    </FeatureGate>
   );
 }

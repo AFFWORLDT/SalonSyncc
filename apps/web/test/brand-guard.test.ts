@@ -26,11 +26,6 @@ const PENDING = new Set<string>([
   "src/app/monthly/page.tsx",
   "src/app/rate/page.tsx",
   "src/app/sheet/page.tsx",
-  "src/components/app/company-expenses.tsx",
-  "src/components/app/expense-dialog.tsx",
-  "src/components/app/ledger-barbers.tsx",
-  "src/components/app/ledger-dialogs.tsx",
-  "src/components/app/ledger-shop.tsx",
   "src/lib/excel.ts",
 ]);
 

@@ -1,5 +1,9 @@
 "use client";
 
+import { useAuth } from "@/lib/auth-context";
+
+import { FeatureGate } from "@/components/app/feature-gate";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Phone, Scissors, Sparkles, UserRound } from "lucide-react";
@@ -21,7 +25,7 @@ import { WhatsAppIcon } from "@/components/app/whatsapp-icon";
 const PAGE = 30;
 
 /** One customer's profile and every visit (/customers/view/?id=…). Static export, so the id is a query param. */
-export default function CustomerPage() {
+function CustomerPageInner() {
   const [id, setId] = useState<string | null>(null);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -33,6 +37,7 @@ export default function CustomerPage() {
 }
 
 function Profile({ id }: { id: string }) {
+  const { has } = useAuth();
   const [pages, setPages] = useState(1);
   const detail = useApi<CustomerDetail>(`/api/customers/${id}`);
   const visits = useApi<Paged<Sale>>(`/api/sales${qs({ customer_id: id, page_size: PAGE * pages })}`);
@@ -78,7 +83,7 @@ function Profile({ id }: { id: string }) {
         )}
       </Card>
 
-      {c.phone && (
+      {c.phone && has("whatsapp") && (
         <Card className="flex-row items-center justify-between gap-4 p-4">
           <div>
             <Label htmlFor="c-wa" className="text-sm font-medium">
@@ -197,5 +202,14 @@ function ProfileSkeleton() {
       </div>
       <Skeleton className="h-64 rounded-xl" />
     </div>
+  );
+}
+
+/** Gated by the salon's plan: without "customers_crm" the page shows the Upgrade card and makes no API calls. */
+export default function CustomerPage() {
+  return (
+    <FeatureGate feature="customers_crm">
+      <CustomerPageInner />
+    </FeatureGate>
   );
 }
