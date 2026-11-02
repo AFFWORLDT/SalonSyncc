@@ -8,7 +8,8 @@
   "compatibility_flags": ["nodejs_compat"],
   "placement": { "mode": "smart" },
   "workers_dev": true,
-  "vars": { "BRAND_NAME": "SalonStation", "ROOT_DOMAIN": "", "ADMIN_HOST": "admin", "MAIL_FROM": "", "SUPPORT_EMAIL": "" },
+  "vars": { "BRAND_NAME": "SalonStation", "ROOT_DOMAIN": "", "ADMIN_HOST": "admin", "MAIL_FROM": "", "SUPPORT_EMAIL": "", "APP_ORIGIN": "https://salonstation-app.affworld0.workers.dev" },
+  // Secrets (wrangler secret put): SESSION_SECRET, SECRETS_KEY (base64 32 bytes), FCM_SERVICE_ACCOUNT, WA_APP_SECRET, WA_VERIFY_TOKEN.
   "d1_databases": [
     {
       "binding": "DB",

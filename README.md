@@ -8,7 +8,7 @@ Multi-salon SaaS on Cloudflare Workers + D1 (Hono). Monorepo: `apps/api`, `packa
 
 ```sh
 npm install
-printf 'SESSION_SECRET=%s\n' "$(openssl rand -hex 32)" > apps/api/.dev.vars   # gitignored, never commit
+printf 'SESSION_SECRET=%s\nSECRETS_KEY=%s\n' "$(openssl rand -hex 32)" "$(openssl rand -base64 32)" > apps/api/.dev.vars   # gitignored, never commit
 npm run db:migrate:local -w @ss/api
 npm run db:seed:local -w @ss/api      # demo orgs alpha (free) and bravo (trial); owner, barber1, barber2 / pass1234
 npm run dev -w @ss/api                # http://localhost:8787
@@ -44,7 +44,7 @@ Public routes (no session) live on `publicApi` at `/api/public` (avatars, servic
 
 ## Migrations
 
-`0001_platform`, `0002_tenant_core`, `0003_seed_plans` (frozen), `0004_core` (services, audit_log, rate_hits), `0005_users_ci` (case-insensitive usernames), `0006_sales` (customers, sales, sale_items), `0007_expenses` (expenses, company_expenses), `0008_ledger` (ledger_entries, barber_payouts, money_transfers).
+`0001_platform`, `0002_tenant_core`, `0003_seed_plans` (frozen), `0004_core` (services, audit_log, rate_hits), `0005_users_ci` (case-insensitive usernames), `0006_sales` (customers, sales, sale_items), `0007_expenses` (expenses, company_expenses), `0008_ledger` (ledger_entries, barber_payouts, money_transfers), `0009_engagement` (org_settings wa_*, org_whatsapp, org_assets, push_tokens, notifications, announcements, ratings, wa_campaigns, wa_messages).
 
 ## Test
 

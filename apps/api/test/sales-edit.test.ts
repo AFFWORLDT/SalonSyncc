@@ -4,6 +4,7 @@ import app from "../src/index";
 import { businessDay, addDays } from "../src/lib/clock";
 import { makeOrg, makeUser, loginAs } from "./helpers";
 import { PUBLIC_LIMITS } from "../src/lib/limits";
+import { hooks } from "../src/tenant/sales/hooks";
 
 // waitUntil work (customer stats) is collected so tests can await it deterministically.
 const pending: Promise<unknown>[] = [];
@@ -265,6 +266,43 @@ describe("optimistic concurrency (a concurrent write lands between the read and 
     expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM sale_items WHERE org_id = ? AND sale_id = ?").bind(a.org.id, s.id).first<any>()).n).toBe(0);
   });
 
+  it("afterSaleEdit / afterSaleDelete run once when the write took effect, never on a stale 409", async () => {
+    const a = await setup("occ-hooks");
+    const edits: [number, number, number][] = [];
+    const dels: number[] = [];
+    const orig = { e: hooks.afterSaleEdit, d: hooks.afterSaleDelete };
+    hooks.afterSaleEdit = async (_c, before, after) => { edits.push([before.id, before.amount, after.amount]); };
+    hooks.afterSaleDelete = async (_c, sale) => { dels.push(sale.id); };
+    try {
+      const s = await post(a.k1, { amount: 50, payment_mode: "cash" });
+      expect((await put(a.ck, s.id, { amount: 60, payment_mode: "cash" })).status).toBe(200);
+      await flush();
+      expect(edits).toEqual([[s.id, 5000, 6000]]);
+      // stale PUT: only the racing winner's edit fires
+      const r = await callIn(racing(() => put(a.ck, s.id, { amount: 70, payment_mode: "card" })), "PUT", `/sales/${s.id}`, a.k1, { amount: 60, payment_mode: "cash", note: "x" });
+      expect(r.status).toBe(409);
+      await flush();
+      expect(edits).toEqual([[s.id, 5000, 6000], [s.id, 6000, 7000]]);
+      // stale DELETE: no delete hook (the racing edit fires its own edit hook)
+      const d = await callIn(racing(() => put(a.ck, s.id, { amount: 80, payment_mode: "card" })), "DELETE", `/sales/${s.id}`, a.k1);
+      expect(d.status).toBe(409);
+      await flush();
+      expect(dels).toEqual([]);
+      expect(edits).toHaveLength(3);
+      expect((await del(a.ck, s.id)).status).toBe(200);
+      await flush();
+      expect(dels).toEqual([s.id]);
+      // a hook that throws never fails the request
+      hooks.afterSaleDelete = () => { throw new Error("boom"); };
+      const s2 = await post(a.k1, { amount: 10, payment_mode: "cash" });
+      expect((await del(a.ck, s2.id)).status).toBe(200);
+      await flush();
+    } finally {
+      hooks.afterSaleEdit = orig.e;
+      hooks.afterSaleDelete = orig.d;
+    }
+  });
+
   it("stale DELETE gets 409 and reverses nothing; double DELETE writes exactly one delete audit row", async () => {
     const a = await setup("occ-del");
     const s = await post(a.k1, { amount: 50, payment_mode: "cash" });
@@ -293,8 +331,10 @@ describe("GET /api/public/receipt/:token", () => {
     await makeOrg({ slug: "rc-b" });
     await setSettings(
       a.org.id,
-      "display_name = 'Alpha Cuts', salon_name_ar = 'ألفا', tagline = 'Sharp', address = 'Main St', contact_phone = '+97141234567', trn = '100000000000003', licence_no = 'L-1', receipt_footer = 'Thanks!', logo_url = 'https://x/logo.png', default_commission_pct = 20, vat_enabled = 1, vat_rate = 5",
+      "display_name = 'Alpha Cuts', salon_name_ar = 'ألفا', tagline = 'Sharp', address = 'Main St', contact_phone = '+97141234567', trn = '100000000000003', licence_no = 'L-1', receipt_footer = 'Thanks!', default_commission_pct = 20, vat_enabled = 1, vat_rate = 5",
     );
+    // the logo comes from org_assets (derived URL), not a stored column
+    await env.DB.prepare("INSERT INTO org_assets(org_id, kind, bytes, type, v) VALUES(?, 'logo', ?, 'image/png', 3)").bind(a.org.id, new Uint8Array([1, 2])).run();
     const s = await post(a.k1, { payment_mode: "card", items: [{ name: "Cut", price: 21, qty: 1 }], customer_name: "Ali", customer_phone: "0501234567", note: "n" });
     const r = await getReceipt(`rc-b.${ROOT}`, s.token);
     expect(r.status).toBe(200);
@@ -324,7 +364,7 @@ describe("GET /api/public/receipt/:token", () => {
         trn: "100000000000003",
         licence_no: "L-1",
         receipt_footer: "Thanks!",
-        logo_url: "https://x/logo.png",
+        logo_url: "/api/public/logo/3?org=rc-a",
         currency: "AED",
         currency_minor: 100,
         locale: expect.any(String),

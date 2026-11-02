@@ -8,7 +8,15 @@ export default defineConfig(async () => {
       cloudflareTest({
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
-          bindings: { TEST_MIGRATIONS: migrations, SESSION_SECRET: "test-secret", ENVIRONMENT: "test" },
+          bindings: {
+            TEST_MIGRATIONS: migrations,
+            SESSION_SECRET: "test-secret",
+            ENVIRONMENT: "test",
+            // Fixed test-only AES key (base64 of bytes 0..31); never a real secret.
+            SECRETS_KEY: "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+            WA_APP_SECRET: "test-wa-app-secret",
+            WA_VERIFY_TOKEN: "test-wa-verify-token",
+          },
         },
       }),
     ],

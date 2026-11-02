@@ -12,6 +12,16 @@ export interface Env {
   MAIL_FROM: string;
   SUPPORT_EMAIL: string;
   ENVIRONMENT?: string;
+  /** App origin for message links when ROOT_DOMAIN is empty (workers.dev), e.g. https://salonstation-app.affworld0.workers.dev. */
+  APP_ORIGIN: string;
+  /** Secret: base64 of 32 random bytes; AES-GCM key for org_whatsapp.token_enc (lib/secrets). */
+  SECRETS_KEY: string;
+  /** Secret: the Firebase service-account JSON (one FCM project for all salons). Unset: push sends are skipped. */
+  FCM_SERVICE_ACCOUNT?: string;
+  /** Secret: the Meta app secret for webhook signatures. Required by the webhook POST (503 without it). */
+  WA_APP_SECRET?: string;
+  /** Secret: the webhook GET handshake token. */
+  WA_VERIFY_TOKEN?: string;
 }
 
 export interface TenantContext {

@@ -1,10 +1,11 @@
-import { Hono } from "hono";
-import type { SettingsInput } from "@ss/contract";
+import { Hono, type Context } from "hono";
+import type { Settings, SettingsInput, SettingsResponse } from "@ss/contract";
 import type { AppEnv } from "../../env";
 import { HttpError } from "../../core/errors";
 import { requireAdmin } from "../../core/roles";
 import { requireFeature } from "../../core/pipeline";
-import { settingsRepo } from "../../data/tenant";
+import { assetsRepo, logoUrl, settingsRepo } from "../../data/tenant";
+import { publicRateLimit, resolvePublicOrg } from "../../core/public";
 
 const bad = (m: string) => new HttpError(400, m);
 
@@ -43,6 +44,23 @@ function percent(b: Record<string, unknown>, k: keyof SettingsInput, label: stri
 
 function link(b: Record<string, unknown>, k: keyof SettingsInput, label: string): string | null {
   const v = text(b, k, label, 300);
+  if (v && !/^https:\/\/\S+$/.test(v)) throw bad(`${label} must be a link starting with https://`);
+  return v;
+}
+
+const TEMPLATE_RE = /^[a-z0-9_]{1,64}$/;
+const WA_LANGUAGE_RE = /^[a-z]{2}(_[A-Z]{2})?$/;
+
+/** A Meta template name: lowercase letters, digits and _, 1-64 characters. */
+function template(b: Record<string, unknown>, k: keyof SettingsInput, label: string): string {
+  const v = b[k];
+  if (typeof v !== "string" || !TEMPLATE_RE.test(v.trim())) throw bad(`${label} must be a template name (a-z, 0-9 and _, up to 64)`);
+  return v.trim();
+}
+
+/** Optional https image link, at most 500 characters. */
+function imageUrl(b: Record<string, unknown>, k: keyof SettingsInput, label: string): string | null {
+  const v = text(b, k, label, 500);
   if (v && !/^https:\/\/\S+$/.test(v)) throw bad(`${label} must be a link starting with https://`);
   return v;
 }
@@ -130,13 +148,42 @@ export function parseSettings(raw: unknown): SettingsInput {
     locale,
     phone_country,
     bill_prefix,
+    wa_bill_auto: bool(b, "wa_bill_auto", "Automatic WhatsApp bills"),
+    wa_bill_template: template(b, "wa_bill_template", "Bill template"),
+    wa_bill_pdf_template: template(b, "wa_bill_pdf_template", "PDF bill template"),
+    wa_reminder_enabled: bool(b, "wa_reminder_enabled", "Visit reminders"),
+    wa_reminder_days: int(b, "wa_reminder_days", "Reminder days", 1, 90),
+    wa_reminder_hour: int(b, "wa_reminder_hour", "Reminder send hour", 0, 23),
+    wa_reminder_template: template(b, "wa_reminder_template", "Reminder template"),
+    wa_language: waLanguage(b),
+    wa_feedback_enabled: bool(b, "wa_feedback_enabled", "Rating requests"),
+    wa_feedback_delay_min: int(b, "wa_feedback_delay_min", "Rating request delay", 0, 1440),
+    wa_feedback_template: template(b, "wa_feedback_template", "Rating template"),
+    wa_feedback_reminder_min: int(b, "wa_feedback_reminder_min", "Rating reminder delay", 0, 1440),
+    wa_feedback_reminder_template: template(b, "wa_feedback_reminder_template", "Rating reminder template"),
+    wa_rating_image_url: imageUrl(b, "wa_rating_image_url", "Rating picture"),
+    wa_rating_reminder_image_url: imageUrl(b, "wa_rating_reminder_image_url", "Rating reminder picture"),
+    wa_fresh_cut_image_url: imageUrl(b, "wa_fresh_cut_image_url", "Fresh cut picture"),
   };
+}
+
+function waLanguage(b: Record<string, unknown>): string {
+  const v = b.wa_language;
+  if (typeof v !== "string" || !WA_LANGUAGE_RE.test(v.trim())) throw bad("WhatsApp language must be a code like en or en_US");
+  return v.trim();
+}
+
+/** Settings plus wa_ready: the org has the whatsapp feature and a connected number. */
+async function withReady(c: Context<AppEnv>, s: Settings): Promise<SettingsResponse> {
+  const { org, features } = c.var.tenant;
+  const wa_ready = features.includes("whatsapp") && (await settingsRepo(c.env.DB, org.id).hasWhatsappConfig());
+  return { ...s, wa_ready };
 }
 
 export const settings = new Hono<AppEnv>();
 settings.use("*", requireFeature("core_sales"));
 
-settings.get("/", async (c) => c.json(await settingsRepo(c.env.DB, c.var.tenant.org.id).get()));
+settings.get("/", async (c) => c.json(await withReady(c, await settingsRepo(c.env.DB, c.var.tenant.org.id).get())));
 
 settings.put("/", requireAdmin, async (c) => {
   let body: unknown;
@@ -153,5 +200,43 @@ settings.put("/", requireAdmin, async (c) => {
     throw bad("That currency uses different decimals; contact support to change it");
   }
   // Nothing in this form changes the plan's features, so the feature cache is left alone.
-  return c.json(await repo.update(next, { id: user.id, name: user.name }));
+  return c.json(await withReady(c, await repo.update(next, { id: user.id, name: user.name })));
+});
+
+// ---------- logo ----------
+
+const LOGO_TYPES = ["image/webp", "image/jpeg", "image/png"];
+const LOGO_MAX = 200 * 1024;
+
+settings.put("/logo", requireAdmin, async (c) => {
+  const type = (c.req.header("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+  if (!LOGO_TYPES.includes(type)) throw bad("Send a WebP, JPEG or PNG image");
+  if (Number(c.req.header("content-length") ?? 0) > LOGO_MAX) throw bad("Logo is too large (max 200 KB)");
+  const bytes = await c.req.arrayBuffer();
+  if (!bytes.byteLength) throw bad("The logo is empty");
+  if (bytes.byteLength > LOGO_MAX) throw bad("Logo is too large (max 200 KB)");
+  const { org } = c.var.tenant;
+  const v = await assetsRepo(c.env.DB, org.id).setLogo(bytes, type);
+  return c.json({ logo_url: logoUrl(v, org.slug) });
+});
+
+settings.delete("/logo", requireAdmin, async (c) => {
+  await assetsRepo(c.env.DB, c.var.tenant.org.id).clearLogo();
+  return c.json({ logo_url: null });
+});
+
+/**
+ * Public logo, mounted on publicApi at /logo: GET /api/public/logo/:v. The org comes from the host (or ?org= on
+ * workers.dev); `v` must be the current version, so the response is immutable. Shares the avatar rate-limit bucket.
+ */
+export const logoPublic = new Hono<AppEnv>();
+logoPublic.get("/:v", publicRateLimit("avatar"), async (c) => {
+  const org = await resolvePublicOrg(c);
+  const v = Number(c.req.param("v"));
+  if (!org || !Number.isInteger(v) || v <= 0) return c.json({ error: "Not found" }, 404);
+  const img = await assetsRepo(c.env.DB, org.id).logo(v);
+  if (!img) return c.json({ error: "Not found" }, 404);
+  return new Response(img.bytes, {
+    headers: { "content-type": img.type, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" },
+  });
 });

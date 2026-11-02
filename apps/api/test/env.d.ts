@@ -12,6 +12,11 @@ declare global {
       SUPPORT_EMAIL: string;
       TEST_MIGRATIONS: D1Migration[];
       ENVIRONMENT: string;
+      APP_ORIGIN: string;
+      SECRETS_KEY: string;
+      FCM_SERVICE_ACCOUNT?: string;
+      WA_APP_SECRET?: string;
+      WA_VERIFY_TOKEN?: string;
     }
   }
 }

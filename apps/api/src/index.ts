@@ -6,7 +6,7 @@ import { tenantAuth, writeGuard, requireFeature, originGuard, WRITE_METHODS } fr
 import { registerMe } from "./platform/me";
 import { auth } from "./platform/auth";
 import { publicApi } from "./core/public";
-import { settings } from "./tenant/settings/routes";
+import { settings, logoPublic } from "./tenant/settings/routes";
 import { staff, avatarPublic } from "./tenant/staff/routes";
 import { services, servicesPublic } from "./tenant/services/routes";
 import { sales } from "./tenant/sales/routes";
@@ -24,6 +24,7 @@ app.route("/api/auth", auth);
 // Public (no session) routes, before the tenant router so its guard never sees them.
 publicApi.route("/avatar", avatarPublic);
 publicApi.route("/services", servicesPublic);
+publicApi.route("/logo", logoPublic);
 app.route("/api/public", publicApi);
 
 // Tenant routes. FAIL-CLOSED: the router-level guard runs tenantAuth whenever a real (non-middleware) handler

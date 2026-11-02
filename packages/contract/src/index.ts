@@ -75,8 +75,8 @@ export interface MeResponse {
 }
 
 /**
- * GET/PUT /api/settings. snake_case like FM; rates are percents (5 = 5%); money in minor units.
- * WhatsApp settings (whatsapp_mode, wa_*) return with the WhatsApp plan.
+ * GET/PUT /api/settings (as SettingsResponse). snake_case like FM; rates are percents (5 = 5%); money in minor units.
+ * FM's legacy whatsapp_mode is not ported.
  */
 export interface Settings {
   display_name: string;
@@ -109,14 +109,39 @@ export interface Settings {
   locale: string;
   phone_country: string; // calling code digits, e.g. "971"
   bill_prefix: string; // 1-6 of A-Z 0-9
+  // WhatsApp (sent only when the org has the whatsapp feature and a connected number). Template names: ^[a-z0-9_]{1,64}$.
+  wa_bill_auto: boolean; // send the bill automatically after each sale with a phone
+  wa_bill_template: string; // default ss_bill
+  wa_bill_pdf_template: string; // default ss_bill_pdf
+  wa_reminder_enabled: boolean; // "time for a fresh cut" reminders
+  wa_reminder_days: number; // 1-90 days since the last visit
+  wa_reminder_hour: number; // 0-23, org timezone
+  wa_reminder_template: string; // default ss_fresh_cut
+  wa_language: string; // Meta language code: "en", "en_US", "ar"
+  wa_feedback_enabled: boolean; // rating request after a visit
+  wa_feedback_delay_min: number; // 0-1440 minutes after the sale
+  wa_feedback_template: string; // default ss_rating
+  wa_feedback_reminder_min: number; // 0-1440 minutes after an unanswered request
+  wa_feedback_reminder_template: string; // default ss_rating_reminder
+  wa_rating_image_url: string | null; // https, <= 500; null = the generic SalonStation picture
+  wa_rating_reminder_image_url: string | null;
+  wa_fresh_cut_image_url: string | null;
   // Read-only (ignored on PUT).
   currency_minor: number; // minor units per major unit
-  logo_url: string | null;
+  logo_url: string | null; // derived: /api/public/logo/<v>?org=<slug>; set via PUT/DELETE /api/settings/logo
   brand_color: string | null;
 }
 
 /** PUT /api/settings body: every editable field is required (full replace, like FM). */
 export type SettingsInput = Omit<Settings, "currency_minor" | "logo_url" | "brand_color">;
+
+/** GET/PUT /api/settings response: the settings plus whether WhatsApp can send (feature on and a number connected). */
+export type SettingsResponse = Settings & { wa_ready: boolean };
+
+/** PUT /api/settings/logo (raw png/jpeg/webp body, max 200 KB) and DELETE /api/settings/logo. */
+export interface LogoResponse {
+  logo_url: string | null;
+}
 
 /** POST/DELETE /api/push/tokens: this device's FCM registration token. */
 export interface PushTokenInput {

@@ -15,8 +15,8 @@ const call = (method: string, path: string, cookie: string, body?: unknown) =>
     ctx,
   );
 
-async function setup(slug: string) {
-  const org = await makeOrg({ slug });
+async function setup(slug: string, plan: "free" | "pro_max" = "free") {
+  const org = await makeOrg({ slug, plan });
   await makeUser(org.id, { username: "own", role: "owner", password: "pass1234" });
   await makeUser(org.id, { username: "bar", role: "barber", password: "pass1234" });
   return { org, owner: await loginAs(slug, "own"), barber: await loginAs(slug, "bar") };
@@ -51,6 +51,22 @@ const valid = (over: Record<string, unknown> = {}) => ({
   locale: "en-AE",
   phone_country: "971",
   bill_prefix: "FM",
+  wa_bill_auto: true,
+  wa_bill_template: "fm_bill",
+  wa_bill_pdf_template: "fm_bill_pdf",
+  wa_reminder_enabled: true,
+  wa_reminder_days: 21,
+  wa_reminder_hour: 10,
+  wa_reminder_template: "fm_visit_reminder",
+  wa_language: "en_US",
+  wa_feedback_enabled: true,
+  wa_feedback_delay_min: 30,
+  wa_feedback_template: "fm_rating",
+  wa_feedback_reminder_min: 1440,
+  wa_feedback_reminder_template: "fm_rating_reminder",
+  wa_rating_image_url: "https://cdn.example.com/rating.jpg",
+  wa_rating_reminder_image_url: null,
+  wa_fresh_cut_image_url: "https://cdn.example.com/fresh.jpg",
   ...over,
 });
 
@@ -76,7 +92,7 @@ describe("settings", () => {
     const again: any = await (await call("GET", "/settings", owner)).json();
     expect(again).toEqual(b);
     // every submitted editable field round-trips (catches swapped binds); read-only fields are untouched
-    expect(again).toEqual({ ...valid(), currency_minor: 100, logo_url: null, brand_color: null });
+    expect(again).toEqual({ ...valid(), currency_minor: 100, logo_url: null, brand_color: null, wa_ready: false });
     const a = await env.DB.prepare("SELECT entity, action, actor_name, before, after FROM audit_log WHERE org_id = ?").bind(org.id).all<any>();
     expect(a.results).toHaveLength(1);
     expect(a.results[0]).toMatchObject({ entity: "settings", action: "update", actor_name: "own" });
@@ -107,10 +123,59 @@ describe("settings", () => {
     ["http link", { google_review_url: "http://x.y" }],
     ["missing field", { locale: undefined }],
     ["non-boolean flag", { notify_sales: "yes" }],
+    ["template with capitals", { wa_bill_template: "FM_Bill" }],
+    ["template with a space", { wa_feedback_template: "fm rating" }],
+    ["template too long", { wa_reminder_template: "a".repeat(65) }],
+    ["empty template", { wa_bill_pdf_template: "" }],
+    ["missing template", { wa_feedback_reminder_template: undefined }],
+    ["bad language", { wa_language: "english" }],
+    ["language lower region", { wa_language: "en_us" }],
+    ["reminder days 0", { wa_reminder_days: 0 }],
+    ["reminder days 91", { wa_reminder_days: 91 }],
+    ["reminder hour 24", { wa_reminder_hour: 24 }],
+    ["feedback delay 1441", { wa_feedback_delay_min: 1441 }],
+    ["feedback reminder -1", { wa_feedback_reminder_min: -1 }],
+    ["feedback delay fractional", { wa_feedback_delay_min: 1.5 }],
+    ["http image", { wa_rating_image_url: "http://x.y/a.jpg" }],
+    ["image too long", { wa_fresh_cut_image_url: "https://x.y/" + "a".repeat(490) }],
+    ["non-boolean wa flag", { wa_bill_auto: 1 }],
   ])("rejects %s with 400", async (_n, over) => {
     const { owner } = await setup(`st-bad-${_n.replace(/\W/g, "").toLowerCase()}`);
     const r = await call("PUT", "/settings", owner, valid(over as any));
     expect(r.status).toBe(400);
+  });
+
+  it("accepts edge values for the WhatsApp fields", async () => {
+    const { owner } = await setup("st-wa-edge");
+    const edge = valid({ wa_language: "ar", wa_reminder_days: 90, wa_reminder_hour: 0, wa_feedback_delay_min: 0, wa_feedback_reminder_min: 1440, wa_rating_image_url: "https://x.y/" + "a".repeat(488), wa_fresh_cut_image_url: null, wa_bill_template: "a".repeat(64) });
+    const r = await call("PUT", "/settings", owner, edge);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ wa_language: "ar", wa_reminder_days: 90, wa_rating_image_url: edge.wa_rating_image_url, wa_fresh_cut_image_url: null });
+  });
+
+  it("GET has the SalonStation WhatsApp defaults and wa_ready", async () => {
+    const { owner } = await setup("st-wa-def");
+    const b: any = await (await call("GET", "/settings", owner)).json();
+    expect(b).toMatchObject({
+      wa_bill_auto: false, wa_bill_template: "ss_bill", wa_bill_pdf_template: "ss_bill_pdf", wa_reminder_enabled: false, wa_reminder_days: 15, wa_reminder_hour: 11,
+      wa_reminder_template: "ss_fresh_cut", wa_language: "en", wa_feedback_enabled: false, wa_feedback_delay_min: 0, wa_feedback_template: "ss_rating",
+      wa_feedback_reminder_min: 120, wa_feedback_reminder_template: "ss_rating_reminder", wa_rating_image_url: null, wa_rating_reminder_image_url: null, wa_fresh_cut_image_url: null,
+      wa_ready: false,
+    });
+  });
+
+  it("wa_ready needs both the whatsapp feature and an org_whatsapp row", async () => {
+    const waRow = (orgId: string) =>
+      env.DB.prepare("INSERT INTO org_whatsapp(org_id, phone_number_id, waba_id, token_enc, updated_at) VALUES(?,?,?,?,?)").bind(orgId, `pn-${orgId}`, "w", "v1.x.y", 1).run();
+    const ready = async (ck: string) => ((await (await call("GET", "/settings", ck)).json()) as any).wa_ready;
+    const pm = await setup("st-wa-pm", "pro_max");
+    expect(await ready(pm.owner)).toBe(false); // feature, no row
+    await waRow(pm.org.id);
+    expect(await ready(pm.owner)).toBe(true);
+    expect(((await (await call("PUT", "/settings", pm.owner, valid())).json()) as any).wa_ready).toBe(true);
+    const fr = await setup("st-wa-free");
+    await waRow(fr.org.id);
+    expect(await ready(fr.owner)).toBe(false); // row, no feature
   });
 
   it("currency: AED to INR is fine, AED to JPY (different decimals) is 400", async () => {

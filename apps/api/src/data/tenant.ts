@@ -9,3 +9,4 @@ export * from "./tenant/ledger";
 export * from "./tenant/reports";
 export * from "./tenant/expenses";
 export * from "./tenant/payouts";
+export * from "./tenant/assets";
