@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "salonstation-app",
+  // Affworld0@gmail.com's Cloudflare account. Never deploy this to any other account.
+  "account_id": "dd501fac7d8aa896ead9530b9cd1b913",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "placement": { "mode": "smart" },
+  "workers_dev": true,
+  "vars": { "BRAND_NAME": "SalonStation", "ROOT_DOMAIN": "", "ADMIN_HOST": "admin", "MAIL_FROM": "", "SUPPORT_EMAIL": "" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "salonstation-db",
+      // database_id filled when the D1 is created (Plan 2 deploy)
+      "database_id": "local-only",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

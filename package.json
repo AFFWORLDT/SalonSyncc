@@ -1,0 +1,1 @@
+{"name":"salonstation","private":true,"workspaces":["apps/*","packages/*"],"scripts":{"test":"npm test --workspaces --if-present","typecheck":"npm run typecheck --workspaces --if-present"}}
