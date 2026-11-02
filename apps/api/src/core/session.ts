@@ -22,8 +22,13 @@ export async function issueSession(c: Context<AppEnv>, p: Omit<SessionPayload, "
 }
 
 export async function readSession(c: Context<AppEnv>): Promise<SessionPayload | null> {
-  const p = await verify<Partial<SessionPayload>>(getCookie(c, COOKIE), c.env.SESSION_SECRET);
-  if (!p) return null;
+  let p: Partial<SessionPayload> | null;
+  try {
+    p = await verify<Partial<SessionPayload>>(getCookie(c, COOKIE), c.env.SESSION_SECRET);
+  } catch {
+    return null; // malformed base64 etc.: treat as no session, never a 500
+  }
+  if (!p || typeof p !== "object") return null;
   if (
     !Number.isInteger(p.uid) || typeof p.orgId !== "string" || !p.orgId ||
     !Number.isInteger(p.v) || typeof p.exp !== "number" || !(p.exp >= Date.now())

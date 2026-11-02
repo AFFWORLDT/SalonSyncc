@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { matchedRoutes } from "hono/route";
 import type { AppEnv } from "./env";
 import { HttpError } from "./core/errors";
 import { tenantAuth } from "./core/pipeline";
@@ -10,16 +11,20 @@ app.get("/api/health", (c) => c.json({ ok: true, brand: c.env.BRAND_NAME }));
 
 app.route("/api/auth", auth);
 
-// Tenant routes: tenantAuth is attached per route (Hono's route() would otherwise run a "*" middleware for
-// every /api path, turning unknown paths into 401 instead of the JSON 404). Task 7 wraps this in a helper.
+// Tenant routes. FAIL-CLOSED: the router-level guard runs tenantAuth whenever a real (non-middleware) handler
+// matched this request, so a route added here without its own auth is still protected. Paths that match no
+// tenant handler fall through (next) to the JSON 404 instead of 401.
 const tenantApi = new Hono<AppEnv>();
+tenantApi.use("*", async (c, next) => {
+  if (!matchedRoutes(c).some((r) => r.method !== "ALL")) return next();
+  return tenantAuth(c, next);
+});
 
 // Test-only probe; checked per request because env is per-request in Workers.
-tenantApi.get(
-  "/_whoami",
-  async (c, next) => (c.env.ENVIRONMENT === "test" ? next() : c.json({ error: "Not found" }, 404)),
-  tenantAuth,
-  (c) => c.json({ orgId: c.var.tenant.org.id, uid: c.var.tenant.user.id }),
+tenantApi.get("/_whoami", (c) =>
+  c.env.ENVIRONMENT === "test"
+    ? c.json({ orgId: c.var.tenant.org.id, uid: c.var.tenant.user.id })
+    : c.json({ error: "Not found" }, 404),
 );
 app.route("/api", tenantApi);
 

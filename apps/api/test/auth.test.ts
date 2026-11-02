@@ -153,6 +153,11 @@ describe("auth", () => {
     expect((await call("https://x.test/api/_whoami")).status).toBe(401);
     expect((await whoami("ss_session=garbage")).status).toBe(401);
     expect((await whoami(c.slice(0, -2) + "xx")).status).toBe(401);
+    for (const bad of ["ss_session=x.a", "ss_session=x.!!", "ss_session=.", "ss_session=a.b.c"]) {
+      const m = await whoami(bad);
+      expect(m.status).toBe(401);
+      expect(await m.json()).toEqual({ error: "Please sign in" });
+    }
     const expired = await sign({ uid: ua.id, orgId: a.id, v: 0, exp: Date.now() - 1000 }, env.SESSION_SECRET);
     expect((await whoami(`ss_session=${expired}`)).status).toBe(401);
     // validly signed, but uid belongs to org A while orgId says B: must not resolve
@@ -165,7 +170,29 @@ describe("auth", () => {
   it("logout clears the cookie", async () => {
     const r = await call("https://x.test/api/auth/logout", { method: "POST" });
     expect(r.status).toBe(200);
-    expect(r.headers.get("set-cookie")).toMatch(/ss_session=;|Max-Age=0/);
+    const sc = r.headers.get("set-cookie")!;
+    expect(sc).toMatch(/ss_session=;/);
+    expect(sc).toMatch(/Max-Age=0/i);
+    expect(sc).toMatch(/Path=\//);
+  });
+
+  it("tenant-host login without body.org works (production path)", async () => {
+    const o = await makeOrg({ slug: "noorg" });
+    await makeUser(o.id, { username: "sam" });
+    const r = await post(`https://noorg.${ROOT}/api/auth/login`, { username: "sam", password: "pass1234" }, ROOT);
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ ok: true, slug: "noorg" });
+  });
+
+  it("fail-closed: every registered /api route except health and auth requires a session", async () => {
+    const guarded = app.routes.filter(
+      (r) => r.method !== "ALL" && r.path.startsWith("/api") && r.path !== "/api/health" && !r.path.startsWith("/api/auth"),
+    );
+    expect(guarded.map((r) => r.path)).toContain("/api/_whoami");
+    for (const r of guarded) {
+      const res = await call(`https://x.test${r.path.replace(/:\w+/g, "1")}`, { method: r.method });
+      expect(res.status, `${r.method} ${r.path}`).toBe(401);
+    }
   });
 
   it("unknown /api paths stay JSON 404 when unauthenticated, health stays public", async () => {
@@ -176,7 +203,11 @@ describe("auth", () => {
   });
 
   it("_whoami is 404 outside the test environment", async () => {
-    const r = await app.fetch(new Request("https://x.test/api/_whoami"), { ...env, ENVIRONMENT: "production" }, ctx);
+    const o = await makeOrg({ slug: "prodprobe" });
+    await makeUser(o.id, { username: "sam" });
+    const cookie = await loginAs("prodprobe", "sam");
+    const r = await app.fetch(new Request("https://x.test/api/_whoami", { headers: { cookie } }), { ...env, ENVIRONMENT: "production" }, ctx);
     expect(r.status).toBe(404);
+    expect(await r.json()).toEqual({ error: "Not found" });
   });
 });
