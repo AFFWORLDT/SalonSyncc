@@ -6,7 +6,20 @@ import { b64url, fromB64url } from "../core/crypto";
  * Anything unexpected (unknown version, malformed text, wrong key, tampered ciphertext) throws.
  */
 
-async function aesKey(keyB64: string): Promise<CryptoKey> {
+/** Imported keys per isolate, keyed by the base64 text (validated on first import; a failed import is not cached). */
+const keyCache = new Map<string, Promise<CryptoKey>>();
+
+function aesKey(keyB64: string): Promise<CryptoKey> {
+  let k = keyCache.get(keyB64);
+  if (!k) {
+    k = importAesKey(keyB64);
+    keyCache.set(keyB64, k);
+    k.catch(() => keyCache.delete(keyB64));
+  }
+  return k;
+}
+
+async function importAesKey(keyB64: string): Promise<CryptoKey> {
   let raw: Uint8Array;
   try {
     raw = Uint8Array.from(atob(keyB64), (c) => c.charCodeAt(0));

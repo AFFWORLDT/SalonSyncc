@@ -5,7 +5,7 @@ import { checkPassword, hashPassword } from "../core/crypto";
 import { issueSession } from "../core/session";
 import { LOGIN_WINDOW_MS, isLocked, loginLimits } from "../lib/limits";
 import { businessDay } from "../lib/clock";
-import { clockOf, settingsRepo } from "../data/tenant";
+import { clockOf, settingsRepo, withWaReady } from "../data/tenant";
 
 /** Registers /me routes on the tenant router. Auth, origin and write guards come from the router-level tenantGuard; do not add them here. */
 export function registerMe(tenantApi: App): void {
@@ -15,7 +15,7 @@ export function registerMe(tenantApi: App): void {
     const body: MeResponse = {
       user: { id: user.id, name: user.name, username: user.username, role: user.role },
       org: { id: org.id, slug: org.slug, name: org.name, status: org.status, planId: org.planId },
-      settings,
+      settings: await withWaReady(c.env.DB, org.id, features, settings),
       features,
       limits,
       subscription: { status: org.status, planId: org.planId, trialEndsAt: org.trialEndsAt, graceEndsAt: org.graceEndsAt },

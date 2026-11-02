@@ -35,6 +35,21 @@ describe("/api/me", () => {
     expect(b.subscription).toEqual({ status: "active", planId: "free", trialEndsAt: null, graceEndsAt: null });
   });
 
+  it("settings.wa_ready: false without a WhatsApp row, true with feature + row; never exposes the token", async () => {
+    const { cookie, org } = await setup("me-wa", { plan: "pro_max" });
+    const b0: any = await (await me(cookie)).json();
+    expect(b0.settings.wa_ready).toBe(false);
+    await env.DB.prepare("INSERT INTO org_whatsapp(org_id, phone_number_id, waba_id, token_enc, updated_at) VALUES(?,?,?,?,?)")
+      .bind(org.id, "pn-me-wa", "waba-1", "v1.SECRETIV.SECRETCT", 1).run();
+    const r = await me(cookie);
+    const text = await r.text();
+    const b1 = JSON.parse(text);
+    expect(b1.settings.wa_ready).toBe(true);
+    expect(text).not.toContain("token");
+    expect(text).not.toContain("token_enc");
+    expect(text).not.toContain("SECRET");
+  });
+
   it("trial org gets pro_max minus whatsapp", async () => {
     const { cookie } = await setup("me-trial", { status: "trial" });
     const b: any = await (await me(cookie)).json();

@@ -66,7 +66,7 @@ export interface MeUser {
 export interface MeResponse {
   user: MeUser;
   org: { id: string; slug: string; name: string; status: string; planId: string };
-  settings: Settings;
+  settings: SettingsResponse; // includes wa_ready (a boolean only; WhatsApp credentials are never returned)
   features: string[]; // enabled feature keys for the org's plan
   limits: { max_staff: number | null };
   subscription: { status: string; planId: string; trialEndsAt: number | null; graceEndsAt: number | null };

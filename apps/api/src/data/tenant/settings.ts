@@ -1,4 +1,4 @@
-import type { Settings, SettingsInput } from "@ss/contract";
+import type { Settings, SettingsInput, SettingsResponse } from "@ss/contract";
 import type { OrgClock } from "../../lib/clock";
 import { auditRepo } from "./audit";
 import { logoUrl } from "./assets";
@@ -15,6 +15,15 @@ const COLS =
 
 const quick = (csv: string): number[] =>
   csv.split(",").map(Number).filter((n) => Number.isFinite(n) && n > 0);
+
+/**
+ * Settings as the API returns them (GET/PUT /api/settings and /api/me): plus wa_ready = the org has the whatsapp
+ * feature and a connected number. Only that boolean leaves org_whatsapp; never the token or token_enc.
+ */
+export async function withWaReady(db: D1Database, orgId: string, features: readonly string[], s: Settings): Promise<SettingsResponse> {
+  const wa_ready = features.includes("whatsapp") && (await settingsRepo(db, orgId).hasWhatsappConfig());
+  return { ...s, wa_ready };
+}
 
 export function settingsRepo(db: D1Database, orgId: string) {
   async function get(): Promise<Settings> {

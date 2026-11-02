@@ -4,7 +4,7 @@ import type { AppEnv } from "../../env";
 import { HttpError } from "../../core/errors";
 import { requireAdmin } from "../../core/roles";
 import { requireFeature } from "../../core/pipeline";
-import { assetsRepo, logoUrl, settingsRepo } from "../../data/tenant";
+import { assetsRepo, logoUrl, settingsRepo, withWaReady } from "../../data/tenant";
 import { publicRateLimit, resolvePublicOrg } from "../../core/public";
 
 const bad = (m: string) => new HttpError(400, m);
@@ -173,12 +173,8 @@ function waLanguage(b: Record<string, unknown>): string {
   return v.trim();
 }
 
-/** Settings plus wa_ready: the org has the whatsapp feature and a connected number. */
-async function withReady(c: Context<AppEnv>, s: Settings): Promise<SettingsResponse> {
-  const { org, features } = c.var.tenant;
-  const wa_ready = features.includes("whatsapp") && (await settingsRepo(c.env.DB, org.id).hasWhatsappConfig());
-  return { ...s, wa_ready };
-}
+const withReady = (c: Context<AppEnv>, s: Settings): Promise<SettingsResponse> =>
+  withWaReady(c.env.DB, c.var.tenant.org.id, c.var.tenant.features, s);
 
 export const settings = new Hono<AppEnv>();
 settings.use("*", requireFeature("core_sales"));
