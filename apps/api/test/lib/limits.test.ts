@@ -4,7 +4,7 @@ import { isLocked, LOGIN_WINDOW_MS, loginLimits, minuteWindow, PUBLIC_LIMITS } f
 describe("limits", () => {
   it("loginLimits: three counters, org-scoped usernames", () => {
     expect(loginLimits("org1", "admin", "1.2.3.4")).toEqual([
-      { key: "ip:1.2.3.4", max: 20 },
+      { key: "login-ip:1.2.3.4", max: 20 },
       { key: "u:org1:admin|1.2.3.4", max: 8 },
       { key: "u:org1:admin", max: 50 },
     ]);

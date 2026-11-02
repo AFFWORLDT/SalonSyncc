@@ -18,15 +18,39 @@ const login = (org: string, username: string, password: string, ip: string) =>
 const MSG = "Too many attempts. Try again in a few minutes.";
 
 describe("login lockout", () => {
-  it("locks a username after 8 wrong passwords, even for the right password", async () => {
+  it("8 wrong from one device lock that device only; another device still gets in", async () => {
+    const org = await makeOrg({ slug: "lk-dev" });
+    await makeUser(org.id, { username: "sam", password: "rightpass" });
+    for (let i = 0; i < 8; i++) expect((await login("lk-dev", "sam", "nope", "10.0.9.1")).status).toBe(401);
+    expect((await login("lk-dev", "sam", "rightpass", "10.0.9.1")).status).toBe(429);
+    expect((await login("lk-dev", "sam", "rightpass", "10.0.9.2")).status).toBe(200);
+  });
+
+  it("50 wrong spread over many devices lock the username from anywhere", async () => {
+    const org = await makeOrg({ slug: "lk-spread" });
+    await makeUser(org.id, { username: "sam", password: "rightpass" });
+    for (let i = 0; i < 50; i++) expect((await login("lk-spread", "sam", "nope", `10.0.8.${i % 10}`)).status).toBe(401);
+    const r = await login("lk-spread", "sam", "rightpass", "10.0.8.200");
+    expect(r.status).toBe(429);
+    expect(await r.json()).toEqual({ error: MSG });
+  });
+
+  it("a username over 60 chars is a plain 401 with no failure row", async () => {
+    const org = await makeOrg({ slug: "lk-long" });
+    expect((await login("lk-long", "x".repeat(61), "nope", "10.0.7.1")).status).toBe(401);
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM login_failures WHERE org_id = ?").bind(org.id).first<{ n: number }>();
+    expect(n!.n).toBe(0);
+  });
+
+  it("locks a device+username after 8 wrong passwords, even for the right password", async () => {
     const org = await makeOrg({ slug: "lk-a" });
     await makeUser(org.id, { username: "sam", password: "rightpass" });
     for (let i = 0; i < 8; i++) expect((await login("lk-a", "sam", "nope", "10.0.0.1")).status).toBe(401);
-    const locked = await login("lk-a", "sam", "rightpass", "10.0.0.2");
+    const locked = await login("lk-a", "sam", "rightpass", "10.0.0.1");
     expect(locked.status).toBe(429);
     expect(await locked.json()).toEqual({ error: MSG });
     // same response for a wrong password once locked
-    const wrong = await login("lk-a", "sam", "nope", "10.0.0.3");
+    const wrong = await login("lk-a", "sam", "nope", "10.0.0.1");
     expect(wrong.status).toBe(429);
     expect(await wrong.json()).toEqual({ error: MSG });
   });
@@ -37,17 +61,17 @@ describe("login lockout", () => {
     await makeUser(a.id, { username: "sam", password: "rightpass" });
     await makeUser(b.id, { username: "sam", password: "rightpass" });
     for (let i = 0; i < 8; i++) await login("lk-b1", "sam", "nope", "10.0.1.1");
-    expect((await login("lk-b1", "sam", "rightpass", "10.0.1.2")).status).toBe(429);
-    expect((await login("lk-b2", "sam", "rightpass", "10.0.1.3")).status).toBe(200);
+    expect((await login("lk-b1", "sam", "rightpass", "10.0.1.1")).status).toBe(429);
+    expect((await login("lk-b2", "sam", "rightpass", "10.0.1.1")).status).toBe(200);
   });
 
   it("a success clears the counter", async () => {
     const org = await makeOrg({ slug: "lk-c" });
     await makeUser(org.id, { username: "sam", password: "rightpass" });
     for (let i = 0; i < 7; i++) await login("lk-c", "sam", "nope", "10.0.2.1");
-    expect((await login("lk-c", "sam", "rightpass", "10.0.2.2")).status).toBe(200);
-    for (let i = 0; i < 7; i++) expect((await login("lk-c", "sam", "nope", "10.0.2.3")).status).toBe(401);
-    expect((await login("lk-c", "sam", "rightpass", "10.0.2.4")).status).toBe(200);
+    expect((await login("lk-c", "sam", "rightpass", "10.0.2.1")).status).toBe(200);
+    for (let i = 0; i < 7; i++) expect((await login("lk-c", "sam", "nope", "10.0.2.1")).status).toBe(401);
+    expect((await login("lk-c", "sam", "rightpass", "10.0.2.1")).status).toBe(200);
     const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM login_failures WHERE org_id = ?").bind(org.id).first<{ n: number }>();
     expect(n!.n).toBe(0);
   });

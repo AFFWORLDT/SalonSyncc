@@ -47,13 +47,30 @@ function link(b: Record<string, unknown>, k: keyof SettingsInput, label: string)
   return v;
 }
 
-function validTimezone(tz: string): boolean {
-  if (!/^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+)*$/.test(tz)) return false;
+/** The canonical IANA name, or null when the zone is unknown. */
+function canonicalTimezone(tz: string): string | null {
+  if (!/^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+)*$/.test(tz)) return null;
   try {
-    new Intl.DateTimeFormat("en-GB", { timeZone: tz });
-    return true;
+    return new Intl.DateTimeFormat("en-US", { timeZone: tz }).resolvedOptions().timeZone;
   } catch {
-    return false;
+    return null;
+  }
+}
+
+function canonicalLocale(l: string): string | null {
+  try {
+    return Intl.getCanonicalLocales(l)[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Decimal digits of a currency's minor unit (AED 2, JPY 0, KWD 3), or null for an unknown code. */
+export function currencyDigits(code: string): number | null {
+  try {
+    return new Intl.NumberFormat("en", { style: "currency", currency: code }).resolvedOptions().maximumFractionDigits ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -74,8 +91,10 @@ export function parseSettings(raw: unknown): SettingsInput {
     return n;
   });
 
-  const timezone = required(b, "timezone", "a timezone", 60);
-  if (!validTimezone(timezone)) throw bad("Unknown timezone");
+  const timezone = canonicalTimezone(required(b, "timezone", "a timezone", 60));
+  if (!timezone) throw bad("Unknown timezone");
+  const locale = canonicalLocale(required(b, "locale", "a locale", 20));
+  if (!locale) throw bad("Unknown locale");
 
   const bill_prefix = text(b, "bill_prefix", "Bill prefix", 6);
   if (!bill_prefix || !/^[A-Z0-9]{1,6}$/.test(bill_prefix)) throw bad("Bill prefix must be 1 to 6 capital letters or digits");
@@ -108,7 +127,7 @@ export function parseSettings(raw: unknown): SettingsInput {
     timezone,
     day_start_hour: int(b, "day_start_hour", "Day start hour", 0, 12),
     currency,
-    locale: required(b, "locale", "a locale", 20),
+    locale,
     phone_country,
     bill_prefix,
   };
@@ -128,6 +147,11 @@ settings.put("/", requireAdmin, async (c) => {
   }
   const next = parseSettings(body);
   const { org, user } = c.var.tenant;
+  const repo = settingsRepo(c.env.DB, org.id);
+  const cur = await repo.get();
+  if (next.currency !== cur.currency && currencyDigits(next.currency) !== Math.round(Math.log10(cur.currency_minor))) {
+    throw bad("That currency uses different decimals; contact support to change it");
+  }
   // Nothing in this form changes the plan's features, so the feature cache is left alone.
-  return c.json(await settingsRepo(c.env.DB, org.id).update(next, { id: user.id, name: user.name }));
+  return c.json(await repo.update(next, { id: user.id, name: user.name }));
 });

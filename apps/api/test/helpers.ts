@@ -13,7 +13,7 @@ export async function makeOrg(opts: { slug: string; plan?: PlanId; status?: OrgS
     env.DB.prepare("INSERT INTO orgs(id,slug,name,status,plan_id,created_at) VALUES(?,?,?,?,?,?)")
       .bind(id, opts.slug, name, status, plan, Date.now()),
     env.DB.prepare("INSERT INTO org_settings(org_id,display_name,bill_prefix) VALUES(?,?,?)")
-      .bind(id, name, opts.slug.slice(0, 3).toUpperCase()),
+      .bind(id, name, (opts.slug.replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase() || "ORG")),
     env.DB.prepare("INSERT INTO subscriptions(org_id) VALUES(?)").bind(id),
   ]);
   return { id, slug: opts.slug, name, status, planId: plan, trialEndsAt: null, graceEndsAt: null };

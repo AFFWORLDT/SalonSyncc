@@ -99,15 +99,17 @@ export function tenantRepo(db: D1Database, orgId: string) {
         .first<{ n: number }>();
       return r?.n ?? 0;
     },
-    /** Records one failure and drops this key's rows that are older than `prune` (ms), in one batch. */
-    async recordLoginFailure(key: string, at: number, prune: number): Promise<void> {
-      await db.batch([
-        db.prepare("INSERT INTO login_failures (org_id, key, at) VALUES (?, ?, ?)").bind(orgId, key, at),
-        db.prepare("DELETE FROM login_failures WHERE org_id = ? AND key = ? AND at < ?").bind(orgId, key, prune),
-      ]);
+    /** Records one failure under each key and drops those keys' rows older than `prune` (ms), in one batch. */
+    async recordLoginFailure(keys: string[], at: number, prune: number): Promise<void> {
+      await db.batch(
+        keys.flatMap((key) => [
+          db.prepare("INSERT INTO login_failures (org_id, key, at) VALUES (?, ?, ?)").bind(orgId, key, at),
+          db.prepare("DELETE FROM login_failures WHERE org_id = ? AND key = ? AND at < ?").bind(orgId, key, prune),
+        ]),
+      );
     },
-    async clearLoginFailures(key: string): Promise<void> {
-      await db.prepare("DELETE FROM login_failures WHERE org_id = ? AND key = ?").bind(orgId, key).run();
+    async clearLoginFailures(keys: string[]): Promise<void> {
+      await db.batch(keys.map((key) => db.prepare("DELETE FROM login_failures WHERE org_id = ? AND key = ?").bind(orgId, key)));
     },
     async nextSeq(name: string): Promise<number> {
       const r = await db

@@ -8,9 +8,10 @@ import { normalizeSlug, slugFromHost } from "../core/tenant";
 import { platformRepo } from "../data/platform";
 import { tenantRepo } from "../data/tenant";
 import { rateCount, rateHit } from "../data/infra";
-import { LOGIN_IP_MAX, LOGIN_USER_MAX, LOGIN_WINDOW_MS, isLocked, loginIpKey, loginUserKey, loginWindow } from "../lib/limits";
+import { LOGIN_WINDOW_MS, isLocked, loginLimits, loginWindow } from "../lib/limits";
 
 const FAIL = "Wrong salon ID, username or password";
+type LL = { key: string; max: number };
 const LOCKED = "Too many attempts. Try again in a few minutes.";
 
 let dummy: Promise<string> | null = null;
@@ -29,7 +30,8 @@ auth.post("/login", async (c) => {
   } catch {
     /* falls through to the generic failure */
   }
-  const username = typeof body.username === "string" ? body.username.trim() : "";
+  let username = typeof body.username === "string" ? body.username.trim() : "";
+  if (username.length > 60) username = ""; // too long to be real: same 401 as not found, no failure row beyond the IP hit
   const password = typeof body.password === "string" ? body.password : "";
 
   const host = slugFromHost(new URL(c.req.url).host, c.env.ROOT_DOMAIN, c.env.ADMIN_HOST);
@@ -43,26 +45,29 @@ auth.post("/login", async (c) => {
   const repo = live ? tenantRepo(c.env.DB, live.id) : null;
 
   // Throttle before looking at the password, so a locked username answers the same whatever is typed.
-  // The device counter always applies; the username counter is org-scoped and only exists for a real salon.
+  // Three counters (see lib/limits.ts): the device, the username on that device, the username from anywhere.
+  // The username counters are org-scoped login_failures rows and only exist for a real salon.
   const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
   const at = Date.now();
-  const ipKey = loginIpKey(ip);
-  const userKey = loginUserKey(username);
-  const [ipCount, userCount] = await Promise.all([
-    rateCount(c.env.DB, ipKey, loginWindow(at)),
-    repo && username ? repo.loginFailureCount(userKey, at - LOGIN_WINDOW_MS) : 0,
+  const [dev, perDevice, anywhere] = loginLimits(live?.id ?? "", username, ip) as [LL, LL, LL];
+  const userKeys = [perDevice.key, anywhere.key];
+  const tracked = repo && username ? repo : null;
+  const [ipCount, deviceUser, anyUser] = await Promise.all([
+    rateCount(c.env.DB, dev.key, loginWindow(at)),
+    tracked ? tracked.loginFailureCount(perDevice.key, at - LOGIN_WINDOW_MS) : 0,
+    tracked ? tracked.loginFailureCount(anywhere.key, at - LOGIN_WINDOW_MS) : 0,
   ]);
-  if (isLocked(ipCount, LOGIN_IP_MAX) || isLocked(userCount, LOGIN_USER_MAX)) throw new HttpError(429, LOCKED);
+  if (isLocked(ipCount, dev.max) || isLocked(deviceUser, perDevice.max) || isLocked(anyUser, anywhere.max)) throw new HttpError(429, LOCKED);
 
   const user = repo && username ? await repo.userByUsername(username) : null;
 
   const ok = await checkPassword(password, user?.password_hash ?? (await dummyHash()));
   if (!live || !repo || !user || !user.active || !ok) {
-    await rateHit(c.env.DB, ipKey, loginWindow(at));
-    if (repo && username) await repo.recordLoginFailure(userKey, at, at - LOGIN_WINDOW_MS);
+    await rateHit(c.env.DB, dev.key, loginWindow(at));
+    if (tracked) await tracked.recordLoginFailure(userKeys, at, at - LOGIN_WINDOW_MS);
     throw new HttpError(401, FAIL);
   }
-  await repo.clearLoginFailures(userKey);
+  await repo.clearLoginFailures(userKeys);
 
   await issueSession(c, { uid: user.id, orgId: live.id, v: user.session_version });
   return c.json({ ok: true, slug: live.slug });

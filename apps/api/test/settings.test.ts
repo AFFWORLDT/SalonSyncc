@@ -62,7 +62,7 @@ describe("settings", () => {
     const r = await call("GET", "/settings", barber);
     expect(r.status).toBe(200);
     const b: any = await r.json();
-    expect(b).toMatchObject({ timezone: "Asia/Dubai", day_start_hour: 4, currency: "AED", currency_minor: 100, locale: "en-AE", phone_country: "971", bill_prefix: "ST-", vat_rate: 5 });
+    expect(b).toMatchObject({ timezone: "Asia/Dubai", day_start_hour: 4, currency: "AED", currency_minor: 100, locale: "en-AE", phone_country: "971", bill_prefix: "STG", vat_rate: 5 });
     expect(b.quick_amounts).toEqual([15, 20, 25, 30, 35, 50]);
     expect(b.display_name).toBe("st-get");
   });
@@ -75,6 +75,8 @@ describe("settings", () => {
     expect(b).toMatchObject({ display_name: "Fresh Cuts", quick_amounts: [15, 20, 50], vat_enabled: true, default_commission_pct: 20, notify_reminder: false, bill_prefix: "FM" });
     const again: any = await (await call("GET", "/settings", owner)).json();
     expect(again).toEqual(b);
+    // every submitted editable field round-trips (catches swapped binds); read-only fields are untouched
+    expect(again).toEqual({ ...valid(), currency_minor: 100, logo_url: null, brand_color: null });
     const a = await env.DB.prepare("SELECT entity, action, actor_name, before, after FROM audit_log WHERE org_id = ?").bind(org.id).all<any>();
     expect(a.results).toHaveLength(1);
     expect(a.results[0]).toMatchObject({ entity: "settings", action: "update", actor_name: "own" });
@@ -111,6 +113,24 @@ describe("settings", () => {
     expect(r.status).toBe(400);
   });
 
+  it("currency: AED to INR is fine, AED to JPY (different decimals) is 400", async () => {
+    const { owner } = await setup("st-cur");
+    expect((await call("PUT", "/settings", owner, valid({ currency: "INR" }))).status).toBe(200);
+    const r = await call("PUT", "/settings", owner, valid({ currency: "JPY" }));
+    expect(r.status).toBe(400);
+    expect(await r.json()).toEqual({ error: "That currency uses different decimals; contact support to change it" });
+  });
+
+  it("canonicalizes timezone and locale; rejects a bad locale", async () => {
+    const { owner } = await setup("st-canon");
+    const r = await call("PUT", "/settings", owner, valid({ timezone: "asia/kolkata", locale: "en-in" }));
+    expect(r.status).toBe(200);
+    const b: any = await r.json();
+    expect(b.locale).toBe("en-IN");
+    expect(b.timezone).toMatch(/^Asia\/(Kolkata|Calcutta)$/);
+    expect((await call("PUT", "/settings", owner, valid({ locale: "not a locale!" }))).status).toBe(400);
+  });
+
   it("accepts a free-text TRN outside the UAE", async () => {
     const { owner } = await setup("st-trn");
     const r = await call("PUT", "/settings", owner, valid({ phone_country: "91", trn: "GSTIN 27AAAPL1234C1ZV" }));
@@ -135,12 +155,23 @@ describe("password change", () => {
     expect(bad.status).toBe(400);
     expect(await bad.json()).toEqual({ error: "Current password is wrong" });
     expect((await call("PUT", "/me/password", owner, { current: "pass1234", next: "abc" })).status).toBe(400);
+    expect((await call("PUT", "/me/password", owner, { current: "pass1234", next: "x".repeat(201) })).status).toBe(400);
     const ok = await call("PUT", "/me/password", owner, { current: "pass1234", next: "newpass1" });
     expect(ok.status).toBe(200);
     const fresh = ok.headers.get("set-cookie")!.split(";")[0]!;
     expect((await call("GET", "/me", owner)).status).toBe(401);
     expect((await call("GET", "/me", fresh)).status).toBe(200);
     expect((await loginAs("pw-a", "own", "newpass1")).startsWith("ss_session=")).toBe(true);
+  });
+});
+
+describe("password change throttle", () => {
+  it("8 wrong current passwords from one device lock further tries with 429", async () => {
+    const { owner } = await setup("pw-lock");
+    for (let i = 0; i < 8; i++) expect((await call("PUT", "/me/password", owner, { current: "bad", next: "newpass1" })).status).toBe(400);
+    const r = await call("PUT", "/me/password", owner, { current: "pass1234", next: "newpass1" });
+    expect(r.status).toBe(429);
+    expect(await r.json()).toEqual({ error: "Too many attempts. Try again in a few minutes." });
   });
 });
 
