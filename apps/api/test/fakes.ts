@@ -28,6 +28,8 @@ export function fakeServices(
     turnstileOk?: (token: string) => boolean;
     /** Whether the fake mail provider accepts mail (default true). */
     mailOk?: boolean;
+    /** Stripe's answer per call (default: { id, url }). */
+    stripe?: (path: string, params: Record<string, string>) => unknown;
   } = {},
 ) {
   const wa: WaSend[] = [];
@@ -36,6 +38,7 @@ export function fakeServices(
   const pushes: PushSend[] = [];
   const numberChecks: WaConfig[] = [];
   const mails: { to: string; subject: string; html: string; text: string }[] = [];
+  const stripeCalls: { path: string; params: Record<string, string> }[] = [];
   let n = 0;
   const svc: Services = {
     wa: {
@@ -66,6 +69,13 @@ export function fakeServices(
         return opts.mailOk ?? true;
       },
     },
+    stripe: {
+      async post(_env: Env, path: string, params: Record<string, string>) {
+        stripeCalls.push({ path, params });
+        if (opts.stripe) return (await opts.stripe(path, params)) as never;
+        return { id: `stripe_fake${++n}`, url: `https://stripe.test${path}/${n}` } as never;
+      },
+    },
     turnstile: {
       async verify(_secret: string, token: string) {
         return opts.turnstileOk ? opts.turnstileOk(token) : true;
@@ -85,6 +95,7 @@ export function fakeServices(
     pushes,
     numberChecks,
     mails,
+    stripeCalls,
     services: svc,
     install() {
       setServicesForTest(() => svc);

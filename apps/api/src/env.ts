@@ -27,6 +27,10 @@ export interface Env {
   RESEND_API_KEY?: string;
   /** Secret: Cloudflare Turnstile secret for signup. Unset: the check is skipped (the IP rate limit still applies). */
   TURNSTILE_SECRET?: string;
+  /** Secret: Stripe secret key (sk_test_… / sk_live_…). Unset: billing is off and the plan page says to contact us. */
+  STRIPE_SECRET_KEY?: string;
+  /** Secret: the Stripe webhook endpoint's signing secret (whsec_…). Required by POST /api/stripe/webhook (503 without it). */
+  STRIPE_WEBHOOK_SECRET?: string;
   /** Static dashboard export (wrangler assets). Only /api/* reaches the Worker (run_worker_first). */
   ASSETS?: Fetcher;
   /** Local dev only (.dev.vars), comma-separated origins allowed to write cross-origin, e.g. http://localhost:3000. Never in wrangler vars. */

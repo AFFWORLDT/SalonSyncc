@@ -130,11 +130,35 @@ const resendMail: MailClient = {
   },
 };
 
+/** Stripe's REST API (form-encoded POSTs, 1 subrequest each). Throws StripeError on a non-2xx answer. */
+export interface StripeClient {
+  post<T = Record<string, unknown>>(env: Env, path: string, params: Record<string, string>): Promise<T>;
+}
+export class StripeError extends Error {}
+
+const stripeApi: StripeClient = {
+  async post(env, path, params) {
+    if (!env.STRIPE_SECRET_KEY) throw new StripeError("Stripe is not set up");
+    const r = await fetch(`https://api.stripe.com/v1${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`, "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(params).toString(),
+    });
+    const j = (await r.json().catch(() => ({}))) as { error?: { message?: string } };
+    if (!r.ok) {
+      console.error("stripe failed", path, r.status, j.error?.message);
+      throw new StripeError(j.error?.message ?? `Stripe answered ${r.status}`);
+    }
+    return j as never;
+  },
+};
+
 export interface Services {
   wa: WaClient;
   push: PushClient;
   turnstile: TurnstileClient;
   mail: MailClient;
+  stripe: StripeClient;
 }
 
 /** Real clients: Meta Graph (v21.0) and FCM v1. */
@@ -143,6 +167,7 @@ const REAL: Services = {
   push: fcmPush,
   turnstile: cfTurnstile,
   mail: resendMail,
+  stripe: stripeApi,
 };
 
 let override: ((env: Env) => Services) | null = null;
