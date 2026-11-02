@@ -106,7 +106,7 @@ describe("starter catalogue", () => {
     expect(r.status).toBe(201);
     const list: any[] = await r.json();
     expect(list).toHaveLength(16);
-    expect(list[0]).toMatchObject({ category: "Haircuts", name: "Haircut", price: 2000, sort_order: 10 });
+    expect(list[0]).toMatchObject({ category: "Haircuts", name: "Haircut", price: 1500, sort_order: 10 });
     expect(list[15]).toMatchObject({ name: "Black mask", price: 2000, sort_order: 160 });
     const again = await call("POST", "/services/starter", ck);
     expect(again.status).toBe(409);
@@ -124,7 +124,7 @@ describe("starter catalogue", () => {
     const o = await setup("sv-starter3");
     await env.DB.prepare("UPDATE org_settings SET currency_minor = 10 WHERE org_id = ?").bind(o.org.id).run();
     const list: any[] = await (await call("POST", "/services/starter", o.ck)).json();
-    expect(list[0].price).toBe(200);
+    expect(list[0].price).toBe(150); // AED 15 Haircut in a 10-per-unit currency
   });
 
   it("concurrent starters insert only once", async () => {

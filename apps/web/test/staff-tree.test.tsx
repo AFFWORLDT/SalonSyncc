@@ -18,3 +18,12 @@ describe("staff tree", () => {
     expect(screen.getByText("U5")).toBeTruthy();
   });
 });
+
+import { stockAvatar, STOCK_AVATARS } from "@/components/app/user-avatar";
+describe("stock avatars", () => {
+  it("each name always gets the same stock picture", () => {
+    expect(stockAvatar("Jatin")).toBe(stockAvatar(" jatin "));
+    expect(STOCK_AVATARS).toContain(stockAvatar("Dinesh"));
+    expect(new Set(["A", "B", "C", "D", "E", "F", "G", "H", "Jatin", "Dinesh"].map(stockAvatar)).size).toBeGreaterThan(3);
+  });
+});

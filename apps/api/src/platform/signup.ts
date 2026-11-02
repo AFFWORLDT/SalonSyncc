@@ -9,7 +9,8 @@ import { isValidSlug, normalizeSlug, slugFromHost } from "../core/tenant";
 import { services } from "../core/services";
 import { platformRepo, signupRepo } from "../data/platform";
 import { rateHit } from "../data/infra";
-import { tenantRepo } from "../data/tenant";
+import { servicesRepo, tenantRepo } from "../data/tenant";
+import { starterItems } from "../data/tenant/services";
 import { billPrefixFor, countryDefaults } from "../lib/countries";
 import { SIGNUP_PER_HOUR, hourWindow } from "../lib/limits";
 import { auth } from "./auth";
@@ -131,6 +132,12 @@ publicApi.post("/signup", originGuard, async (c) => {
   const salonUrl = root ? `https://${slug}.${root}/` : `${new URL(c.req.url).origin}/login/?org=${encodeURIComponent(slug)}`;
   const siteUrl = root ? `https://${root}` : new URL(c.req.url).origin;
   const mail = welcomeEmail({ brand: c.env.BRAND_NAME, siteUrl, salonName, ownerName, slug, salonUrl, username: email, trialEndsAt, supportEmail: c.env.SUPPORT_EMAIL });
+  // A new salon starts with FM Salon's price list (editable), so the first bill can be rung up straight away.
+  const addServices = async () => {
+    const owner = await tenantRepo(c.env.DB, orgId).userByUsername(email);
+    if (owner) await servicesRepo(c.env.DB, orgId).insertStarter(starterItems(defaults.currency_minor), { id: owner.id, name: owner.name });
+  };
+  c.executionCtx.waitUntil(addServices().catch((e) => console.error("starter services failed", (e as Error).message)));
   const sendWelcome = async () => {
     const configured = !!c.env.RESEND_API_KEY && !!c.env.MAIL_FROM;
     const ok = configured && (await services(c.env).mail.send(c.env, { to: email, ...mail, replyTo: c.env.SUPPORT_EMAIL || undefined }));

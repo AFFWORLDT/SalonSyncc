@@ -58,6 +58,15 @@ describe("signup", () => {
     expect(org.owner_user_id).toBe(owner.id);
   });
 
+  it("a new salon starts with FM Salon's price list", async () => {
+    await signup({ slug: "svc-salon", country: "AE" });
+    await flush();
+    const r = await env.DB.prepare("SELECT COUNT(*) AS n, MIN(price) AS lo FROM services WHERE org_id = (SELECT id FROM orgs WHERE slug = 'svc-salon')").first<any>();
+    expect(r.n).toBe(16);
+    const cut = await env.DB.prepare("SELECT price FROM services WHERE name = 'Haircut' AND org_id = (SELECT id FROM orgs WHERE slug = 'svc-salon')").first<any>();
+    expect(cut.price).toBe(1500);
+  });
+
   it("an unknown country falls back to UAE defaults", async () => {
     await signup({ slug: "zz-salon", country: "ZZ" });
     const st = await env.DB.prepare("SELECT s.currency FROM org_settings s JOIN orgs o ON o.id = s.org_id WHERE o.slug = 'zz-salon'").first<any>();
@@ -117,10 +126,11 @@ describe("signup", () => {
     expect((await signup({}, { origin: "https://evil.test" })).status).toBe(403);
   });
 
-  it("costs at most 12 D1 statements", async () => {
+  it("the whole invocation (signup + starter services + welcome email) stays within 45 D1 statements", async () => {
     const { db, count } = countingDb(env.DB);
     expect((await signup({}, {}, { DB: db })).status).toBe(201);
-    expect(count.statements).toBeLessThanOrEqual(12);
+    await flush();
+    expect(count.statements).toBeLessThanOrEqual(45);
   });
 });
 

@@ -43,9 +43,9 @@ export const serviceAudit = (r: ServiceRow) => ({
   active: !!r.active,
 });
 
-/** FM's starting price sheet (FM migration 0004). Prices are in fils (AED x 100); the route converts them to the org's minor unit. */
+/** FM Salon's price sheet (from its staging catalogue, 2026-11-03). Prices are in fils (AED x 100); callers convert to the org's minor unit. */
 export const STARTER_SERVICES: ReadonlyArray<{ category: string; name: string; description: string; fils: number; sort: number }> = [
-  { category: "Haircuts", name: "Haircut", description: "Scissor or clipper, finished and styled", fils: 2000, sort: 10 },
+  { category: "Haircuts", name: "Haircut", description: "Scissor or clipper, finished and styled", fils: 1500, sort: 10 },
   { category: "Haircuts", name: "Skin fade", description: "Blended down to the skin, sharp line-up", fils: 2500, sort: 20 },
   { category: "Haircuts", name: "Kids haircut", description: "Boys under 12", fils: 1500, sort: 30 },
   { category: "Haircuts", name: "Hair wash", description: "At the basin, with a quick dry", fils: 1000, sort: 40 },
@@ -193,4 +193,9 @@ export function servicesRepo(db: D1Database, orgId: string) {
       return r.results.length ? r.results : null;
     },
   };
+}
+
+/** The starter catalogue priced in an org's minor unit (AED fils by default). */
+export function starterItems(currencyMinor = 100) {
+  return STARTER_SERVICES.map((s) => ({ category: s.category, name: s.name, description: s.description, price: Math.round((s.fils / 100) * currencyMinor), sort: s.sort }));
 }

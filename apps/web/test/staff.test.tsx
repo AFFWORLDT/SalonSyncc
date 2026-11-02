@@ -31,7 +31,7 @@ describe("staff page", () => {
         <BarbersPage />
       </AuthProvider>
     );
-    await waitFor(() => expect(screen.getByText("Owner")).toBeTruthy());
+    await waitFor(() => expect(screen.getAllByText("Owner").length).toBeGreaterThan(0));
     expect(screen.getByTestId("staff-limit").textContent).toContain("2 of 2 staff");
     expect((screen.getByText("Add staff").closest("button") as HTMLButtonElement).disabled).toBe(true);
   });

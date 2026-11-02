@@ -5,15 +5,19 @@
 
 export type Appearance = "system" | "light" | "dark";
 
-/** Default accent (the "SalonKit" choice): deep green on the cream light theme, the logo's rose gold in dark. */
+/** Default accent (the "SalonKit" choice): deep green on the cream light theme, a brighter green in dark. */
 export const DEFAULT_ACCENT = "#C08A5B";
 /** The light-mode colour of the default accent. */
 export const LIGHT_BRAND = "#1F7A6A";
+/** The dark-mode colour of the default accent: the same green, a step brighter for dark backgrounds. */
+export const DARK_BRAND = "#2A9D88";
+/** Glow colours of the dark background mesh: deep teals. */
+const DARK_MESH = ["#1F7A6A", "#2A9D88", "#0F2E29"] as const;
 /** Glow colours of the light background mesh: teal, the logo's gold, deep green. */
 const LIGHT_MESH = ["#2A9D88", "#B8935A", "#1D4A42"] as const;
 
 export const ACCENTS: { name: string; hex: string }[] = [
-  { name: "SalonKit (green / gold)", hex: "#C08A5B" },
+  { name: "SalonKit green", hex: "#C08A5B" },
   { name: "Salon blue", hex: "#3B4CCA" },
   { name: "Red", hex: "#D71921" },
   { name: "Gold", hex: "#D4AF37" },
@@ -93,11 +97,12 @@ export function accentForLight(hex: string): string {
 }
 
 const PALETTE = {
+  // Dark: deep green-black, so the green accent and teal glows sit in the same family as the light theme.
   dark: {
-    bg: "#000000",
-    card: "#1C1C1C",
-    muted: "#262626",
-    border: "#2E2E2E",
+    bg: "#08110F",
+    card: "#13201C",
+    muted: "#1A2A25",
+    border: "#26382F",
     fg: "#F2F2F2",
     mutedFg: "#8C8C8C",
     faint: "#5C5C5C",
@@ -134,9 +139,9 @@ const GLASS = { light: { card: 0.62, popover: 0.86, border: 0.55 }, dark: { card
 export function themeVars(mode: "light" | "dark", accent: string): Record<string, string> {
   const p = PALETTE[mode];
   const brand = accent.toUpperCase() === DEFAULT_ACCENT;
-  const a = mode === "light" ? (brand ? LIGHT_BRAND : accentForLight(accent)) : accent.toUpperCase();
-  // Background mesh: cream with teal and gold glows in light (brand), accent glows otherwise.
-  const mesh = mode === "light" && brand ? LIGHT_MESH : [a, a, a];
+  const a = mode === "light" ? (brand ? LIGHT_BRAND : accentForLight(accent)) : brand ? DARK_BRAND : accent.toUpperCase();
+  // Background mesh: cream with teal and gold glows in light, deep teal glows in dark (brand); accent glows otherwise.
+  const mesh = brand ? (mode === "light" ? LIGHT_MESH : DARK_MESH) : [a, a, a];
   const onA = onAccent(a);
   return {
     "--background": p.bg,
