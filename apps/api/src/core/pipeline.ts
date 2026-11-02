@@ -4,6 +4,7 @@ import { HttpError } from "./errors";
 import { readSession } from "./session";
 import { slugFromHost } from "./tenant";
 import { platformRepo } from "../data/platform";
+import { featuresFor } from "./features-cache";
 import { tenantRepo } from "../data/tenant";
 
 /**
@@ -31,6 +32,7 @@ export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     throw new HttpError(401, "Please sign in");
   }
 
-  c.set("tenant", { org, user, repo });
+  const { features, limits } = await featuresFor(c.env.DB, org);
+  c.set("tenant", { org, user, repo, features, limits });
   await next();
 };

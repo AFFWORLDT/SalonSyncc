@@ -3,6 +3,7 @@ import { matchedRoutes } from "hono/route";
 import type { AppEnv } from "./env";
 import { HttpError } from "./core/errors";
 import { tenantAuth } from "./core/pipeline";
+import { registerMe } from "./platform/me";
 import { auth } from "./platform/auth";
 
 const app = new Hono<AppEnv>();
@@ -28,6 +29,7 @@ tenantApi.get("/_whoami", (c) =>
     ? c.json({ orgId: c.var.tenant.org.id, uid: c.var.tenant.user.id })
     : c.json({ error: "Not found" }, 404),
 );
+registerMe(tenantApi);
 app.route("/api", tenantApi);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
