@@ -24,7 +24,7 @@ describe("limits", () => {
   });
   it("window and public limits", () => {
     expect(LOGIN_WINDOW_MS).toBe(900_000);
-    expect(PUBLIC_LIMITS).toEqual({ pub: 60, pdf: 10 });
+    expect(PUBLIC_LIMITS).toEqual({ pub: 60, pdf: 10, avatar: 300 });
     const t = 1_800_000_000_000;
     expect(minuteWindow(t)).toBe(minuteWindow(t + 59_999 - (t % 60_000)));
     expect(minuteWindow(t)).not.toBe(minuteWindow(t + 60_000));

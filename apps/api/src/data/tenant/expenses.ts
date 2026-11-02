@@ -72,12 +72,17 @@ export function expensesRepo(db: D1Database, orgId: string) {
       return !!r?.can_add_expense;
     },
 
-    /** An active user of this org an expense can be logged for; null otherwise (another org's id, inactive, unknown). */
-    barberFor(id: number): Promise<{ id: number; name: string } | null> {
-      return db
-        .prepare("SELECT id, name FROM users WHERE org_id = ? AND id = ? AND active = 1 AND role IN ('owner','admin','barber')")
+    /**
+     * A user of this org an expense can be logged for, with whether they are still active; null for another org's id or
+     * an unknown one. Inactive users are returned so an admin can still correct or zero their past expenses; the route
+     * refuses a NEW expense for them.
+     */
+    async barberFor(id: number): Promise<{ id: number; name: string; active: boolean } | null> {
+      const r = await db
+        .prepare("SELECT id, name, active FROM users WHERE org_id = ? AND id = ? AND role IN ('owner','admin','barber')")
         .bind(orgId, id)
-        .first<{ id: number; name: string }>();
+        .first<{ id: number; name: string; active: number }>();
+      return r ? { id: r.id, name: r.name, active: !!r.active } : null;
     },
 
     /** FM GET /expenses: newest day first, then the barbers' order. */

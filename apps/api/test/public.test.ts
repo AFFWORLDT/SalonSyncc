@@ -53,7 +53,7 @@ describe("publicRateLimit", () => {
     expect((await get("https://x.test/api/public/_probe", "", h)).status).toBe(200);
   });
   it("limits.ts semantics", () => {
-    expect(PUBLIC_LIMITS).toEqual({ pub: 60, pdf: 10 });
+    expect(PUBLIC_LIMITS).toEqual({ pub: 60, pdf: 10, avatar: 300 });
     expect(minuteWindow(59_999)).toBe(0);
     expect(minuteWindow(60_000)).toBe(1);
   });

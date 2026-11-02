@@ -1,6 +1,7 @@
 -- Local demo data: orgs alpha (free/active) and bravo (pro_max/trial). Users owner, barber1, barber2: password pass1234. Re-runnable.
--- Seeded sales/expenses are inserted directly, so they have NO ledger lines (the API posts those); anything created through
--- the API afterwards does. Seeded sales use days today-1 and today-2 so they never collide with today's bill counter.
+-- Seeded sales and expenses are inserted directly, with the same ledger lines the API would post for them (end of file),
+-- so demo ledger balances agree with demo reports. Seeded sales use days today-1 and today-2 so they never collide with
+-- today's bill counter.
 UPDATE orgs SET owner_user_id = NULL WHERE id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM sale_items WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM sales WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
@@ -76,8 +77,9 @@ WHERE sa.org_id = 'org_demo_alpha' AND (
 INSERT INTO expenses(org_id,barber_id,day,amount,note,created_at,updated_at)
 SELECT 'org_demo_alpha', id, date('now','-1 day'), 500, 'Supplies', CAST(strftime('%s','now') AS INTEGER) * 1000, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM users WHERE org_id = 'org_demo_alpha' AND username = 'barber1';
 
-INSERT INTO company_expenses(org_id,uid,day,amount,note,paid_from,created_at,updated_at) VALUES
-  ('org_demo_alpha','alpha-ce-rent',date('now','-2 day'),20000,'Rent','bank',CAST(strftime('%s','now') AS INTEGER) * 1000,CAST(strftime('%s','now') AS INTEGER) * 1000);
+INSERT INTO company_expenses(org_id,uid,day,amount,note,paid_from,created_by,created_at,updated_at)
+SELECT 'org_demo_alpha','alpha-ce-rent',date('now','-2 day'),20000,'Rent','bank',id,CAST(strftime('%s','now') AS INTEGER) * 1000,CAST(strftime('%s','now') AS INTEGER) * 1000
+FROM users WHERE org_id = 'org_demo_alpha' AND username = 'owner';
 
 -- bravo
 INSERT INTO users(org_id,username,name,role,password_hash,active,session_version,created_at) VALUES
@@ -110,6 +112,30 @@ WHERE sa.org_id = 'org_demo_bravo' AND (
 INSERT INTO expenses(org_id,barber_id,day,amount,note,created_at,updated_at)
 SELECT 'org_demo_bravo', id, date('now','-1 day'), 500, 'Supplies', CAST(strftime('%s','now') AS INTEGER) * 1000, CAST(strftime('%s','now') AS INTEGER) * 1000 FROM users WHERE org_id = 'org_demo_bravo' AND username = 'barber1';
 
-INSERT INTO company_expenses(org_id,uid,day,amount,note,paid_from,created_at,updated_at) VALUES
-  ('org_demo_bravo','bravo-ce-rent',date('now','-2 day'),20000,'Rent','bank',CAST(strftime('%s','now') AS INTEGER) * 1000,CAST(strftime('%s','now') AS INTEGER) * 1000);
+INSERT INTO company_expenses(org_id,uid,day,amount,note,paid_from,created_by,created_at,updated_at)
+SELECT 'org_demo_bravo','bravo-ce-rent',date('now','-2 day'),20000,'Rent','bank',id,CAST(strftime('%s','now') AS INTEGER) * 1000,CAST(strftime('%s','now') AS INTEGER) * 1000
+FROM users WHERE org_id = 'org_demo_bravo' AND username = 'owner';
 
+-- ledger: the lines the API posts (lib/ledger saleLines / expenseLines / companyExpenseLines), for both orgs.
+-- Sale: shop line on bank (card) or cash (cash), plus a commission line on the barber book when commission > 0.
+INSERT INTO ledger_entries(org_id,at,day,book,account,barber_id,amount,kind,source,source_id,ref,memo,actor_id)
+SELECT org_id, created_at, day, 'shop', CASE payment_mode WHEN 'card' THEN 'bank' ELSE 'cash' END, NULL, amount, 'sale', 'sale', id,
+       bill_no, 'Bill ' || bill_no || ' · ' || customer_label, created_by
+FROM sales WHERE org_id IN ('org_demo_alpha','org_demo_bravo') ORDER BY org_id, id;
+
+INSERT INTO ledger_entries(org_id,at,day,book,account,barber_id,amount,kind,source,source_id,ref,memo,actor_id)
+SELECT org_id, created_at, day, 'barber', NULL, barber_id, commission, 'commission', 'sale', id, bill_no, 'Commission · ' || bill_no, created_by
+FROM sales WHERE org_id IN ('org_demo_alpha','org_demo_bravo') AND commission > 0 ORDER BY org_id, id;
+
+-- Barber expense: out of the day's cash; ref "<barber> · <day>", entered by the owner.
+INSERT INTO ledger_entries(org_id,at,day,book,account,barber_id,amount,kind,source,source_id,ref,memo,actor_id)
+SELECT e.org_id, e.created_at, e.day, 'shop', 'cash', NULL, -e.amount, 'expense', 'expense', e.id,
+       u.name || ' · ' || e.day, 'Expense · ' || u.name || COALESCE(' · ' || e.note, ''),
+       (SELECT o.id FROM users o WHERE o.org_id = e.org_id AND o.username = 'owner')
+FROM expenses e JOIN users u ON u.org_id = e.org_id AND u.id = e.barber_id
+WHERE e.org_id IN ('org_demo_alpha','org_demo_bravo') ORDER BY e.org_id, e.id;
+
+-- Company expense: out of the account it was paid from; ref is the note.
+INSERT INTO ledger_entries(org_id,at,day,book,account,barber_id,amount,kind,source,source_id,ref,memo,actor_id)
+SELECT org_id, created_at, day, 'shop', paid_from, NULL, -amount, 'company_expense', 'company_expense', id, note, 'Company · ' || note, created_by
+FROM company_expenses WHERE org_id IN ('org_demo_alpha','org_demo_bravo') ORDER BY org_id, id;

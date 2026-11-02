@@ -28,7 +28,7 @@ export async function resolvePublicOrg(c: Context<AppEnv>): Promise<Org | null> 
 }
 
 /** Per-IP fixed-window limiter backed by the global rate_hits table. */
-export function publicRateLimit(bucket: "pub" | "pdf"): MiddlewareHandler<AppEnv> {
+export function publicRateLimit(bucket: keyof typeof PUBLIC_LIMITS): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
     const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
     const at = Date.now();

@@ -22,8 +22,11 @@ export function loginLimits(orgId: string, rawUsername: string, ip: string): { k
 /** Fixed 15-minute window the device counter (rate_hits) counts in. */
 export const loginWindow = (at: number) => Math.floor(at / LOGIN_WINDOW_MS);
 
-/** Requests per minute per IP on the public links; the PDF costs CPU to draw, so it gets fewer. */
-export const PUBLIC_LIMITS = { pub: 60, pdf: 10 } as const;
+/**
+ * Requests per minute per IP on the public links; the PDF costs CPU to draw, so it gets fewer. Staff photos have their
+ * own, higher bucket: one staff screen loads many of them, and they must not eat the receipts/services budget.
+ */
+export const PUBLIC_LIMITS = { pub: 60, pdf: 10, avatar: 300 } as const;
 
 /** The minute a request counts in (fixed windows). */
 export const minuteWindow = (at: number) => Math.floor(at / 60_000);

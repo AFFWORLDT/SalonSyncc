@@ -326,6 +326,43 @@ describe("referential rulings", () => {
   });
 });
 
+describe("a service deleted between resolving the items and the write batch (M7)", () => {
+  it("answers 400 with a refresh hint and writes nothing", async () => {
+    const a = await setup("svc-race-sale");
+    const svc = await json(await call("POST", "/services", a.ck, { category: "Haircuts", name: "Cut", price: 20 }));
+    let done = false;
+    const DB = new Proxy(env.DB, {
+      get(t, k) {
+        if (k === "batch")
+          return async (stmts: D1PreparedStatement[]) => {
+            if (!done) {
+              done = true;
+              await env.DB.prepare("DELETE FROM services WHERE org_id = ? AND id = ?").bind(a.org.id, svc.id).run();
+            }
+            return t.batch(stmts);
+          };
+        const v = (t as any)[k];
+        return typeof v === "function" ? v.bind(t) : v;
+      },
+    });
+    const r = await app.fetch(
+      new Request("https://x.test/api/sales", {
+        method: "POST",
+        headers: { cookie: a.k1, "content-type": "application/json" },
+        body: JSON.stringify({ payment_mode: "cash", items: [{ service_id: svc.id, qty: 1 }] }),
+      }),
+      { ...E, DB },
+      ctx,
+    );
+    expect(done).toBe(true);
+    expect(r.status).toBe(400);
+    expect(await json(r)).toEqual({ error: "One of the services no longer exists. Refresh and pick again." });
+    for (const t of ["sales", "sale_items", "ledger_entries"])
+      expect((await env.DB.prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE org_id = ?`).bind(a.org.id).first<any>()).n, t).toBe(0);
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND entity = 'sale'").bind(a.org.id).first<any>()).n).toBe(0);
+  });
+});
+
 describe("ledger data layer and hooks", () => {
   it("reverseStmts only touches the caller's org (INV§8.4)", async () => {
     const a = await setup("lg-rev-a");

@@ -146,7 +146,7 @@ export function salesRepo(db: D1Database, orgId: string) {
       return r ? { ...toSale(r), updated_at: r.updated_at } : null;
     },
 
-    /** Whether this org has the sale at all, deleted or not (to tell 404 from 409 after a lost race). */
+    /** Whether this org has the sale and it is not soft-deleted (to tell 404 from 409 after a lost race). */
     async isLive(id: number): Promise<boolean> {
       const r = await db.prepare("SELECT 1 AS x FROM sales WHERE org_id = ? AND id = ? AND deleted_at IS NULL").bind(orgId, id).first();
       return !!r;

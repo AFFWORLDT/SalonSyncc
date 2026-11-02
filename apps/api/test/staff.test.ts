@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import app from "../src/index";
 import { makeOrg, makeUser, loginAs } from "./helpers";
 import { tenantRepo } from "../src/data/tenant";
+import { PUBLIC_LIMITS } from "../src/lib/limits";
 
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 const E = { ...env, ROOT_DOMAIN: "" };
@@ -249,6 +250,82 @@ describe("avatars", () => {
     expect((await pub(`/avatar/${a.owner.id}/1`)).status).toBe(404);
     expect((await pub(`/avatar/999999/1?org=st-pa-a`)).status).toBe(404);
     expect((await pub(`/avatar/x/1?org=st-pa-a`)).status).toBe(404);
+  });
+});
+
+describe("final-review hardening", () => {
+  const png = (n: number) => new Uint8Array(n).fill(7);
+  const put = (path: string, ck: string, bytes: Uint8Array, type = "image/png") => call("PUT", path, ck, bytes, { "content-type": type });
+
+  it("I2: PUT keeps phone and commission_pct when omitted; explicit null or empty clears them", async () => {
+    const { ck } = await setup("st-keep");
+    const u: any = await (await call("POST", "/users", ck, input({ phone: "050 123 4567", commission_pct: 25 }))).json();
+    const phone = u.phone;
+    expect(phone).toBeTruthy();
+    const r = await call("PUT", `/users/${u.id}`, ck, { name: "Sonu", username: "sonu", can_add_expense: true });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ phone, commission_pct: 25, can_add_expense: true });
+    const c1 = await call("PUT", `/users/${u.id}`, ck, { name: "Sonu", username: "sonu", commission_pct: null });
+    expect(await c1.json()).toMatchObject({ phone, commission_pct: null });
+    const c2 = await call("PUT", `/users/${u.id}`, ck, { name: "Sonu", username: "sonu", phone: "" });
+    expect(await c2.json()).toMatchObject({ phone: null, commission_pct: null });
+    const c3 = await call("PUT", `/users/${u.id}`, ck, { name: "Sonu", username: "sonu", phone: "050 123 4567", commission_pct: 30 });
+    expect(await c3.json()).toMatchObject({ phone, commission_pct: 30 });
+    const c4 = await call("PUT", `/users/${u.id}`, ck, { name: "Sonu", username: "sonu", phone: null, commission_pct: "" });
+    expect(await c4.json()).toMatchObject({ phone: null, commission_pct: null });
+  });
+
+  it("M1: the public avatar needs the current version and an active user", async () => {
+    const { org, ck } = await setup("st-avv");
+    const bar = await makeUser(org.id, { username: "bar", role: "barber" });
+    await put(`/users/${bar.id}/avatar`, ck, png(10));
+    await put(`/users/${bar.id}/avatar`, ck, png(11));
+    expect((await pub(`/avatar/${bar.id}/2?org=st-avv`)).status).toBe(200);
+    expect((await pub(`/avatar/${bar.id}/1?org=st-avv`)).status).toBe(404);
+    expect((await pub(`/avatar/${bar.id}/3?org=st-avv`)).status).toBe(404);
+    expect((await pub(`/avatar/${bar.id}/x?org=st-avv`)).status).toBe(404);
+    await env.DB.prepare("UPDATE users SET active = 0 WHERE org_id = ? AND id = ?").bind(org.id, bar.id).run();
+    expect((await pub(`/avatar/${bar.id}/2?org=st-avv`)).status).toBe(404);
+  });
+
+  it("M2: public avatars have their own per-IP bucket (300/min); other public routes stay on pub", async () => {
+    const { owner, ck } = await setup("st-avrl");
+    await put("/me/avatar", ck, png(10));
+    const h = { "CF-Connecting-IP": "7.7.7.77" };
+    const av = () => app.fetch(new Request(`https://x.test/api/public/avatar/${owner.id}/1?org=st-avrl`, { headers: h }), E, ctx);
+    for (let i = 0; i < PUBLIC_LIMITS.avatar; i++) expect((await av()).status, `hit ${i}`).toBe(200);
+    const r = await av();
+    expect(r.status).toBe(429);
+    expect(Number(r.headers.get("retry-after"))).toBeGreaterThan(0);
+    // The pub bucket for the same IP is untouched.
+    expect((await app.fetch(new Request("https://x.test/api/public/_probe", { headers: h }), E, ctx)).status).toBe(200);
+  });
+
+  it("M8: a user who only created records (a company expense) is deactivated, not deleted", async () => {
+    const { org, ck } = await setup("st-act");
+    const adm = await makeUser(org.id, { username: "adm", role: "admin" });
+    const ak = await loginAs("st-act", "adm");
+    expect((await call("POST", "/company-expenses", ak, { amount: 100, note: "Rent", paid_from: "bank" })).status).toBe(200);
+    expect(await (await call("DELETE", `/users/${adm.id}`, ck)).json()).toEqual({ ok: true, deactivated: true });
+    expect(await env.DB.prepare("SELECT active FROM users WHERE org_id = ? AND id = ?").bind(org.id, adm.id).first()).toEqual({ active: 0 });
+  });
+
+  it("M8: transfers, payouts and audit rows authored by a user also count", async () => {
+    const { org, owner, ck } = await setup("st-act2");
+    const ids: number[] = [];
+    for (const n of ["t1", "p1", "a1", "none"]) ids.push((await makeUser(org.id, { username: n, role: "admin" })).id);
+    const [t1, p1, a1, none] = ids as [number, number, number, number];
+    await env.DB.prepare(
+      "INSERT INTO money_transfers (org_id, uid, day, amount, from_account, to_account, created_by, created_at, updated_at) VALUES (?, 'u-t1', '2026-11-01', 100, 'cash', 'bank', ?, 1, 1)",
+    ).bind(org.id, t1).run();
+    await env.DB.prepare(
+      "INSERT INTO barber_payouts (org_id, uid, barber_id, day, amount, paid_from, created_by, created_at, updated_at) VALUES (?, 'u-p1', ?, '2026-11-01', 100, 'cash', ?, 1, 1)",
+    ).bind(org.id, owner.id, p1).run();
+    await env.DB.prepare(
+      "INSERT INTO audit_log (org_id, at, actor_id, actor_name, entity, entity_id, ref, action) VALUES (?, 1, ?, 'a1', 'service', 1, 'x', 'create')",
+    ).bind(org.id, a1).run();
+    for (const id of [t1, p1, a1]) expect(await (await call("DELETE", `/users/${id}`, ck)).json(), String(id)).toMatchObject({ deactivated: true });
+    expect(await (await call("DELETE", `/users/${none}`, ck)).json()).toMatchObject({ deleted: true });
   });
 });
 

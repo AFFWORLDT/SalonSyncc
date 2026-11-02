@@ -181,13 +181,17 @@ export interface User {
   created_at: number;
 }
 
+/**
+ * POST/PUT /api/users body. On PUT, an omitted optional field keeps its stored value; for `phone` and `commission_pct`
+ * an explicit null or "" clears it (commission then falls back to the org default). On POST, omitted means none.
+ */
 export interface UserInput {
   name: string;
   username: string;
-  phone?: string | null;
+  phone?: string | null; // PUT: omitted = keep, null/"" = clear
   password?: string; // required on create
   role?: Role;
-  commission_pct?: number | null;
+  commission_pct?: number | null; // PUT: omitted = keep, null/"" = clear (use the org default)
   sort_order?: number;
   active?: boolean;
   can_add_expense?: boolean;

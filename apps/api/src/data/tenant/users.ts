@@ -84,9 +84,9 @@ export function usersRepo(db: D1Database, orgId: string) {
     },
     /**
      * Whether the user is referenced by business records, in which case they are deactivated rather than deleted.
-     * audit_log actor references do not count.
-     * Counts sales (as barber or creator, soft-deleted ones too: they still reference the user), ledger lines (barber book),
-     * expenses and payouts.
+     * Counts sales (as barber or creator, soft-deleted ones too: they still reference the user), ledger lines (barber book
+     * or as actor), expenses, payouts (as barber or creator), company expenses and transfers they entered, and audit rows
+     * they authored: anyone whose name the history shows is kept.
      */
     async userHasActivity(id: number): Promise<boolean> {
       const r = await db
@@ -94,8 +94,13 @@ export function usersRepo(db: D1Database, orgId: string) {
           `SELECT EXISTS (SELECT 1 FROM sales WHERE org_id = ?1 AND barber_id = ?2)
                 + EXISTS (SELECT 1 FROM sales WHERE org_id = ?1 AND created_by = ?2)
                 + EXISTS (SELECT 1 FROM ledger_entries WHERE org_id = ?1 AND barber_id = ?2)
+                + EXISTS (SELECT 1 FROM ledger_entries WHERE org_id = ?1 AND actor_id = ?2)
                 + EXISTS (SELECT 1 FROM expenses WHERE org_id = ?1 AND barber_id = ?2)
-                + EXISTS (SELECT 1 FROM barber_payouts WHERE org_id = ?1 AND barber_id = ?2) AS n`,
+                + EXISTS (SELECT 1 FROM barber_payouts WHERE org_id = ?1 AND barber_id = ?2)
+                + EXISTS (SELECT 1 FROM barber_payouts WHERE org_id = ?1 AND created_by = ?2)
+                + EXISTS (SELECT 1 FROM company_expenses WHERE org_id = ?1 AND created_by = ?2)
+                + EXISTS (SELECT 1 FROM money_transfers WHERE org_id = ?1 AND created_by = ?2)
+                + EXISTS (SELECT 1 FROM audit_log WHERE org_id = ?1 AND actor_id = ?2) AS n`,
         )
         .bind(orgId, id)
         .first<{ n: number }>();
@@ -206,10 +211,11 @@ export function usersRepo(db: D1Database, orgId: string) {
     async clearAvatar(id: number): Promise<void> {
       await db.prepare("UPDATE users SET avatar = NULL, avatar_type = NULL, avatar_v = 0, updated_at = ? WHERE org_id = ? AND id = ?").bind(Date.now(), orgId, id).run();
     },
-    async avatar(id: number): Promise<{ bytes: Uint8Array; type: string } | null> {
+    /** The photo of an active user of this org at version `v` (its current avatar_v); null otherwise. */
+    async avatar(id: number, v: number): Promise<{ bytes: Uint8Array; type: string } | null> {
       const r = await db
-        .prepare("SELECT avatar, avatar_type FROM users WHERE org_id = ? AND id = ? AND avatar IS NOT NULL")
-        .bind(orgId, id)
+        .prepare("SELECT avatar, avatar_type FROM users WHERE org_id = ? AND id = ? AND avatar_v = ? AND active = 1 AND avatar IS NOT NULL")
+        .bind(orgId, id, v)
         .first<{ avatar: ArrayBuffer | number[]; avatar_type: string | null }>();
       if (!r) return null;
       const bytes = r.avatar instanceof ArrayBuffer ? new Uint8Array(r.avatar) : new Uint8Array(r.avatar as number[]);

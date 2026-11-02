@@ -22,7 +22,7 @@ curl -c j -X POST localhost:8787/api/auth/login -H 'content-type: application/js
 curl -b j localhost:8787/api/me
 ```
 
-The seed is re-runnable. It inserts a few services, two barbers, four sales (with items), one barber expense and one company expense per org, directly in SQL, so **seeded sales and expenses have no ledger lines**; anything created through the API does.
+The seed is re-runnable. It inserts a few services, two barbers, four sales (with items), one barber expense and one company expense per org, directly in SQL, together with the ledger lines the API would post for them, so the demo ledger balances agree with the demo reports.
 
 ## Modules and routes
 

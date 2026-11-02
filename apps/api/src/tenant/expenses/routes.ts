@@ -84,9 +84,13 @@ expenses.put("/", async (c) => {
   } else if (!(await repo.canAddExpense(me.id))) {
     throw new HttpError(403, "Expenses are added by the admin. Ask them to add yours.");
   }
-  const barber = await repo.barberFor(barberId);
-  if (!barber) throw bad(NO_BARBER);
+  const found = await repo.barberFor(barberId);
+  // A barber logging their own is always active (inactive users have no session).
+  if (!found || (!isAdmin(me) && !found.active)) throw bad(NO_BARBER);
+  const barber = { id: found.id, name: found.name };
   const old = await repo.byBarberDay(barber.id, day);
+  // Admins may still correct or zero an existing expense of a since-deactivated barber (FM), but not start a new one.
+  if (!old && !found.active) throw bad(NO_BARBER);
   const actor = { id: me.id, name: me.name };
 
   const zero = b.amount === 0 || b.amount === "0" || b.amount === "";

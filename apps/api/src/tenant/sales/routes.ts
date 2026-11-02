@@ -14,6 +14,7 @@ const bad = (m: string) => new HttpError(400, m);
 const MAX_ITEMS = 30;
 const MAX_QTY = 20;
 const NO_BARBER = "Choose an active barber";
+const SERVICE_GONE = "One of the services no longer exists. Refresh and pick again.";
 
 function clean(v: unknown, max: number): string | null {
   if (v === undefined || v === null) return null;
@@ -156,24 +157,31 @@ sales.post("/", async (c) => {
 
   const pct = barber.commission_pct ?? settings.default_commission_pct;
   const vatRate = settings.vat_enabled ? settings.vat_rate : 0;
-  const sale = await repo.create(
-    {
-      bill_no: billNo,
-      day,
-      barber,
-      customer: phone ? { phone, name, rename: isAdmin(me) } : null,
-      customer_label: label,
-      amount,
-      payment_mode,
-      note,
-      commission_pct: pct,
-      commission: commissionOf(amount, pct),
-      vat_rate: vatRate,
-      vat_amount: vatOf(amount, vatRate),
-      items,
-    },
-    { id: me.id, name: me.name },
-  );
+  let sale: Sale;
+  try {
+    sale = await repo.create(
+      {
+        bill_no: billNo,
+        day,
+        barber,
+        customer: phone ? { phone, name, rename: isAdmin(me) } : null,
+        customer_label: label,
+        amount,
+        payment_mode,
+        note,
+        commission_pct: pct,
+        commission: commissionOf(amount, pct),
+        vat_rate: vatRate,
+        vat_amount: vatOf(amount, vatRate),
+        items,
+      },
+      { id: me.id, name: me.name },
+    );
+  } catch (e) {
+    // A catalogue service was deleted between resolveItems and the batch: sale_items' FK failed and nothing was written.
+    if (/FOREIGN KEY constraint failed/i.test(String((e as Error)?.message ?? e))) throw bad(SERVICE_GONE);
+    throw e;
+  }
 
   refreshStats(c, [sale.customer_id]);
   // Promise.resolve().then: even a hook that throws synchronously can never fail a committed sale.

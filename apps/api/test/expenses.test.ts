@@ -169,6 +169,35 @@ describe("PUT /api/expenses (barber expense, one per barber per day)", () => {
   });
 });
 
+describe("PUT /api/expenses for a since-deactivated barber (I1)", () => {
+  it("admin edits and zeroes an existing past expense of an inactive barber; a new one for them is 400", async () => {
+    const a = await setup("ex-inactive");
+    const day = addDays(dubaiToday(), -2);
+    const first = await json(await call("PUT", "/expenses", a.ck, { amount: 40, note: "tea", barber_id: a.b2.id, day }));
+    await env.DB.prepare("UPDATE users SET active = 0 WHERE org_id = ? AND id = ?").bind(a.org.id, a.b2.id).run();
+
+    const ed = await call("PUT", "/expenses", a.ck, { amount: 60, note: "tea", barber_id: a.b2.id, day });
+    expect(ed.status).toBe(200);
+    expect(await json(ed)).toMatchObject({ id: first.id, barber_id: a.b2.id, day, amount: 6000 });
+    expect(await liveLines(a.org.id, "expense", first.id)).toEqual([{ book: "shop", account: "cash", amount: -6000 }]);
+    expect(await balances(a.org.id)).toEqual([{ book: "shop", account: "cash", barber_id: null, bal: -6000 }]);
+
+    const z = await call("PUT", "/expenses", a.ck, { amount: 0, barber_id: a.b2.id, day });
+    expect(z.status).toBe(200);
+    expect(await json(z)).toEqual({ ok: true, deleted: true });
+    expect(await expenseRows(a.org.id)).toEqual([]);
+    expect(await liveLines(a.org.id, "expense", first.id)).toEqual([]);
+    expect(await balances(a.org.id)).toEqual([{ book: "shop", account: "cash", barber_id: null, bal: 0 }]);
+
+    // No row for (barber, day): creating one for an inactive barber is refused.
+    const other = addDays(dubaiToday(), -1);
+    const nw = await call("PUT", "/expenses", a.ck, { amount: 10, barber_id: a.b2.id, day: other });
+    expect(nw.status).toBe(400);
+    expect(await json(nw)).toEqual({ error: "Choose an active barber" });
+    expect(await expenseRows(a.org.id)).toEqual([]);
+  });
+});
+
 describe("GET /api/expenses", () => {
   it("barbers see only their own; admins filter by barber, month or day; orgs never see each other's", async () => {
     const a = await setup("ex-get");

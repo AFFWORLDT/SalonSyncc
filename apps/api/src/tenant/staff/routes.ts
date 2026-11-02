@@ -60,14 +60,17 @@ async function body(c: Context<AppEnv>): Promise<Record<string, unknown>> {
   throw bad("Send the details as JSON");
 }
 
-/** Validated profile fields; role/active/sort/etc stay undefined when the request didn't send them. */
+/**
+ * Validated profile fields; role/active/sort/etc stay undefined when the request didn't send them.
+ * `phone` and `commission` are `undefined` when omitted (PUT keeps the stored value), null when sent as null or "" (clears).
+ */
 async function readInput(c: Context<AppEnv>, raw: Record<string, unknown>, creating: boolean) {
   const b = raw as unknown as UserInput;
   const name = clean(b.name, 60);
   if (!name) throw bad("Enter a name");
   const username = clean(b.username, 60) ?? "";
   if (!USERNAME_RE.test(username)) throw bad("Username: 2–60 letters, numbers, . _ - @ +, no spaces");
-  let phone: string | null = null;
+  let phone: string | null | undefined = b.phone === undefined ? undefined : null;
   if (clean(b.phone)) {
     const { phone_country } = await settingsRepo(c.env.DB, c.var.tenant.org.id).get();
     phone = canonicalPhone(b.phone, phone_country);
@@ -75,7 +78,8 @@ async function readInput(c: Context<AppEnv>, raw: Record<string, unknown>, creat
   }
   if (creating && (typeof b.password !== "string" || b.password.length < 4)) throw bad("Password must be at least 4 characters");
   if (b.role !== undefined && b.role !== "admin" && b.role !== "barber" && b.role !== "owner") throw bad("Choose a role");
-  const commission = b.commission_pct === null || b.commission_pct === undefined || (b.commission_pct as unknown) === "" ? null : pct(b.commission_pct, "Commission");
+  const commission =
+    b.commission_pct === undefined ? undefined : b.commission_pct === null || (b.commission_pct as unknown) === "" ? null : pct(b.commission_pct, "Commission");
   const sort = Number.isInteger(b.sort_order) ? (b.sort_order as number) : null;
   return {
     name,
@@ -112,9 +116,9 @@ staff.post("/users", gate, requireAdmin, async (c) => {
   const w: StaffWrite = {
     name: u.name,
     username: u.username,
-    phone: u.phone,
+    phone: u.phone ?? null,
     role: u.role ?? "barber",
-    commission_pct: u.commission,
+    commission_pct: u.commission ?? null,
     sort_order: u.sort ?? (await repo.nextSortOrder()),
     active: true,
     can_add_expense: !!u.canAddExpense,
@@ -152,9 +156,10 @@ staff.put("/users/:id", gate, requireAdmin, async (c) => {
   const w: StaffWrite = {
     name: u.name,
     username: existing.role === "owner" ? existing.username : u.username,
-    phone: u.phone,
+    // Omitted = keep (only explicit null or "" clears), like the other optional fields.
+    phone: u.phone === undefined ? existing.phone : u.phone,
     role: existing.role === "owner" ? "owner" : (u.role ?? existing.role),
-    commission_pct: u.commission,
+    commission_pct: u.commission === undefined ? existing.commission_pct : u.commission,
     sort_order: u.sort ?? existing.sort_order,
     active,
     can_add_expense: u.canAddExpense ?? !!existing.can_add_expense,
@@ -229,13 +234,18 @@ staff.delete("/me/avatar", gate, (c) => clearAvatar(c, c.var.tenant.user.id));
 staff.put("/users/:id/avatar", gate, requireAdmin, (c) => saveAvatar(c, userId(c.req.param("id"))));
 staff.delete("/users/:id/avatar", gate, requireAdmin, (c) => clearAvatar(c, userId(c.req.param("id"))));
 
-/** Public photo route, mounted on publicApi at /avatar: GET /api/public/avatar/:id/:v. The org comes from the host (or ?org= on workers.dev). */
+/**
+ * Public photo route, mounted on publicApi at /avatar: GET /api/public/avatar/:id/:v. The org comes from the host (or
+ * ?org= on workers.dev). `v` must be the user's current avatar_v and the user must be active. Own rate-limit bucket.
+ */
 export const avatarPublic = new Hono<AppEnv>();
-avatarPublic.get("/:id/:v", publicRateLimit("pub"), async (c) => {
+avatarPublic.get("/:id/:v", publicRateLimit("avatar"), async (c) => {
   const org = await resolvePublicOrg(c);
   const id = Number(c.req.param("id"));
-  if (!org || !Number.isInteger(id) || id <= 0) return c.json({ error: "Not found" }, 404);
-  const img = await usersRepo(c.env.DB, org.id).avatar(id);
+  const v = Number(c.req.param("v"));
+  if (!org || !Number.isInteger(id) || id <= 0 || !Number.isInteger(v) || v <= 0) return c.json({ error: "Not found" }, 404);
+  // Only the current version of an active user's photo: old URLs and deactivated staff are 404.
+  const img = await usersRepo(c.env.DB, org.id).avatar(id, v);
   if (!img) return c.json({ error: "Not found" }, 404);
   return new Response(img.bytes, {
     headers: { "content-type": img.type, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" },
