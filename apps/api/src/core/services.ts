@@ -49,6 +49,11 @@ export interface WaTemplateCreate {
 
 export interface WaClient {
   sendTemplate(cfg: WaConfig, phone: string, template: string, lang: string, params: WaValue[]): Promise<SendResult>;
+  /**
+   * True when `cfg.token` can read `cfg.phoneNumberId` (GET {GRAPH}/{id}?fields=id answers with that id): proof the
+   * salon really holds that number before it is connected (M6). 1 subrequest; never throws (false on any failure).
+   */
+  checkNumber(cfg: WaConfig): Promise<boolean>;
   /** Uploads a header file; returns Meta's media id. */
   uploadMedia(cfg: WaConfig, file: File): Promise<string>;
   listTemplates(cfg: WaConfig): Promise<WaTemplateInfo[]>;

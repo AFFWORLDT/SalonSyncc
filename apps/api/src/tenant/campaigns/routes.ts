@@ -2,14 +2,15 @@ import { Hono, type Context } from "hono";
 import type { WaParam, WaSlot } from "@ss/contract";
 import type { AppEnv } from "../../env";
 import { HttpError } from "../../core/errors";
-import { requireFeature } from "../../core/pipeline";
+import { requireFeature, TENANT_AUTH_STMTS } from "../../core/pipeline";
+import { FREE_STMTS, FREE_SUBREQUESTS, meteredEnv } from "../../lib/metered";
 import { requireAdmin } from "../../core/roles";
 import { randomToken } from "../../core/crypto";
 import { services, type SendResult, type WaConfig } from "../../core/services";
 import { settingsRepo, waCampaignsRepo, waMessagesRepo } from "../../data/tenant";
 import { canonicalPhone } from "../../lib/phone";
 import { allowedRecipient, bodyParams, templateSlots, templateVars } from "../../lib/whatsapp";
-import { CAMPAIGN_BATCH, drainCampaign } from "../../jobs/wa-jobs";
+import { CAMPAIGN_BATCH, DRAIN_FIXED_STMTS, drainCampaign } from "../../jobs/wa-jobs";
 import { NOT_READY } from "../whatsapp/bill";
 import { waSetup } from "../whatsapp/ready";
 
@@ -157,10 +158,15 @@ campaigns.post("/wa/campaigns/:id/next", ...gate, async (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id <= 0) throw new HttpError(404, "Not found");
   const orgId = c.var.tenant.org.id;
-  const row = await waCampaignsRepo(c.env.DB, orgId).row(id);
+  // The cron's two counters (lib/metered): after auth's reserved worst case, row 1 + WA config 1 + drain 5 + 2 per send.
+  const budget = { left: FREE_SUBREQUESTS, stmts: FREE_STMTS - TENANT_AUTH_STMTS };
+  const env = meteredEnv(c.env, budget);
+  const row = await waCampaignsRepo(env.DB, orgId).row(id);
   if (!row) throw new HttpError(404, "Not found");
-  const cfg = await ready(c);
-  const k = await drainCampaign(c.env, orgId, id, CAMPAIGN_BATCH, { left: CAMPAIGN_BATCH }, { cfg, row });
+  const cfg = await waSetup(env, c.var.tenant.org, c.var.tenant.features);
+  if (!cfg) throw new HttpError(409, NOT_READY, "wa_not_ready");
+  const limit = Math.min(CAMPAIGN_BATCH, budget.left, Math.floor((budget.stmts - DRAIN_FIXED_STMTS) / 2));
+  const k = await drainCampaign(env, orgId, id, limit, budget, { cfg, row });
   if (!k) throw new HttpError(404, "Not found");
   return c.json(k);
 });

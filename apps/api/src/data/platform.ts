@@ -67,6 +67,16 @@ export interface CronOrg {
   doneRuns: Set<string>;
 }
 
+/** The org behind a webhook phone_number_id, with what the webhook needs, from one statement. */
+export interface WebhookOrg {
+  org: Org;
+  /** org_settings.phone_country, to canonicalise STOP phones. */
+  phoneCountry: string;
+  planFeatures: string[];
+  limits: { max_staff: number | null };
+  overrides: { feature_key: string; enabled: 0 | 1 }[];
+}
+
 /**
  * The cron org loader: ONE D1 statement for every served org with its settings, WhatsApp presence, open campaign and
  * feature inputs (R3). Platform-level on purpose (it is what finds the orgs, like orgByPhoneNumberId); each correlated
@@ -125,6 +135,32 @@ export function platformRepo(db: D1Database) {
         .bind(phoneNumberId)
         .first<OrgRow>();
       return r ? toOrg(r) : null;
+    },
+    /**
+     * The webhook's org lookup in ONE statement (I3: a payload costs a fixed number of statements per number): the org
+     * owning a phone_number_id, its calling code (for STOP phones) and its feature inputs for computeFeatures, as the
+     * cron's loader reads them. Platform-level like orgByPhoneNumberId; every subselect is tied to the found org's row.
+     */
+    async webhookOrg(phoneNumberId: string): Promise<WebhookOrg | null> {
+      const r = await db
+        .prepare(
+          `SELECT o.id, o.slug, o.name, o.status, o.plan_id, o.trial_ends_at, o.grace_ends_at,
+             (SELECT phone_country FROM org_settings WHERE org_id = o.id) AS cc,
+             (SELECT json_group_array(feature_key) FROM plan_features WHERE plan_id = o.plan_id) AS plan_features,
+             (SELECT limits_json FROM plans WHERE id = o.plan_id) AS limits_json,
+             (SELECT json_group_array(json_object('feature_key', feature_key, 'enabled', enabled)) FROM org_feature_overrides WHERE org_id = o.id) AS overrides
+           FROM org_whatsapp w JOIN orgs o ON o.id = w.org_id WHERE w.phone_number_id = ?`,
+        )
+        .bind(phoneNumberId)
+        .first<OrgRow & { cc: string | null; plan_features: string | null; limits_json: string | null; overrides: string | null }>();
+      if (!r) return null;
+      return {
+        org: toOrg(r),
+        phoneCountry: r.cc ?? "971",
+        planFeatures: JSON.parse(r.plan_features ?? "[]") as string[],
+        limits: parseLimits(r.limits_json ?? null),
+        overrides: JSON.parse(r.overrides ?? "[]") as { feature_key: string; enabled: 0 | 1 }[],
+      };
     },
     async planFeatures(planId: string): Promise<string[]> {
       const { results } = await db

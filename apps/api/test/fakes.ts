@@ -18,12 +18,19 @@ export interface PushSend {
  * call `uninstall()` (or `setServicesForTest(null)`) in afterEach.
  */
 export function fakeServices(
-  opts: { send?: (s: WaSend) => SendResult | Promise<SendResult>; dead?: string[]; templates?: WaTemplateInfo[] } = {},
+  opts: {
+    send?: (s: WaSend) => SendResult | Promise<SendResult>;
+    dead?: string[];
+    templates?: WaTemplateInfo[];
+    /** checkNumber's answer (default: every token can use its number). */
+    numberOk?: (cfg: WaConfig) => boolean;
+  } = {},
 ) {
   const wa: WaSend[] = [];
   const uploads: { cfg: WaConfig; file: File }[] = [];
   const created: { cfg: WaConfig; name: string; language: string; body: string; examples: string[] }[] = [];
   const pushes: PushSend[] = [];
+  const numberChecks: WaConfig[] = [];
   let n = 0;
   const svc: Services = {
     wa: {
@@ -35,6 +42,10 @@ export function fakeServices(
       async uploadMedia(cfg, file) {
         uploads.push({ cfg, file });
         return `media_fake${++n}`;
+      },
+      async checkNumber(cfg) {
+        numberChecks.push(cfg);
+        return opts.numberOk ? opts.numberOk(cfg) : true;
       },
       async listTemplates() {
         return opts.templates ?? [];
@@ -56,6 +67,7 @@ export function fakeServices(
     uploads,
     created,
     pushes,
+    numberChecks,
     services: svc,
     install() {
       setServicesForTest(() => svc);

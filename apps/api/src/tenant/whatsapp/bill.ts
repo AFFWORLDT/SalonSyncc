@@ -3,7 +3,8 @@ import type { Env } from "../../env";
 import { platformRepo, type Org } from "../../data/platform";
 import { assetsRepo, salesRepo, settingsRepo, waMessagesRepo } from "../../data/tenant";
 import { orgAppUrl } from "../../core/links";
-import { services, type SendResult } from "../../core/services";
+import { services, type SendResult, type WaConfig } from "../../core/services";
+import type { Budget } from "../../jobs/wa-jobs";
 import { moneyText } from "../../lib/money";
 import { allowedRecipient, firstName, type WaValue } from "../../lib/whatsapp";
 import { billPdf } from "../../lib/pdf";
@@ -77,15 +78,27 @@ export async function sendBill(env: Env, orgId: string, saleId: number, actorId:
   if (!sale.customer_phone) return { error: "This bill has no customer mobile", code: "no_phone" };
   const cfg = await waSetup(env, org);
   if (!cfg) return { error: NOT_READY, code: "wa_not_ready" };
-  const s = await settingsRepo(env.DB, orgId).get();
-  const repo = waMessagesRepo(env.DB, orgId);
+  return deliverBill(env, org, sale, await settingsRepo(env.DB, orgId).get(), cfg, actorId);
+}
+
+/**
+ * The send itself, for a caller that already holds the org, the sale (with its phone), the settings and the WA config
+ * (the sale hook, I4: no re-reads). D1: the opt-out check 1 + the log row 1. With `budget`, one Graph call is taken
+ * from it first; an empty budget logs the bill "skipped" without a call.
+ */
+export async function deliverBill(env: Env, org: Org, sale: Sale, s: Settings, cfg: WaConfig, actorId: number | null, budget?: Budget): Promise<WaMessage> {
+  const repo = waMessagesRepo(env.DB, org.id);
   const params = billParams(env, org, sale, s);
-  const phone = sale.customer_phone;
+  const phone = sale.customer_phone!;
   let r: SendResult;
   if (await repo.optedOut(sale.customer_id, phone)) r = { status: "skipped", error: "opted out" };
   else if (!allowedRecipient(cfg.testNumbers, phone, cfg.callingCode)) r = { status: "skipped", error: "not in test numbers" };
-  else r = await services(env).wa.sendTemplate(cfg, phone, s.wa_bill_template, s.wa_language, params);
-  return repo.log({ kind: "bill", phone, template: s.wa_bill_template, params, customerId: sale.customer_id, saleId, actorId }, r);
+  else if (budget && budget.left <= 0) r = { status: "skipped", error: "send budget used up" };
+  else {
+    if (budget) budget.left--;
+    r = await services(env).wa.sendTemplate(cfg, phone, s.wa_bill_template, s.wa_language, params);
+  }
+  return repo.log({ kind: "bill", phone, template: s.wa_bill_template, params, customerId: sale.customer_id, saleId: sale.id, actorId }, r);
 }
 
 /** "f.m_salon_" from an Instagram profile URL, else null. */

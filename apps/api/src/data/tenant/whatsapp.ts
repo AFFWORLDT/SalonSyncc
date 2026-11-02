@@ -183,28 +183,39 @@ export function waMessagesRepo(db: D1Database, orgId: string) {
     },
 
     /**
-     * The writes for one webhook change of this org (FM POST /wa/webhook, org-scoped): delivery receipts by wa_id (delivered_at
-     * and read_at are set only once; "read" implies delivered; "failed" stores the error, at most 300 chars) and STOP replies
-     * as opt-outs by this org's canonical phone. Statements only: the caller batches them.
+     * STOP replies (FM POST /wa/webhook, org-scoped): every phone in ONE statement (I3), this org's canonical phones.
      */
-    webhookStatements(statuses: WaStatusEvent[], optOutPhones: string[]): D1PreparedStatement[] {
-      const out: D1PreparedStatement[] = [];
-      for (const s of statuses) {
-        if (s.status === "failed") {
-          out.push(
-            db.prepare("UPDATE wa_messages SET status = 'failed', error = ? WHERE org_id = ? AND wa_id = ?").bind((s.error ?? "Not delivered").slice(0, 300), orgId, s.wa_id),
-          );
-        } else if (s.status === "delivered") {
-          out.push(db.prepare("UPDATE wa_messages SET delivered_at = COALESCE(delivered_at, ?) WHERE org_id = ? AND wa_id = ?").bind(s.at, orgId, s.wa_id));
-        } else {
-          out.push(
-            db
-              .prepare("UPDATE wa_messages SET read_at = COALESCE(read_at, ?), delivered_at = COALESCE(delivered_at, ?) WHERE org_id = ? AND wa_id = ?")
-              .bind(s.at, s.at, orgId, s.wa_id),
-          );
-        }
+    optOutStatement(phones: string[]): D1PreparedStatement {
+      return db
+        .prepare("UPDATE customers SET wa_opt_out = 1 WHERE org_id = ?1 AND phone IN (SELECT value FROM json_each(?2))")
+        .bind(orgId, JSON.stringify([...new Set(phones)]));
+    },
+
+    /**
+     * Delivery receipts by wa_id, at most 3 statements whatever their number (I3), one per kind present, in this order:
+     * delivered (delivered_at set once, the earliest time in the payload), read (read_at set once; "read" implies
+     * delivered) and failed (status + error, at most 300 chars; RETURNING wa_id so the caller can see which matched,
+     * M5). Each drives a json_each over [wa_id, time] or [wa_id, error] tuples. Statements only: the caller batches them.
+     */
+    statusStatements(statuses: WaStatusEvent[]): { kind: WaStatusEvent["status"]; n: number; stmt: D1PreparedStatement }[] {
+      // An unqualified wa_id inside the subselects is the outer (updated) wa_messages row's: json_each has no such column.
+      const ids = "wa_id IN (SELECT json_extract(value, '$[0]') FROM json_each(?2))";
+      const first = (col: string) =>
+        `COALESCE(${col}, (SELECT MIN(json_extract(j.value, '$[1]')) FROM json_each(?2) j WHERE json_extract(j.value, '$[0]') = wa_id))`;
+      const SQL = {
+        delivered: `UPDATE wa_messages SET delivered_at = ${first("delivered_at")} WHERE org_id = ?1 AND ${ids}`,
+        read: `UPDATE wa_messages SET read_at = ${first("read_at")}, delivered_at = ${first("delivered_at")} WHERE org_id = ?1 AND ${ids}`,
+        failed: `UPDATE wa_messages SET status = 'failed',
+                   error = (SELECT json_extract(j.value, '$[1]') FROM json_each(?2) j WHERE json_extract(j.value, '$[0]') = wa_id ORDER BY j.key DESC LIMIT 1)
+                 WHERE org_id = ?1 AND ${ids} RETURNING wa_id`,
+      } as const;
+      const out: { kind: WaStatusEvent["status"]; n: number; stmt: D1PreparedStatement }[] = [];
+      for (const kind of ["delivered", "read", "failed"] as const) {
+        const of = statuses.filter((s) => s.status === kind);
+        if (!of.length) continue;
+        const tuples = of.map((s) => [s.wa_id, kind === "failed" ? (s.error ?? "Not delivered").slice(0, 300) : s.at]);
+        out.push({ kind, n: of.length, stmt: db.prepare(SQL[kind]).bind(orgId, JSON.stringify(tuples)) });
       }
-      for (const phone of new Set(optOutPhones)) out.push(db.prepare("UPDATE customers SET wa_opt_out = 1 WHERE org_id = ? AND phone = ?").bind(orgId, phone));
       return out;
     },
 

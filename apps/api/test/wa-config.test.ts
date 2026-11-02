@@ -1,5 +1,7 @@
 import { env } from "cloudflare:test";
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { fakeServices } from "./fakes";
+import { setServicesForTest } from "../src/core/services";
 import app from "../src/index";
 import { makeOrg, makeUser, loginAs } from "./helpers";
 import { waConfigRepo } from "../src/data/tenant";
@@ -33,6 +35,14 @@ async function setup(slug: string, plan: "pro" | "pro_max" = "pro_max", phoneCou
 const body = (over: Record<string, unknown> = {}) => ({ phone_number_id: "1234567890", waba_id: "98765432100", token: TOKEN, ...over });
 const auditRows = async (orgId: string) =>
   (await env.DB.prepare("SELECT entity, action, actor_name, before, after FROM audit_log WHERE org_id = ? AND entity = 'whatsapp' ORDER BY id").bind(orgId).all<any>()).results;
+
+// Every PUT verifies the token against Graph (M6) through the services seam: a fake that accepts, unless a test says otherwise.
+let f = fakeServices();
+beforeEach(() => {
+  f = fakeServices();
+  f.install();
+});
+afterEach(() => setServicesForTest(null));
 
 describe("PUT/GET/DELETE /api/whatsapp/config", () => {
   it("set then get: never echoes the token; token_enc is encrypted (RF4); audit redacted", async () => {
@@ -159,6 +169,48 @@ describe("PUT/GET/DELETE /api/whatsapp/config", () => {
     // the number is free for another salon now
     const b = await setup("wac-del-b");
     expect((await call("PUT", "/whatsapp/config", b.own, body({ phone_number_id: "20000005" }))).status).toBe(200);
+  });
+});
+
+describe("M6: PUT verifies the token can use the phone number (1 Graph call)", () => {
+  it("success: the check gets the submitted number id and token, then the config is saved", async () => {
+    const a = await setup("wac-m6-ok");
+    const r = await call("PUT", "/whatsapp/config", a.own, body({ phone_number_id: "20000101" }));
+    expect(r.status).toBe(200);
+    expect(f.numberChecks).toHaveLength(1);
+    expect(f.numberChecks[0]).toMatchObject({ phoneNumberId: "20000101", token: TOKEN });
+    expect((await waConfigRepo(env.DB, a.org.id, env.SECRETS_KEY).get())?.phoneNumberId).toBe("20000101");
+  });
+
+  it("failure: 400 'WhatsApp token cannot access this phone number', nothing saved or audited, so the number can't be squatted", async () => {
+    setServicesForTest(null);
+    f = fakeServices({ numberOk: (cfg) => cfg.token === "OWNERtoken" });
+    f.install();
+    const victim = await setup("wac-m6-victim");
+    const squatter = await setup("wac-m6-squat");
+    const r = await call("PUT", "/whatsapp/config", squatter.own, body({ phone_number_id: "20000102", token: "SQUATtoken" }));
+    expect(r.status).toBe(400);
+    expect(await r.json()).toEqual({ error: "WhatsApp token cannot access this phone number" });
+    expect(await env.DB.prepare("SELECT 1 FROM org_whatsapp WHERE org_id = ?").bind(squatter.org.id).first()).toBeNull();
+    expect(await auditRows(squatter.org.id)).toEqual([]);
+    // The real owner's token passes and the number is theirs.
+    expect((await call("PUT", "/whatsapp/config", victim.own, body({ phone_number_id: "20000102", token: "OWNERtoken" }))).status).toBe(200);
+  });
+
+  it("Graph client checkNumber: GET {GRAPH}/{id}?fields=id; true only for 200 with the same id; never throws", async () => {
+    const cfg = { phoneNumberId: "1234567890", wabaId: "1", token: TOKEN, testNumbers: null, callingCode: "971" };
+    const calls: string[] = [];
+    const fake = (status: number, payload: unknown) =>
+      (async (url: string, init: RequestInit) => {
+        calls.push(`${init.method} ${url}`);
+        return new Response(JSON.stringify(payload), { status });
+      }) as unknown as typeof fetch;
+    expect(await graphWaClient(fake(200, { id: "1234567890" })).checkNumber(cfg)).toBe(true);
+    expect(calls).toEqual([`GET ${GRAPH}/1234567890?fields=id`]);
+    expect(await graphWaClient(fake(200, { id: "999" })).checkNumber(cfg)).toBe(false);
+    expect(await graphWaClient(fake(400, { error: { message: "Unsupported get request", code: 100 } })).checkNumber(cfg)).toBe(false);
+    const down = graphWaClient((async () => { throw new Error("network down"); }) as unknown as typeof fetch);
+    expect(await down.checkNumber(cfg)).toBe(false);
   });
 });
 

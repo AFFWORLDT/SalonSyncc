@@ -1,10 +1,12 @@
 import { env } from "cloudflare:test";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import app from "../src/index";
 import { waWebhook } from "../src/integrations/wa-webhook";
 import { makeOrg, makeUser } from "./helpers";
 import { waConfigRepo } from "../src/data/tenant";
 import type { OrgStatus } from "../src/data/platform";
+import { countingDb } from "./counting-db";
+import { invalidateFeatures } from "../src/core/features-cache";
 
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 const SECRET = "test-wa-app-secret";
@@ -145,5 +147,87 @@ describe("POST /api/wa/webhook", () => {
   it("is mounted outside the tenant router and the public rate limiter", () => {
     expect(waWebhook.routes.some((r) => r.method === "GET")).toBe(true);
     expect(waWebhook.routes.some((r) => r.method === "POST")).toBe(true);
+  });
+});
+
+describe("I3: the webhook's statements are capped (45) whatever the payload size; opt-outs go first", () => {
+  afterEach(() => vi.restoreAllMocks());
+  /** `n` sent messages wamid.N<i> in this org. */
+  const sentMessages = (orgId: string, n: number) =>
+    env.DB.prepare(
+      `INSERT INTO wa_messages (org_id, kind, phone, template, status, wa_id, created_at, sent_at)
+       WITH RECURSIVE k(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM k WHERE i < ?2) SELECT ?1, 'bill', '0501234567', 't', 'sent', 'wamid.N' || i, 1, 1 FROM k`,
+    ).bind(orgId, n).run();
+  const counted = async (body: unknown) => {
+    const { db, count } = countingDb(env.DB);
+    const res = await hook(body, { e: { DB: db } });
+    return { res, count };
+  };
+  const st = (i: number, kind: string, ts: number) => ({ id: `wamid.N${i}`, status: kind, timestamp: String(ts), ...(kind === "failed" ? { errors: [{ code: 1, title: `bad ${i}` }] } : {}) });
+
+  it("200 statuses and 3 STOPs: at most 45 statements, all 3 opt-outs recorded, every status applied", async () => {
+    const a = await waOrg("wh-i3-big");
+    for (const p of ["0501110001", "0501110002", "0501110003"]) {
+      await env.DB.prepare("INSERT INTO customers (org_id, name, phone, created_at) VALUES (?, 'C', ?, 1)").bind(a.org.id, p).run();
+    }
+    await sentMessages(a.org.id, 200);
+    invalidateFeatures(a.org.id);
+    const statuses = Array.from({ length: 200 }, (_, i) => st(i + 1, ["delivered", "read", "failed"][i % 3]!, 1_800_000_000 + i));
+    const stops = [stop("971501110001"), stop("971501110002", "unsubscribe"), stop("971501110003")];
+    const { res, count } = await counted(payload(change(a.phoneNumberId, { statuses, messages: stops })));
+    expect(res.status).toBe(200);
+    expect(count.statements, `D1 statements (round trips: ${count.calls})`).toBeLessThanOrEqual(45);
+    const opted = await env.DB.prepare("SELECT COUNT(*) AS n FROM customers WHERE org_id = ? AND wa_opt_out = 1").bind(a.org.id).first<any>();
+    expect(opted.n).toBe(3);
+    const rows = (await env.DB.prepare("SELECT wa_id, status, error, delivered_at, read_at FROM wa_messages WHERE org_id = ? AND wa_id LIKE 'wamid.N%'").bind(a.org.id).all<any>()).results;
+    const by = new Map(rows.map((r) => [r.wa_id, r]));
+    for (let i = 0; i < 200; i++) {
+      const r = by.get(`wamid.N${i + 1}`);
+      const at = (1_800_000_000 + i) * 1000;
+      if (i % 3 === 0) expect(r, `delivered ${i}`).toMatchObject({ status: "sent", delivered_at: at, read_at: null });
+      if (i % 3 === 1) expect(r, `read ${i}`).toMatchObject({ status: "sent", delivered_at: at, read_at: at });
+      if (i % 3 === 2) expect(r, `failed ${i}`).toMatchObject({ status: "failed", error: `bad ${i + 1} (1)` });
+    }
+  });
+
+  it("delivered then read in one payload keeps the earlier delivered_at; duplicates keep the first time", async () => {
+    const a = await waOrg("wh-i3-order");
+    await sentMessages(a.org.id, 1);
+    await hook(payload(change(a.phoneNumberId, { statuses: [st(1, "delivered", 1_800_000_000), st(1, "read", 1_800_000_050), st(1, "delivered", 1_800_000_090)] })));
+    const r = await env.DB.prepare("SELECT delivered_at, read_at FROM wa_messages WHERE org_id = ? AND wa_id = 'wamid.N1'").bind(a.org.id).first<any>();
+    expect(r).toEqual({ delivered_at: 1_800_000_000_000, read_at: 1_800_000_050_000 });
+  });
+
+  it("many orgs in one payload: still at most 45 statements, every opt-out applied first, the dropped status updates logged", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    const orgs = [];
+    for (let i = 0; i < 14; i++) {
+      const o = await waOrg(`wh-i3-many-${i}`);
+      await sentMessages(o.org.id, 3);
+      invalidateFeatures(o.org.id);
+      orgs.push(o);
+    }
+    // Every org gets all three status kinds; the LAST org's change also carries a STOP.
+    const changes = orgs.map((o, i) =>
+      change(o.phoneNumberId, { statuses: [st(1, "delivered", 1_800_000_000), st(2, "read", 1_800_000_000), st(3, "failed", 1_800_000_000)], ...(i === 13 ? { messages: [stop("971501234567")] } : {}) }),
+    );
+    const { res, count } = await counted(payload(...changes));
+    expect(res.status).toBe(200);
+    expect(count.statements, `D1 statements (round trips: ${count.calls})`).toBeLessThanOrEqual(45);
+    expect(await optOut(orgs[13]!.org.id)).toBe(1);
+    expect(err.mock.calls.some((c) => /status updates? dropped/.test(String(c[0])))).toBe(true);
+    // The first orgs' statuses went through.
+    const first = await env.DB.prepare("SELECT delivered_at FROM wa_messages WHERE org_id = ? AND wa_id = 'wamid.N1'").bind(orgs[0]!.org.id).first<any>();
+    expect(first.delivered_at).toBe(1_800_000_000_000);
+  });
+
+  it("M5: a failed status matching no message is warned with its wa_id", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const a = await waOrg("wh-m5");
+    await hook(payload(change(a.phoneNumberId, { statuses: [{ id: "wamid.UNKNOWN", status: "failed", timestamp: "1800000000" }, status("failed")] })));
+    expect((await msg(a.org.id)).status).toBe("failed");
+    const lines = warn.mock.calls.map((c) => c.join(" "));
+    expect(lines.some((l) => l.includes("wamid.UNKNOWN"))).toBe(true);
+    expect(lines.some((l) => l.includes("wamid.SAME"))).toBe(false);
   });
 });

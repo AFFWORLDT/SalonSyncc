@@ -32,6 +32,12 @@ export const originGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
 };
 
 /**
+ * D1 statements tenantAuth costs at most (unmetered, before a route runs): host org 1 + org 1 + user 1 + features 3
+ * on a cold cache (plan features, plan limits, overrides). Routes metering their own work reserve this first.
+ */
+export const TENANT_AUTH_STMTS = 6;
+
+/**
  * Binds the request to exactly one org, taken ONLY from the signed session (and checked against the host).
  * Never reads the org from a query string, header or body.
  */

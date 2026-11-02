@@ -31,15 +31,15 @@ import { computeFeatures } from "../core/features-cache";
 import type { WaConfig } from "../core/services";
 import { waSetup } from "../tenant/whatsapp/ready";
 import { localHour } from "../lib/clock";
-import { meteredEnv } from "../lib/metered";
-import { CAMPAIGN_BATCH, WA_BATCH, drainCampaign, inFeedbackHours, runFeedback, runFeedbackReminders, runReminders, type Budget, type JobPre } from "./wa-jobs";
+import { FREE_STMTS, FREE_SUBREQUESTS, meteredEnv } from "../lib/metered";
+import { CAMPAIGN_BATCH, JOB_FIXED_STMTS, drainCampaign, inFeedbackHours, ratingLimit, reminderLimit, runFeedback, runFeedbackReminders, runReminders, type Budget, type JobPre } from "./wa-jobs";
 import { BARBER_REMINDER_STMTS, SUMMARY_STMTS, pushDueDay, runBarberReminder, runSummary } from "./push-jobs";
 import { PRUNE_STMTS, prune } from "./prune";
 
 /** Outbound subrequests per invocation, across all orgs (D19; the free plan allows 50). */
-export const CRON_BUDGET = 40;
+export const CRON_BUDGET = FREE_SUBREQUESTS;
 /** D1 statements per invocation, across all orgs (the free plan counts each one, ~50; our ceiling). */
-export const CRON_STMTS = 45;
+export const CRON_STMTS = FREE_STMTS;
 /** The cron interval (wrangler.jsonc "*\/10 * * * *"). */
 export const TICK_MS = 600_000;
 export const tickIndex = (at: number): number => Math.floor(at / TICK_MS);
@@ -71,7 +71,6 @@ const CAMPAIGN_FIXED_STMTS = 6;
  * takes a whole tick from the other salons' reminders and ratings: 22 -> 7 sends a tick (6 + 2*7 + 1 = 21).
  */
 const CAMPAIGN_STMT_CAP = Math.floor(CRON_STMTS / 2);
-const JOB_FIXED_STMTS = 3;
 /** The cheapest step's worst case (a rating job with limit 1, WA config loaded): below this nothing more fits. */
 const MIN_STEP_STMTS = JOB_FIXED_STMTS + 1;
 /** job_runs rows newer than this are read with the orgs (a target+1 run is at most ~2 days after its day starts). */
@@ -189,13 +188,14 @@ async function runWaJobs(env: Env, c: OrgCtx, at: number, budget: CronBudget): P
 
   if (s.wa_reminder_enabled && c.hour >= s.wa_reminder_hour) {
     await step("reminders", async () => {
-      const limit = Math.min(WA_BATCH, budget.left, Math.floor((budget.stmts - c.cfgCost() - JOB_FIXED_STMTS) / 2));
+      const limit = reminderLimit(budget, c.cfgCost());
       if (limit >= 1) await runReminders(env, org.id, at, limit, budget, c.pre);
     });
   }
 
-  if (s.wa_feedback_enabled && inFeedbackHours(at, s)) {
-    const limit = () => Math.min(WA_BATCH, budget.left, budget.stmts - c.cfgCost() - JOB_FIXED_STMTS);
+  // Rating requests need `ratings` too (M8): without it the /rate link they carry is a 404.
+  if (s.wa_feedback_enabled && c.features.includes("ratings") && inFeedbackHours(at, s)) {
+    const limit = () => ratingLimit(budget, c.cfgCost());
     await step("rating requests", async () => {
       const l = limit();
       if (l >= 1) await runFeedback(env, org.id, at, l, budget, undefined, c.pre);

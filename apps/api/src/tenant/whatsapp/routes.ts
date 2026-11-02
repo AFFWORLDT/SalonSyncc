@@ -1,16 +1,18 @@
 import { Hono } from "hono";
 import type { WaConfigView } from "@ss/contract";
-import type { AppEnv } from "../../env";
+import type { AppEnv, Env } from "../../env";
 import type { Context } from "hono";
 import { HttpError } from "../../core/errors";
-import { requireFeature } from "../../core/pipeline";
+import { services } from "../../core/services";
+import { requireFeature, TENANT_AUTH_STMTS } from "../../core/pipeline";
 import { forbidden, isAdmin, requireAdmin } from "../../core/roles";
 import { platformRepo } from "../../data/platform";
 import { salesRepo, settingsRepo, waConfigRepo, waMessagesRepo, type WaConfigInput } from "../../data/tenant";
 import { canonicalPhone } from "../../lib/phone";
 import { isBillError, NOT_READY, sendBill } from "./bill";
-import { waReady } from "./ready";
-import { runFeedback, runFeedbackReminders, runReminders, WA_BATCH } from "../../jobs/wa-jobs";
+import { waSetup } from "./ready";
+import { ratingLimit, reminderLimit, runFeedback, runFeedbackReminders, runReminders, type JobPre } from "../../jobs/wa-jobs";
+import { FREE_STMTS, FREE_SUBREQUESTS, meteredEnv } from "../../lib/metered";
 
 /**
  * The salon's own WhatsApp credentials: GET/PUT/DELETE /whatsapp/config. Owner/admin, feature `whatsapp`, gated per
@@ -23,6 +25,7 @@ const bad = (m: string) => new HttpError(400, m);
 const ID_RE = /^\d{5,25}$/;
 const MAX_TEST_NUMBERS = 20;
 const DUPLICATE = "That WhatsApp number is already connected to another salon";
+const NO_ACCESS = "WhatsApp token cannot access this phone number";
 
 /** Parses the PUT body. Error messages never include the submitted token. */
 function parseConfig(b: unknown, callingCode: string): WaConfigInput {
@@ -78,6 +81,9 @@ whatsapp.put("/whatsapp/config", ...gate, async (c) => {
   const input = parseConfig(body, phone_country);
   const owner = await platformRepo(c.env.DB).orgByPhoneNumberId(input.phoneNumberId);
   if (owner && owner.id !== org.id) throw new HttpError(409, DUPLICATE);
+  // M6: prove the token can use this number (1 Graph call) before claiming it, so no salon can squat another's number.
+  const probe = { phoneNumberId: input.phoneNumberId, wabaId: input.wabaId, token: input.token, testNumbers: input.testNumbers, callingCode: phone_country };
+  if (!(await services(c.env).wa.checkNumber(probe))) throw bad(NO_ACCESS);
   const r = await waConfigRepo(c.env.DB, org.id, c.env.SECRETS_KEY).set(input, { id: user.id, name: user.name });
   if (r === "conflict") throw new HttpError(409, DUPLICATE);
   return c.json({ wa_ready: true });
@@ -135,24 +141,39 @@ whatsapp.put("/customers/:id/whatsapp", ...gate, async (c) => {
   return c.json(row);
 });
 
-// ---------- manual job runs (FM routes.ts 1523-1535): admin, feature whatsapp, 40 sends per call, no hour window ----------
+// ---------- manual job runs (FM routes.ts 1523-1535): admin, feature whatsapp, no hour window ----------
+//
+// Free-plan budget (D19), the cron's two counters (jobs/hourly.ts): FREE_SUBREQUESTS Graph sends and FREE_STMTS D1
+// statements per request. tenantAuth's worst case (TENANT_AUTH_STMTS, unmetered) is reserved up front; everything
+// after it runs on meteredEnv, and each job's limit comes from reminderLimit / ratingLimit, so a run never crosses the
+// cap (a D1 "too many queries" mid-loop would lose the log row of a sent message and strand the claimed rows).
+// Worst case: auth 6 + WA config 1 + settings 1 + reminders 3 + 2*17 = 45; feedback: 6 + 2 + (3 + L1) + (3 + L2) <= 45.
 
-const requireReady = async (c: Context<AppEnv>) => {
-  if (!(await waReady(c, c.var.tenant.org))) throw new HttpError(409, NOT_READY, "wa_not_ready");
-};
+/** The metered env and budget of one manual run, and the jobs' `pre` (WA config, settings); 409 when not WA-ready. */
+async function manualRun(c: Context<AppEnv>): Promise<{ env: Env; budget: { left: number; stmts: number }; pre: JobPre }> {
+  const budget = { left: FREE_SUBREQUESTS, stmts: FREE_STMTS - TENANT_AUTH_STMTS };
+  const env = meteredEnv(c.env, budget);
+  const { org, features } = c.var.tenant;
+  const cfg = await waSetup(env, org, features);
+  if (!cfg) throw new HttpError(409, NOT_READY, "wa_not_ready");
+  const s = await settingsRepo(env.DB, org.id).get();
+  return { env, budget, pre: { s, cfg: async () => cfg } };
+}
 
 /** Due visit reminders now (like FM, regardless of wa_reminder_enabled / wa_reminder_hour). */
 whatsapp.post("/wa/reminders/run", ...gate, async (c) => {
-  await requireReady(c);
-  return c.json(await runReminders(c.env, c.var.tenant.org.id, Date.now(), WA_BATCH, { left: WA_BATCH }));
+  const { env, budget, pre } = await manualRun(c);
+  return c.json(await runReminders(env, c.var.tenant.org.id, Date.now(), reminderLimit(budget), budget, pre));
 });
 
-/** Due rating requests, then due rating reminders, sharing one 40-send budget, as one tally (FM order). */
+/** Due rating requests, then due rating reminders, sharing one budget, as one tally (FM order). */
 whatsapp.post("/wa/feedback/run", ...gate, async (c) => {
-  await requireReady(c);
+  const { env, budget, pre } = await manualRun(c);
   const orgId = c.var.tenant.org.id;
-  const budget = { left: WA_BATCH };
-  const a = await runFeedback(c.env, orgId, Date.now(), WA_BATCH, budget);
-  const b = await runFeedbackReminders(c.env, orgId, Date.now(), WA_BATCH, budget);
+  // M8: rating messages carry the /rate link, which is a 404 without `ratings`: nothing to send then.
+  if (!c.var.tenant.features.includes("ratings")) return c.json({ due: 0, sent: 0, failed: 0, skipped: 0 });
+  const a = await runFeedback(env, orgId, Date.now(), ratingLimit(budget), budget, undefined, pre);
+  const l = ratingLimit(budget);
+  const b = l >= 1 ? await runFeedbackReminders(env, orgId, Date.now(), l, budget, pre) : { due: 0, sent: 0, failed: 0, skipped: 0 };
   return c.json({ due: a.due + b.due, sent: a.sent + b.sent, failed: a.failed + b.failed, skipped: a.skipped + b.skipped });
 });

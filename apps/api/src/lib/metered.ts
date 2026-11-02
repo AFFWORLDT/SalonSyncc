@@ -7,6 +7,14 @@
  * here before a cron path uses it.
  */
 
+/**
+ * Our per-invocation ceilings on the Workers free plan (50 subrequests, 50 D1 statements; headroom kept). The cron
+ * (jobs/hourly.ts) and every HTTP route that sends in a loop (manual WhatsApp job runs, campaign /next, the webhook)
+ * share these two counters' sizes.
+ */
+export const FREE_SUBREQUESTS = 40;
+export const FREE_STMTS = 45;
+
 const REAL = Symbol("metered-real");
 const STATEMENT_OK = new Set<PropertyKey>(["bind", "first", "all", "run", "raw"]);
 const unmetered = (p: PropertyKey) => {

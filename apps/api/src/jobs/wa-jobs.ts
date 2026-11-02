@@ -19,7 +19,8 @@
  * Opted-out customers are excluded by the due queries (RF3); a phone outside the org's test list is logged "skipped"
  * without a Graph call (and without spending budget).
  * The claims (wa_reminded_at, wa_feedback_at, wa_feedback_reminded_at) are stamped with the run time `at`.
- * Like FM, the jobs don't check wa_*_enabled or the hour (the cron does, Task 11; the manual run routes don't).
+ * Like FM, the jobs don't check wa_*_enabled or the hour (the cron does, Task 11; the manual run routes don't). Callers
+ * size `limit` with reminderLimit / ratingLimit from a metered budget (lib/metered): the cron and the manual routes.
  */
 import type { Settings, WaCampaign, WaParam, WaReminderRun } from "@ss/contract";
 import type { Env } from "../env";
@@ -31,8 +32,17 @@ import { allowedRecipient, bodyParams, firstName, visitTime, type WaValue } from
 import { waSetup } from "../tenant/whatsapp/ready";
 import { featuresFor } from "../core/features-cache";
 
-/** FM's batch: interactive runs (manual routes) send at most 40. */
+/** FM's batch: at most 40 sends per job run (the cron and the manual routes cap it further by statements). */
 export const WA_BATCH = 40;
+
+/** A job run's fixed worst-case statements with `pre` (due list 1, claim 1, release 1 on a budget stop). */
+export const JOB_FIXED_STMTS = 3;
+type Counters = { left: number; stmts: number };
+/** Visit reminders that fit both counters: 3 + 2L statements (a failed send also releases its claim), `extra` reserved. */
+export const reminderLimit = (b: Counters, extra = 0): number =>
+  Math.max(0, Math.min(WA_BATCH, b.left, Math.floor((b.stmts - extra - JOB_FIXED_STMTS) / 2)));
+/** Rating requests or rating reminders that fit both counters: 3 + L statements, `extra` reserved. */
+export const ratingLimit = (b: Counters, extra = 0): number => Math.max(0, Math.min(WA_BATCH, b.left, b.stmts - extra - JOB_FIXED_STMTS));
 const DAY_MS = 86_400_000;
 const RECENT_MS = 20 * 3_600_000;
 
@@ -45,7 +55,8 @@ export function inFeedbackHours(at: number, s: Pick<Settings, "timezone" | "day_
 
 /**
  * Shared per-run budget: `left` = outbound Graph/FCM calls (decremented before each one). `stmts` = D1 statements
- * left, set only by the cron and decremented by lib/metered.ts (the jobs never read it; the cron sizes `limit` from it).
+ * left, set by the cron and the HTTP routes that run jobs, decremented by lib/metered.ts (the jobs never read it; the
+ * callers size `limit` from it).
  */
 export type Budget = { left: number; stmts?: number };
 
@@ -224,6 +235,8 @@ export async function runFeedbackReminders(env: Env, orgId: string, at: number, 
  * about 11 + 2N statements (N sends), so N = 15 is about 41. Free-plan limit: raise on upgrade.
  */
 export const CAMPAIGN_BATCH = 15;
+/** drainCampaign's fixed worst-case statements when given `pre.row` and `pre.cfg`: claim 2, finish 1, view 1, release 1. */
+export const DRAIN_FIXED_STMTS = 5;
 
 /**
  * Sends the next batch of one campaign of org `orgId` (FM wa-jobs drainCampaign): POST /api/wa/campaigns/:id/next

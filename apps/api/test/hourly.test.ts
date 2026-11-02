@@ -286,6 +286,19 @@ describe("hourly cron: WhatsApp jobs", () => {
     expect(f.wa).toHaveLength(0);
   });
 
+  it("M8: rating requests and reminders need the ratings feature too (whatsapp alone: none; visit reminders still go)", async () => {
+    install();
+    const a = await salon("cr-no-ratings");
+    await env.DB.prepare("INSERT INTO org_feature_overrides (org_id, feature_key, enabled, set_at) VALUES (?, 'ratings', 0, 1)").bind(a.org.id).run();
+    invalidateFeatures(a.org.id);
+    await dueReminders(a.org.id, 1, Date.UTC(2026, 10, 20, 3, 0));
+    await set(a.org.id, "wa_feedback_enabled = 1, wa_feedback_delay_min = 0, wa_feedback_reminder_min = 0");
+    const c = await env.DB.prepare("INSERT INTO customers (org_id, name, phone, created_at) VALUES (?, 'Rated', '+971500000998', 1) RETURNING id").bind(a.org.id).first<{ id: number }>();
+    await sale(a.org.id, a.b1.id, "2026-11-20", 2000, { customerId: c!.id, createdAt: Date.UTC(2026, 10, 20, 3, 0) });
+    await tick(Date.UTC(2026, 10, 20, 7, 0)); // 11:00 Dubai: inside FEEDBACK_HOURS
+    expect(f.wa.map((s) => s.template)).toEqual(["ss_fresh_cut"]);
+  });
+
   it("one org throwing does not stop the next", async () => {
     const at0 = Date.UTC(2026, 10, 20, 8, 10);
     const bad = await salon("cr-bad");

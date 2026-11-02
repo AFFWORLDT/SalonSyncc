@@ -78,6 +78,15 @@ export function graphWaClient(fetchFn: typeof fetch = (...a) => fetch(...a)): Wa
       }
     },
 
+    async checkNumber(cfg): Promise<boolean> {
+      try {
+        const data = await call<{ id?: string }>(cfg, `${encodeURIComponent(cfg.phoneNumberId)}?fields=id`);
+        return data.id === cfg.phoneNumberId;
+      } catch {
+        return false; // a Graph or network failure: not proven (the message may carry the token, so it is not passed on)
+      }
+    },
+
     uploadMedia: (cfg, file) =>
       admin(cfg, async () => {
         const form = new FormData();

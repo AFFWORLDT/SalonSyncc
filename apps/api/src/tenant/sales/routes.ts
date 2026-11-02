@@ -184,7 +184,7 @@ sales.post("/", async (c) => {
   }
 
   refreshStats(c, [sale.customer_id]);
-  runHook(c, "afterSale", () => hooks.afterSale(c, sale));
+  runHook(c, "afterSale", () => hooks.afterSale(c, sale, settings));
   return c.json(sale, 201);
 });
 
@@ -260,7 +260,7 @@ sales.put("/:id", async (c) => {
   if (!updated) throw new HttpError(404, "Not found"); // deleted right after our write
   refreshStats(c, [updated.customer_id, updated.customer_id !== sale.customer_id ? sale.customer_id : null]);
   // Only reached when the guarded write took effect (a lost race threw 404/409 above).
-  runHook(c, "afterSaleEdit", () => hooks.afterSaleEdit(c, sale, updated));
+  runHook(c, "afterSaleEdit", () => hooks.afterSaleEdit(c, sale, updated, settings));
   return c.json(updated);
 });
 

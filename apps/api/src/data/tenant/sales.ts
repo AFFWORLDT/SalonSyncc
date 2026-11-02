@@ -108,6 +108,15 @@ export function saleSnapshot(s: Omit<Sale, "id" | "token" | "bill_no" | "created
 }
 
 /** Every query here is scoped by org_id; test/sql-guard.test.ts enforces it. */
+/**
+ * A bill's lines go in with ONE statement (free plan: every statement counts, I4; a 30-line bill was 30), from a JSON
+ * array of [service_id, name, price, qty] in bill order (ORDER BY j.key keeps the item ids in that order).
+ */
+const ITEM_COLS = "json_extract(j.value, '$[0]'), json_extract(j.value, '$[1]'), json_extract(j.value, '$[2]'), json_extract(j.value, '$[3]')";
+/** Binds: org, sale id, the items JSON (then the caller's WHERE binds). */
+const ITEMS_FROM_JSON = `SELECT ?, ?, ${ITEM_COLS} FROM json_each(?) j`;
+const itemsJson = (items: SaleItem[]) => JSON.stringify(items.map((i) => [i.service_id, i.name, i.price, i.qty]));
+
 export function salesRepo(db: D1Database, orgId: string) {
   const audit = auditRepo(db, orgId);
   const ledger = ledgerRepo(db, orgId);
@@ -204,11 +213,13 @@ export function salesRepo(db: D1Database, orgId: string) {
           )
           .bind(e.day, e.barber.id, ...cust.binds, e.customer_label, e.amount, e.payment_mode, e.note, e.commission_pct, e.commission, e.vat_amount, at, orgId, old.id, old.updated_at),
         db.prepare(`DELETE FROM sale_items WHERE org_id = ? AND sale_id = ? AND ${g.sql}`).bind(orgId, old.id, ...g.binds),
-        ...e.items.map((i) =>
-          db
-            .prepare(`INSERT INTO sale_items (org_id, sale_id, service_id, name, price, qty) SELECT ?, ?, ?, ?, ?, ? WHERE ${g.sql}`)
-            .bind(orgId, old.id, i.service_id, i.name, i.price, i.qty, ...g.binds),
-        ),
+        ...(e.items.length
+          ? [
+              db
+                .prepare(`INSERT INTO sale_items (org_id, sale_id, service_id, name, price, qty) ${ITEMS_FROM_JSON} WHERE ${g.sql} ORDER BY j.key`)
+                .bind(orgId, old.id, itemsJson(e.items), ...g.binds),
+            ]
+          : []),
         audit.stmt({ actor, entity: "sale", entityId: old.id, ref: old.bill_no, action: "update", when: g, before: saleSnapshot(prev), after: saleSnapshot(next) }),
       );
       if (needsRepost(oldLines, newLines)) {
@@ -269,13 +280,16 @@ export function salesRepo(db: D1Database, orgId: string) {
             orgId, n.bill_no, randomToken(12), n.day, n.barber.id, ...cust.binds, n.customer_label, n.amount, n.payment_mode, n.note,
             n.commission_pct, n.commission, n.vat_rate, n.vat_amount, actor.id, at, at,
           ),
-        ...n.items.map((i) =>
-          db
-            .prepare(
-              "INSERT INTO sale_items (org_id, sale_id, service_id, name, price, qty) VALUES (?, (SELECT id FROM sales WHERE org_id = ? AND bill_no = ?), ?, ?, ?, ?)",
-            )
-            .bind(orgId, orgId, n.bill_no, i.service_id, i.name, i.price, i.qty),
-        ),
+        ...(n.items.length
+          ? [
+              db
+                .prepare(
+                  `INSERT INTO sale_items (org_id, sale_id, service_id, name, price, qty)
+                   SELECT ?, (SELECT id FROM sales WHERE org_id = ? AND bill_no = ?), ${ITEM_COLS} FROM json_each(?) j ORDER BY j.key`,
+                )
+                .bind(orgId, orgId, n.bill_no, itemsJson(n.items)),
+            ]
+          : []),
         audit.stmt({ actor, entity: "sale", entityId: saleId, ref: n.bill_no, action: "create", before: null, after: snapshot }),
         ...ledger.postStmts(
           "sale",
