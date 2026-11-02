@@ -75,6 +75,8 @@ export interface MeResponse {
   subscription: { status: string; planId: string; trialEndsAt: number | null; graceEndsAt: number | null };
   brand: { name: string };
   today: string; // business day (YYYY-MM-DD) in the org timezone
+  /** Support mode: a SalonKit support person is signed in as the owner (2 hours, audited). */
+  support?: boolean;
 }
 
 /**

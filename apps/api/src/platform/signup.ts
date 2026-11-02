@@ -15,6 +15,7 @@ import { billPrefixFor, countryDefaults } from "../lib/countries";
 import { SIGNUP_PER_HOUR, hourWindow } from "../lib/limits";
 import { auth } from "./auth";
 import { welcomeEmail } from "../emails/welcome";
+import { sha256 } from "../lib/hash";
 
 const DAY = 86_400_000;
 export const TRIAL_DAYS = 7;
@@ -34,10 +35,6 @@ export function ipKey(raw: string): string {
 const bad = (m: string) => new HttpError(400, m);
 const ip = (c: Context<AppEnv>) => c.req.header("CF-Connecting-IP") ?? "unknown";
 
-async function sha256(s: string): Promise<string> {
-  const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 /** GET /api/public/slug?s= — is this salon ID free? { slug, available, reason? } */
 publicApi.get("/slug", publicRateLimit("slug"), async (c) => {

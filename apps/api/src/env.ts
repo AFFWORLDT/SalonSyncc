@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import type { FeatureKey } from "@ss/features";
 import type { Org } from "./data/platform";
 import type { UserRow, tenantRepo } from "./data/tenant";
+import type { PlatformUser } from "./data/admin";
 
 export interface Env {
   DB: D1Database;
@@ -38,7 +39,9 @@ export interface TenantContext {
   repo: ReturnType<typeof tenantRepo>;
   features: FeatureKey[];
   limits: { max_staff: number | null };
+  /** Support mode: the platform user signed in as this salon's owner (null for a normal session). */
+  supportBy: number | null;
 }
 
-export type AppEnv = { Bindings: Env; Variables: { tenant: TenantContext } };
+export type AppEnv = { Bindings: Env; Variables: { tenant: TenantContext; platform: PlatformUser } };
 export type App = Hono<AppEnv>;

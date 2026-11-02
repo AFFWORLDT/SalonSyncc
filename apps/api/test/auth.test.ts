@@ -205,6 +205,8 @@ describe("auth", () => {
       "POST /api/public/signup",
       "GET /api/wa/webhook",
       "POST /api/wa/webhook",
+      // The super admin panel signs out without a session (it only clears its cookie); its other routes need ss_platform.
+      "POST /api/platform/logout",
     ]);
     const key = (r: (typeof api)[number]) => `${r.method} ${r.path}`;
     const registered = new Set(api.map(key));

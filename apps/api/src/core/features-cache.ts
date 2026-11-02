@@ -8,10 +8,15 @@ export interface OrgFeatures {
 }
 
 const TTL_MS = 60_000;
-const cache = new Map<string, { at: number; status: string; planId: string; value: OrgFeatures }>();
+const cache = new Map<string, { at: number; status: string; planId: string; lim: string; value: OrgFeatures }>();
 
 export function invalidateFeatures(orgId: string): void {
   cache.delete(orgId);
+}
+
+/** After a plan matrix change every org on this isolate re-reads its features (others within the 60 s TTL). */
+export function invalidateAllFeatures(): void {
+  cache.clear();
 }
 
 /**
@@ -26,6 +31,8 @@ export function computeFeatures(org: Org, planFeatures: string[], planLimits: Li
     features = trial.features.filter((f) => !TRIAL_EXCLUDED.includes(f));
     limits = { ...trial.limits };
   }
+  // The super admin's per-salon limits override wins over the plan (and the trial).
+  if (org.limitsOverride) limits = { ...org.limitsOverride };
   return {
     features: Object.freeze(effectiveFeatures(features, overrides)) as FeatureKey[],
     limits: Object.freeze(limits),
@@ -34,7 +41,7 @@ export function computeFeatures(org: Org, planFeatures: string[], planLimits: Li
 
 export async function featuresFor(db: D1Database, org: Org): Promise<OrgFeatures> {
   const hit = cache.get(org.id);
-  if (hit && Date.now() - hit.at < TTL_MS && hit.status === org.status && hit.planId === org.planId) return hit.value;
+  if (hit && Date.now() - hit.at < TTL_MS && hit.status === org.status && hit.planId === org.planId && hit.lim === JSON.stringify(org.limitsOverride ?? null)) return hit.value;
 
   const platform = platformRepo(db);
   let planFeatures: string[] = [];
@@ -44,6 +51,6 @@ export async function featuresFor(db: D1Database, org: Org): Promise<OrgFeatures
 }
 
 function prime(org: Org, value: OrgFeatures): OrgFeatures {
-  cache.set(org.id, { at: Date.now(), status: org.status, planId: org.planId, value });
+  cache.set(org.id, { at: Date.now(), status: org.status, planId: org.planId, lim: JSON.stringify(org.limitsOverride ?? null), value });
   return value;
 }

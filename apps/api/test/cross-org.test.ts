@@ -50,7 +50,7 @@ describe("cross-org registry coverage", () => {
       r.path.startsWith("/api/public/") &&
       publicApi.routes.some((p) => p.handler === r.handler && p.method === r.method && `/api/public${p.path === "/*" ? "/*" : p.path}` === r.path);
     const tenant = app.routes.filter(
-      (r) => r.path.startsWith("/api") && r.handler !== guard && r.path !== "/api/health" && !r.path.startsWith("/api/auth/") && !isPublic(r) && r.path.includes("/:"),
+      (r) => r.path.startsWith("/api") && r.handler !== guard && r.path !== "/api/health" && !r.path.startsWith("/api/auth/") && !r.path.startsWith("/api/platform/") && !isPublic(r) && r.path.includes("/:"),
     );
     expect(tenant.length).toBeGreaterThan(10);
     const names = new Set(CASES.map((c) => c.name));

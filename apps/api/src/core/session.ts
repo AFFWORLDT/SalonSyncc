@@ -11,14 +11,18 @@ export interface SessionPayload {
   orgId: string;
   v: number;
   exp: number; // ms
+  /** Support mode: the platform user who is signed in as this salon's owner (2-hour session, red banner). */
+  sp?: number;
 }
 
 const cookieOpts = { httpOnly: true, secure: true, sameSite: "Lax", path: "/" } as const;
 
-export async function issueSession(c: Context<AppEnv>, p: Omit<SessionPayload, "exp">): Promise<void> {
-  const exp = Date.now() + SESSION_MS;
-  const token = await sign({ uid: p.uid, orgId: p.orgId, v: p.v, exp } satisfies SessionPayload, c.env.SESSION_SECRET);
-  setCookie(c, COOKIE, token, { ...cookieOpts, maxAge: SESSION_MS / 1000 });
+export async function issueSession(c: Context<AppEnv>, p: Omit<SessionPayload, "exp">, ttlMs = SESSION_MS): Promise<void> {
+  const exp = Date.now() + ttlMs;
+  const payload: SessionPayload = { uid: p.uid, orgId: p.orgId, v: p.v, exp };
+  if (p.sp !== undefined) payload.sp = p.sp;
+  const token = await sign(payload, c.env.SESSION_SECRET);
+  setCookie(c, COOKIE, token, { ...cookieOpts, maxAge: Math.floor(ttlMs / 1000) });
 }
 
 export async function readSession(c: Context<AppEnv>): Promise<SessionPayload | null> {
@@ -33,7 +37,9 @@ export async function readSession(c: Context<AppEnv>): Promise<SessionPayload | 
     !Number.isInteger(p.uid) || typeof p.orgId !== "string" || !p.orgId ||
     !Number.isInteger(p.v) || typeof p.exp !== "number" || !(p.exp >= Date.now())
   ) return null;
-  return { uid: p.uid!, orgId: p.orgId, v: p.v!, exp: p.exp };
+  const out: SessionPayload = { uid: p.uid!, orgId: p.orgId, v: p.v!, exp: p.exp };
+  if (Number.isInteger(p.sp)) out.sp = p.sp;
+  return out;
 }
 
 export function clearSession(c: Context<AppEnv>): void {

@@ -75,7 +75,7 @@ export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   }
 
   const { features, limits } = await featuresFor(c.env.DB, org);
-  c.set("tenant", { org, user, repo, features, limits });
+  c.set("tenant", { org, user, repo, features, limits, supportBy: session.sp ?? null });
   await next();
 };
 

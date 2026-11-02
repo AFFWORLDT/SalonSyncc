@@ -12,6 +12,8 @@ export interface Org {
   planId: PlanId;
   trialEndsAt: number | null;
   graceEndsAt: number | null;
+  /** Super admin override of the plan's limits (orgs.limits_override_json); null/absent = the plan's. */
+  limitsOverride?: { max_staff: number | null } | null;
 }
 
 interface OrgRow {
@@ -22,6 +24,7 @@ interface OrgRow {
   plan_id: PlanId;
   trial_ends_at: number | null;
   grace_ends_at: number | null;
+  limits_override_json?: string | null;
 }
 
 const toOrg = (r: OrgRow): Org => ({
@@ -32,9 +35,10 @@ const toOrg = (r: OrgRow): Org => ({
   planId: r.plan_id,
   trialEndsAt: r.trial_ends_at,
   graceEndsAt: r.grace_ends_at,
+  limitsOverride: r.limits_override_json ? parseLimits(r.limits_override_json) : null,
 });
 
-const ORG_COLS = "id, slug, name, status, plan_id, trial_ends_at, grace_ends_at";
+const ORG_COLS = "id, slug, name, status, plan_id, trial_ends_at, grace_ends_at, limits_override_json";
 
 /** Org statuses the cron serves (expired, deactivated and deleted orgs are skipped). */
 export const CRON_STATUSES = ["trial", "active", "grace", "past_due"] as const satisfies readonly OrgStatus[];
@@ -83,7 +87,7 @@ export interface WebhookOrg {
  * subselect and the settings join are tied to the outer org row's id. Ordered by id for the cron's rotation.
  */
 const CRON_ORGS_SQL = `SELECT o.id AS o_id, o.slug AS slug, o.name AS o_name, o.status AS o_status, o.plan_id AS o_plan,
-       o.trial_ends_at AS o_trial, o.grace_ends_at AS o_grace,
+       o.trial_ends_at AS o_trial, o.grace_ends_at AS o_grace, o.limits_override_json AS o_limits,
        ${SETTINGS_COLS.split(", ").map((c) => `st.${c.trim()}`).join(", ")},
        (SELECT v FROM org_assets WHERE org_id = o.id AND kind = 'logo') AS logo_v,
        EXISTS (SELECT 1 FROM org_whatsapp WHERE org_id = o.id) AS has_wa,
@@ -115,7 +119,7 @@ export function platformRepo(db: D1Database) {
     async orgBySaleToken(token: string): Promise<Org | null> {
       const r = await db
         .prepare(
-          `SELECT o.id, o.slug, o.name, o.status, o.plan_id, o.trial_ends_at, o.grace_ends_at
+          `SELECT o.id, o.slug, o.name, o.status, o.plan_id, o.trial_ends_at, o.grace_ends_at, o.limits_override_json
            FROM sales s JOIN orgs o ON o.id = s.org_id WHERE s.token = ? AND s.deleted_at IS NULL`,
         )
         .bind(token)
@@ -129,7 +133,7 @@ export function platformRepo(db: D1Database) {
     async orgByPhoneNumberId(phoneNumberId: string): Promise<Org | null> {
       const r = await db
         .prepare(
-          `SELECT o.id, o.slug, o.name, o.status, o.plan_id, o.trial_ends_at, o.grace_ends_at
+          `SELECT o.id, o.slug, o.name, o.status, o.plan_id, o.trial_ends_at, o.grace_ends_at, o.limits_override_json
            FROM org_whatsapp w JOIN orgs o ON o.id = w.org_id WHERE w.phone_number_id = ?`,
         )
         .bind(phoneNumberId)
@@ -144,7 +148,7 @@ export function platformRepo(db: D1Database) {
     async webhookOrg(phoneNumberId: string): Promise<WebhookOrg | null> {
       const r = await db
         .prepare(
-          `SELECT o.id, o.slug, o.name, o.status, o.plan_id, o.trial_ends_at, o.grace_ends_at,
+          `SELECT o.id, o.slug, o.name, o.status, o.plan_id, o.trial_ends_at, o.grace_ends_at, o.limits_override_json,
              (SELECT phone_country FROM org_settings WHERE org_id = o.id) AS cc,
              (SELECT json_group_array(feature_key) FROM plan_features WHERE plan_id = o.plan_id) AS plan_features,
              (SELECT limits_json FROM plans WHERE id = o.plan_id) AS limits_json,
@@ -180,7 +184,7 @@ export function platformRepo(db: D1Database) {
     async cronOrgs(since: number): Promise<CronOrg[]> {
       const { results } = await db.prepare(CRON_ORGS_SQL).bind(since).all<Record<string, any>>();
       return results.map((r) => ({
-        org: toOrg({ id: r.o_id, slug: r.slug, name: r.o_name, status: r.o_status, plan_id: r.o_plan, trial_ends_at: r.o_trial, grace_ends_at: r.o_grace }),
+        org: toOrg({ id: r.o_id, slug: r.slug, name: r.o_name, status: r.o_status, plan_id: r.o_plan, trial_ends_at: r.o_trial, grace_ends_at: r.o_grace, limits_override_json: r.o_limits }),
         settings: toSettings(r),
         hasWa: r.has_wa === 1,
         openCampaign: r.open_campaign ?? null,
