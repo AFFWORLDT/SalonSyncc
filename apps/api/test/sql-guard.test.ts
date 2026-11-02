@@ -27,6 +27,10 @@ it("every tenant table has a checked statement somewhere", () => {
   // login_failures has no repo statement yet (added with the login rate limiter); add it here then.
   // Tables added by later tasks get their repo statements in their own task; they are listed here as they gain one.
   const pending = ["login_failures", "services", "audit_log"];
+  // Pending tables must really have no statement yet; once a task adds SQL for one, remove it from `pending`.
+  for (const t of pending) {
+    expect(stmts.some((s) => new RegExp(`\\b${t}\\b`, "i").test(s)), `${t} now has statements: remove it from pending`).toBe(false);
+  }
   for (const t of TENANT_TABLES.filter((t) => !pending.includes(t))) {
     expect(stmts.some((s) => new RegExp(`\\b${t}\\b`, "i").test(s)), `no statement checked for ${t}`).toBe(true);
   }

@@ -18,21 +18,24 @@ async function runCase(fetcher: Fetcher, c: CrossOrgCase): Promise<string[]> {
   await makeUser(a.id, { username: "own" });
   await makeUser(b.id, { username: "own" });
   const id = await c.seed(a.id);
-  const before = c.read ? JSON.stringify(await c.read(a.id, id)) : null;
+  const before = JSON.stringify(await c.read(a.id, id));
   const cookie = await loginAs(b.slug, "own");
-  const res = await fetcher(
-    new Request(`https://x.test${c.path(id)}`, {
-      method: c.method,
-      headers: { cookie, ...(c.body !== undefined ? { "content-type": "application/json" } : {}) },
-      body: c.body !== undefined ? JSON.stringify(c.body) : undefined,
-    }),
-  );
+  const call = (ck: string) =>
+    fetcher(
+      new Request(`https://x.test${c.path(id)}`, {
+        method: c.method,
+        headers: { cookie: ck, ...(c.body !== undefined ? { "content-type": "application/json" } : {}) },
+        body: c.body !== undefined ? JSON.stringify(c.body) : undefined,
+      }),
+    );
+  const res = await call(cookie);
   const problems: string[] = [];
   if (res.status !== 404) problems.push(`${c.name}: expected 404, got ${res.status}`);
-  if (c.read) {
-    const after = JSON.stringify(await c.read(a.id, id));
-    if (after !== before) problems.push(`${c.name}: org A's row changed`);
-  }
+  const after = JSON.stringify(await c.read(a.id, id));
+  if (after !== before) problems.push(`${c.name}: org A's row changed`);
+  // Positive control: the owning org must not get 404, so a mistyped path/method cannot pass vacuously.
+  const own = await call(await loginAs(a.slug, "own"));
+  if (own.status === 404) problems.push(`${c.name}: positive control got 404 for org A's own owner (bad path/method?)`);
   return problems;
 }
 
@@ -88,5 +91,10 @@ describe("cross-org isolation harness", () => {
 
   it("passes for a properly scoped route", async () => {
     expect(await runCase(mk(false), selfCase)).toEqual([]);
+  });
+
+  it("fails when the positive control 404s (mistyped path)", async () => {
+    const problems = await runCase(mk(false), { ...selfCase, path: (id) => `/api/svcs/${id}` });
+    expect(problems.some((p) => /positive control got 404/.test(p))).toBe(true);
   });
 });
