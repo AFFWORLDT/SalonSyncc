@@ -78,7 +78,8 @@ export function adminRepo(db: D1Database) {
       ]);
     },
     async deleteUser(id: number, a: AuditInput): Promise<boolean> {
-      const [del] = await db.batch([db.prepare("DELETE FROM platform_users WHERE id = ?").bind(id), audit(a)]);
+      // Their support codes go too (they reference the user); platform_audit keeps the history.
+      const [, del] = await db.batch([db.prepare("DELETE FROM support_sessions WHERE platform_user_id = ?").bind(id), db.prepare("DELETE FROM platform_users WHERE id = ?").bind(id), audit(a)]);
       return (del!.meta.changes ?? 0) > 0;
     },
     /** New password and a bumped session_version (signs every other device out). Returns the new version. */

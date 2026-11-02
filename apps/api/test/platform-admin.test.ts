@@ -272,3 +272,52 @@ describe("plans, users, audit, overview", () => {
     expect((await req("GET", `${ADMIN}/api/platform/orgs`)).status).toBe(401);
   });
 });
+
+describe("review fixes", () => {
+  async function supportCookie(slug: string, pidEmail: string) {
+    const org = await makeOrg({ slug });
+    await makeUser(org.id, { username: "own" });
+    const ownerId = (await env.DB.prepare("SELECT id FROM users WHERE org_id = ? AND username = 'own'").bind(org.id).first<{ id: number }>())!.id;
+    await env.DB.prepare("UPDATE orgs SET owner_user_id = ? WHERE id = ?").bind(ownerId, org.id).run();
+    await makePlatformUser(pidEmail, "support");
+    const pc = await platformLogin(pidEmail);
+    const r = (await (await P("POST", `/orgs/${org.id}/support`, pc)).json()) as { url: string };
+    const ok = await req("POST", `https://${slug}.salonkit.online/api/auth/support`, { code: decodeURIComponent(r.url.split("support=")[1]!) });
+    expect(ok.status).toBe(200);
+    return { cookie: cookieOf(ok), email: pidEmail };
+  }
+  const salonMe = (slug: string, cookie: string) => req("GET", `https://${slug}.salonkit.online/api/me`, undefined, { cookie });
+
+  it("a support user who opened codes can be removed, and their support sessions end", async () => {
+    const s = await supportCookie("rm-helper", "rm@salonkit.test");
+    expect((await salonMe("rm-helper", s.cookie)).status).toBe(200);
+    const users = (await (await P("GET", "/users", owner)).json()) as { id: number; email: string }[];
+    const u = users.find((x) => x.email === s.email)!;
+    expect((await P("DELETE", `/users/${u.id}`, owner)).status).toBe(200);
+    expect((await salonMe("rm-helper", s.cookie)).status).toBe(401);
+  });
+
+  it("a platform password change ends that person's support sessions", async () => {
+    const s = await supportCookie("pw-helper", "pwh@salonkit.test");
+    await env.DB.prepare("UPDATE platform_users SET session_version = session_version + 1 WHERE email = ?").bind(s.email).run();
+    expect((await salonMe("pw-helper", s.cookie)).status).toBe(401);
+  });
+
+  it("support codes are not exchanged on the apex host", async () => {
+    const org = await makeOrg({ slug: "apex-no" });
+    const u = await makeUser(org.id, { username: "own" });
+    await env.DB.prepare("UPDATE orgs SET owner_user_id = ? WHERE id = ?").bind(u.id, org.id).run();
+    const r = (await (await P("POST", `/orgs/${org.id}/support`, owner)).json()) as { url: string };
+    const code = decodeURIComponent(r.url.split("support=")[1]!);
+    expect((await req("POST", "https://salonkit.online/api/auth/support", { code, org: "apex-no" })).status).toBe(401);
+  });
+
+  it("bulk audits only the salons it changed", async () => {
+    const a = await makeOrg({ slug: "bulk-real", status: "expired" });
+    const gone = await makeOrg({ slug: "bulk-gone", status: "deleted" });
+    const r = (await (await P("POST", "/orgs/bulk", owner, { ids: [a.id, gone.id, "org_nope"], action: "deactivate" })).json()) as { changed: number };
+    expect(r.changed).toBe(1);
+    const n = await env.DB.prepare("SELECT org_id FROM platform_audit WHERE org_id IN (?, ?, 'org_nope') AND action = 'deactivate'").bind(a.id, gone.id).all<any>();
+    expect(n.results.map((x: any) => x.org_id)).toEqual([a.id]);
+  });
+});

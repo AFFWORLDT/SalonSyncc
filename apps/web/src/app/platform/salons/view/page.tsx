@@ -95,12 +95,17 @@ function Detail({ id }: { id: string }) {
   }
 
   async function support() {
+    // Open the tab inside the click (popup blockers allow that), then point it at the link once it arrives.
+    const tab = window.open("about:blank", "_blank");
+    if (tab) tab.opener = null;
     try {
       const r = await papi<{ url: string }>(`/orgs/${encodeURIComponent(o.id)}/support`, { method: "POST" });
-      window.open(r.url, "_blank", "noopener");
-      toast.success("Support link opened in a new tab (works once, for 60 seconds)");
+      if (tab) tab.location.href = r.url;
+      else window.location.href = r.url;
+      toast.success("Signed in as the salon in a new tab (the link works once, for 60 seconds)");
       reload();
     } catch (e) {
+      tab?.close();
       toast.error(errorMessage(e));
     }
   }

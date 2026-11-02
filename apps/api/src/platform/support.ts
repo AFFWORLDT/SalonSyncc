@@ -23,7 +23,8 @@ auth.post("/support", originGuard, async (c) => {
   const fail = (code?: string) => new HttpError(401, "This support link has expired. Open a new one from the admin panel.", code);
   if (typeof b.code !== "string" || b.code.length > 100) throw fail();
   const host = slugFromHost(new URL(c.req.url).host, c.env.ROOT_DOMAIN, c.env.ADMIN_HOST);
-  const slug = host.kind === "tenant" ? host.slug : host.kind === "none" && typeof b.org === "string" ? normalizeSlug(b.org) : "";
+  // The salon's own host only; body.org is for workers.dev/local dev, where there are no salon subdomains.
+  const slug = host.kind === "tenant" ? host.slug : !c.env.ROOT_DOMAIN && typeof b.org === "string" ? normalizeSlug(b.org) : "";
   const org = slug ? await platformRepo(c.env.DB).orgBySlug(slug) : null;
   if (!org || org.status === "deactivated" || org.status === "deleted") throw fail();
   const repo = adminRepo(c.env.DB);
@@ -35,6 +36,6 @@ auth.post("/support", originGuard, async (c) => {
   const pu = await repo.userById(used.pid);
   if (!user || !user.active || !pu) throw fail();
   await repo.audit({ who: pu.email, action: "support_login", orgId: org.id, after: { as: user.username }, at: Date.now() }).run();
-  await issueSession(c, { uid: user.id, orgId: org.id, v: user.session_version, sp: pu.id }, SUPPORT_SESSION_MS);
+  await issueSession(c, { uid: user.id, orgId: org.id, v: user.session_version, sp: pu.id, spv: pu.session_version }, SUPPORT_SESSION_MS);
   return c.json({ ok: true, slug: org.slug });
 });

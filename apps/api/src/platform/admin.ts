@@ -292,18 +292,18 @@ platformApi.post("/orgs/bulk", async (c) => {
   const n = action === "extend_trial" ? days(b.days) : 0;
   const now = Date.now();
   const repo = adminRepo(c.env.DB);
-  const stmts: D1PreparedStatement[] = [];
   const ph = (from: number) => ids.map((_, i) => `?${i + from}`).join(",");
-  if (action === "deactivate") {
-    stmts.push(c.env.DB.prepare(`UPDATE orgs SET status = 'deactivated', deactivated_at = ?1 WHERE status != 'deleted' AND id IN (${ph(2)})`).bind(now, ...ids));
-  } else {
-    const t = now + n * DAY;
-    stmts.push(c.env.DB.prepare(`UPDATE orgs SET status = 'trial', trial_ends_at = ?1, grace_ends_at = ?2, deactivated_at = NULL WHERE status != 'deleted' AND id IN (${ph(3)})`).bind(t, t + 7 * DAY, ...ids));
-  }
-  for (const id of ids) stmts.push(repo.audit(auditOf(c, action === "deactivate" ? "deactivate" : "extend_trial", id, undefined, { bulk: true, days: n || undefined })));
-  const [res] = await c.env.DB.batch(stmts);
-  ids.forEach(invalidateFeatures);
-  return c.json({ ok: true, changed: res!.meta.changes ?? 0 });
+  const t = now + n * DAY;
+  const update =
+    action === "deactivate"
+      ? c.env.DB.prepare(`UPDATE orgs SET status = 'deactivated', deactivated_at = ?1 WHERE status != 'deleted' AND id IN (${ph(2)}) RETURNING id`).bind(now, ...ids)
+      : c.env.DB.prepare(`UPDATE orgs SET status = 'trial', trial_ends_at = ?1, grace_ends_at = ?2, deactivated_at = NULL WHERE status != 'deleted' AND id IN (${ph(3)}) RETURNING id`).bind(t, t + 7 * DAY, ...ids);
+  const { results } = await update.all<{ id: string }>();
+  // Audit only the salons that actually changed (unknown or deleted ids are skipped by the update).
+  const changed = results.map((r) => r.id);
+  if (changed.length) await c.env.DB.batch(changed.map((id) => repo.audit(auditOf(c, action === "deactivate" ? "deactivate" : "extend_trial", id, undefined, { bulk: true, days: n || undefined }))));
+  changed.forEach(invalidateFeatures);
+  return c.json({ ok: true, changed: changed.length });
 });
 
 // ---------- plans ----------

@@ -37,6 +37,6 @@ test("super admin signs in, opens a salon and logs in as it (support mode)", asy
   await expect(page.getByText("Features")).toBeVisible();
 
   const [tab] = await Promise.all([context.waitForEvent("page"), page.getByRole("button", { name: "Log in as salon" }).click()]);
-  await tab.waitForURL((u) => !u.pathname.startsWith("/login"));
+  await tab.waitForURL((u) => u.protocol.startsWith("http") && !u.pathname.startsWith("/login"));
   await expect(tab.getByTestId("support-banner")).toBeVisible();
 });
