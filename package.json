@@ -1,1 +1,14 @@
-{"name":"salonstation","private":true,"workspaces":["apps/*","packages/*"],"scripts":{"test":"npm test --workspaces --if-present","typecheck":"npm run typecheck --workspaces --if-present"}}
+{
+  "name": "salonstation",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "node scripts/secret-scan.mjs && npm test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "secrets": "node scripts/secret-scan.mjs",
+    "prepare": "git config core.hooksPath .githooks || true"
+  }
+}

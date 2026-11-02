@@ -1,0 +1,3 @@
+#!/bin/sh
+# Blocks commits that carry credentials (scripts/secret-scan.mjs).
+exec node scripts/secret-scan.mjs
