@@ -50,7 +50,7 @@ export function HomePushPrompt() {
     state === "blocked"
       ? "Notifications are blocked for this site. Allow them in your browser settings to get new-sale alerts."
       : state === "needs-install"
-        ? "Add FM Salon to your Home Screen, then turn on notifications to get alerts."
+        ? "Add this app to your Home Screen, then turn on notifications to get alerts."
         : "Turn on notifications to get alerted about new sales and the day’s summary.";
 
   return (

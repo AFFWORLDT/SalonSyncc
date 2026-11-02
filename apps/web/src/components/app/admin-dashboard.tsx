@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Check, Minus, Plus } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
 import { qs } from "@/lib/api";
-import { money, dateLabel, businessToday, monthShort, num } from "@/lib/format";
+import { money, dateLabel, businessToday, getFormat, monthShort, num } from "@/lib/format";
 import type { Overview } from "@/lib/types";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +15,7 @@ import { deltaPercent } from "@/components/admin/stat-card";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CompanyExpenseDialog } from "./company-expenses";
+import { useAuth } from "@/lib/auth-context";
 import { DateInput } from "./date-input";
 import { MoneyTile } from "./money-tile";
 import { HomePushPrompt } from "./push-prompt";
@@ -54,6 +55,9 @@ export function AdminDashboard() {
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
   const [addExpense, setAddExpense] = useState(false);
+  const { has, readOnly } = useAuth();
+  // Longer ranges are part of the advanced reports feature (spec: "dashboard ranges").
+  const presets = has("reports_advanced") ? PRESETS : PRESETS.slice(0, 1);
 
   function choose(p: (typeof PRESETS)[number]) {
     setPreset(p.id);
@@ -83,7 +87,7 @@ export function AdminDashboard() {
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
           <div className="flex rounded-lg bg-muted p-1" role="radiogroup" aria-label="Range">
-            {PRESETS.map((x) => (
+            {presets.map((x) => (
               <button
                 key={x.id}
                 type="button"
@@ -134,9 +138,11 @@ export function AdminDashboard() {
           value={t?.expense ?? null}
           hint={t?.company_expense ? `incl. ${money(t.company_expense)} company` : undefined}
           action={
-            <Button size="icon-sm" variant="outline" aria-label="Add company expense" className="-my-1.5 -mr-1.5 rounded-full" onClick={() => setAddExpense(true)}>
-              <Plus />
-            </Button>
+            has("expenses") && !readOnly ? (
+              <Button size="icon-sm" variant="outline" aria-label="Add company expense" className="-my-1.5 -mr-1.5 rounded-full" onClick={() => setAddExpense(true)}>
+                <Plus />
+              </Button>
+            ) : undefined
           }
         />
         <MoneyTile label={`Commission ${word}`} value={t?.commission ?? null} />
@@ -233,8 +239,8 @@ export function AdminDashboard() {
           kind="area"
           data={data.series.map((d) => ({
             label: data.series_by === "month" ? monthShort(d.key) : d.key.slice(8),
-            sales: d.sales / 100,
-            profit: d.profit / 100,
+            sales: d.sales / getFormat().minor,
+            profit: d.profit / getFormat().minor,
           }))}
           config={{ sales: { label: "Sales" }, profit: { label: "Profit" } }}
           height={220}

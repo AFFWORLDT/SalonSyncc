@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { FeatureKey } from "@ss/features";
 import { clearApiCache } from "@/hooks/use-api";
 import { api, clearSessionCaches, onApiEvent, SESSION_CACHE_PREFIX } from "./api";
-import { setFormat } from "./format";
+import { setFormat, setServerToday } from "./format";
 import type { MeResponse, Settings } from "./types";
 import { forgetPushToken } from "@/lib/push";
 
@@ -69,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const apply = useCallback((m: MeResponse | null) => {
     setFormat(m?.settings ?? null);
+    setServerToday(m?.today ?? null);
     setMe(m);
     writeCache(m);
   }, []);
@@ -121,6 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await api("/api/auth/logout", { method: "POST", redirectOn401: false });
     } finally {
       setFormat(null);
+      setServerToday(null);
       setMe(null);
       clearSessionCaches();
       clearApiCache();

@@ -5,12 +5,13 @@ import { AuthProvider } from "@/lib/auth-context";
 import { AppShell } from "@/components/admin/app-shell";
 import { EnvBadge } from "@/components/app/env-badge";
 import "./globals.css";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: { default: "FM Salon", template: "%s — FM Salon" },
-  description: "Faizan Mohammed Gents Salon — daily sales, expenses and reports.",
+  title: { default: BRAND_NAME, template: `%s · ${BRAND_NAME}` },
+  description: "Daily sales, bills, expenses and reports for your salon.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "FM Salon", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: BRAND_NAME, statusBarStyle: "default" },
   robots: { index: false, follow: false },
 };
 

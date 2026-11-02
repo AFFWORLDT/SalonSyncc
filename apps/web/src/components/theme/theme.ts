@@ -5,7 +5,7 @@
 
 export type Appearance = "system" | "light" | "dark";
 
-/** The blue of the scissors in the FM Salon logo. */
+/** Default accent (blue); a salon can pick another per device. */
 export const DEFAULT_ACCENT = "#3B4CCA";
 
 export const ACCENTS: { name: string; hex: string }[] = [

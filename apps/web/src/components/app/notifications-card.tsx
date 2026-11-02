@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 
 const HINT: Record<PushState, string> = {
   unsupported: "This browser can't show notifications. On Android use Chrome; on iPhone add the app to the Home Screen first.",
-  "needs-install": "On iPhone: tap Share → Add to Home Screen, open FM Salon from there, then turn this on.",
+  "needs-install": "On iPhone: tap Share → Add to Home Screen, open the app from there, then turn this on.",
   blocked: "Notifications are blocked for this site. Allow them in the browser or phone settings, then come back.",
   off: "Off on this device.",
   on: "On for this device.",

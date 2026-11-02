@@ -23,31 +23,15 @@ const FORBIDDEN: [string, RegExp][] = [
 /** Country data may name 971 (it is one of many calling codes). */
 const ALLOW = new Set(["src/lib/phone-countries.ts"]);
 const PENDING = new Set<string>([
-  "src/app/globals.css",
-  "src/app/history/page.tsx",
-  "src/app/layout.tsx",
   "src/app/monthly/page.tsx",
   "src/app/rate/page.tsx",
-  "src/app/services/page.tsx",
-  "src/app/settings/page.tsx",
   "src/app/sheet/page.tsx",
   "src/components/app/company-expenses.tsx",
-  "src/components/app/customer-picker.tsx",
   "src/components/app/expense-dialog.tsx",
   "src/components/app/ledger-barbers.tsx",
   "src/components/app/ledger-dialogs.tsx",
   "src/components/app/ledger-shop.tsx",
-  "src/components/app/money-tile.tsx",
-  "src/components/app/notifications-card.tsx",
-  "src/components/app/phone-field.tsx",
-  "src/components/app/push-prompt.tsx",
-  "src/components/app/sale-sheet.tsx",
-  "src/components/app/service-picker.tsx",
-  "src/components/theme/theme-provider.tsx",
-  "src/components/theme/theme.ts",
   "src/lib/excel.ts",
-  "src/lib/format.ts",
-  "src/lib/push.ts",
 ]);
 
 const root = join(__dirname, "..");

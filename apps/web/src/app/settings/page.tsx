@@ -350,10 +350,10 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
               className="h-11 w-full"
             />
           </Field>
-          <Field label="Currency" htmlFor="s-cur" hint="3-letter code, e.g. AED, INR, KWD">
+          <Field label="Currency" htmlFor="s-cur" hint="3-letter code, e.g. INR, KWD, USD">
             <Input id="s-cur" value={s.currency} maxLength={3} onChange={(e) => set("currency", e.target.value.toUpperCase().replace(/[^A-Z]/g, ""))} className="h-11 font-mono" />
           </Field>
-          <Field label="Number format" htmlFor="s-locale" hint="e.g. en-AE, en-IN, ar-AE">
+          <Field label="Number format" htmlFor="s-locale" hint="e.g. en-IN, en-GB, ar">
             <Input id="s-locale" value={s.locale} onChange={(e) => set("locale", e.target.value.trim())} className="h-11 font-mono" />
           </Field>
           <Field label="Phone country code" htmlFor="s-cc" hint="Digits only, e.g. 91 for India">

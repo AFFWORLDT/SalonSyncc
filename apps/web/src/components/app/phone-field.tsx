@@ -1,11 +1,11 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { COUNTRIES } from "@/lib/format";
+import { countriesFor, getFormat } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 
-/** Country code picker (UAE +971 by default) + national number, with the error shown under it. */
+/** Country code picker (the salon's own country first) + national number, with the error shown under it. */
 export function PhoneField({
   id,
   cc,
@@ -34,7 +34,7 @@ export function PhoneField({
             onChange={(e) => onChange(e.target.value, local)}
             className="absolute inset-0 cursor-pointer opacity-0"
           >
-            {COUNTRIES.map((c) => (
+            {countriesFor(getFormat().phoneCountry).map((c) => (
               <option key={c.label} value={c.code}>
                 {c.label}
               </option>
@@ -47,7 +47,7 @@ export function PhoneField({
           type="tel"
           inputMode="tel"
           autoComplete={inputProps?.autoComplete ?? "off"}
-          placeholder={COUNTRIES.find((c) => c.code === cc)?.example ?? ""}
+          placeholder={countriesFor(getFormat().phoneCountry).find((c) => c.code === cc)?.example ?? ""}
           value={local}
           onChange={(e) => onChange(cc, e.target.value)}
           aria-invalid={!!error}

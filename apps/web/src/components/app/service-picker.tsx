@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Minus, Plus, X } from "lucide-react";
-import { money } from "@/lib/format";
+import { money, currencyCode, fromInput, toInput } from "@/lib/format";
 import type { Service } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -72,7 +72,7 @@ export function ServicePicker({
     onChange(qty <= 0 ? lines.filter((l) => l !== line) : lines.map((l) => (l === line ? { ...l, qty: Math.min(20, qty) } : l)));
   }
   function addOther() {
-    const price = Math.round(Number(otherPrice) * 100);
+    const price = fromInput(otherPrice);
     if (!otherName.trim() || !(price > 0)) return;
     onChange([...lines, { key: `o${Date.now()}`, service_id: null, name: otherName.trim(), price, qty: 1 }]);
     setOtherName("");
@@ -151,8 +151,8 @@ export function ServicePicker({
                     className={padField(target === priceTarget(l))}
                     aria-label={`Price for ${l.name}`}
                   >
-                    <span className="mr-1 text-xs text-muted-foreground">AED</span>
-                    {target === priceTarget(l) ? activeText || <span className="text-muted-foreground">{l.price / 100}</span> : l.price / 100}
+                    <span className="mr-1 text-xs text-muted-foreground">{currencyCode()}</span>
+                    {target === priceTarget(l) ? activeText || <span className="text-muted-foreground">{toInput(l.price)}</span> : toInput(l.price)}
                   </button>
                   {l.qty > 1 ? <span>× {l.qty} = {money(l.price * l.qty)}</span> : null}
                 </div>
@@ -187,7 +187,7 @@ export function ServicePicker({
           className={cn(padField(target === "other"), "h-10 w-20 shrink-0")}
           aria-label="Other item price"
         >
-          {otherPrice || <span className="text-muted-foreground">AED</span>}
+          {otherPrice || <span className="text-muted-foreground">{currencyCode()}</span>}
         </button>
         <Button type="button" variant="outline" className="h-10" onClick={addOther} disabled={!otherName.trim() || !(Number(otherPrice) > 0)}>
           <Plus />

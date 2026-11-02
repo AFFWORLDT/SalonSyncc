@@ -16,9 +16,9 @@ import { SaleListSkeleton, SaleRow } from "./sale-row";
 import { useSaleSheet } from "./sale-sheet";
 
 export function BarberToday() {
-  const { user } = useAuth();
+  const { user, has, readOnly } = useAuth();
   // Set per barber on the Barbers page. Off: the barber sees the day's expense but only the admin can add or change it.
-  const canAddExpense = user?.can_add_expense ?? false;
+  const canAddExpense = has("expenses") && !readOnly && (user?.can_add_expense ?? false);
   const { openNew } = useSaleSheet();
   const today = businessToday();
   const report = useApi<MyReport>(`/api/reports/me?month=${today.slice(0, 7)}`);

@@ -5,7 +5,7 @@ import { Eye, EyeOff, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { notifyDataChanged, useApi } from "@/hooks/use-api";
-import { money, toInput } from "@/lib/format";
+import { money, currencyCode, getFormat, toInput } from "@/lib/format";
 import type { Service } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ export default function ServicesPage() {
   async function toggle(s: Service) {
     setData((d) => d?.map((x) => (x.id === s.id ? { ...x, active: !x.active } : x)) ?? d);
     try {
-      await api(`/api/services/${s.id}`, { method: "PUT", body: { ...s, price: s.price / 100, active: !s.active } });
+      await api(`/api/services/${s.id}`, { method: "PUT", body: { ...s, price: s.price / getFormat().minor, active: !s.active } });
       notifyDataChanged();
     } catch (err) {
       toast.error(errorMessage(err));
@@ -189,7 +189,7 @@ function ServiceForm({ service, category, categories, onDone }: { service: Servi
         <Input id="sv-desc" value={desc} onChange={(e) => setDesc(e.target.value)} className="h-11" />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Price (AED)" htmlFor="sv-price">
+        <Field label={`Price (${currencyCode()})`} htmlFor="sv-price">
           <Input id="sv-price" required inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d.]/g, ""))} className="num h-11" />
         </Field>
         <Field label="Order" htmlFor="sv-order" hint="Lower shows first">

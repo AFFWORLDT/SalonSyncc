@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { useApi, notifyDataChanged } from "@/hooks/use-api";
-import { money, checkPhone, businessToday, splitPhone, toInput } from "@/lib/format";
+import { money, checkPhone, businessToday, currencyCode, fromInput, getFormat, includedVat, splitPhone, toInput } from "@/lib/format";
+import { isStale } from "@/lib/api";
 import type { PaymentMode, Sale, Service, Settings, SettingsResponse, User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -59,8 +60,12 @@ export function SaleSheetProvider({ children }: { children: React.ReactNode }) {
     setOpen(true);
   }, []);
   const [bill, setBill] = useState<Sale | null>(null);
-  const { settings } = useAuth();
-  const value = useMemo(() => ({ openNew, openEdit, openBill: setBill }), [openNew, openEdit]);
+  const { settings, readOnly } = useAuth();
+  // A lapsed subscription is read-only: bills still open, but no new or changed sales (the API would answer 402).
+  const value = useMemo(() => {
+    const blocked = () => toast.error("Your subscription has ended. Upgrade to add or change sales.");
+    return readOnly ? { openNew: blocked, openEdit: blocked, openBill: setBill } : { openNew, openEdit, openBill: setBill };
+  }, [openNew, openEdit, readOnly]);
 
   return (
     <SaleSheetContext.Provider value={value}>
@@ -120,7 +125,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
     (editing?.items ?? []).map((i, n) => ({ key: `e${n}`, service_id: i.service_id, name: i.name, price: i.price, qty: i.qty }))
   );
   const [amount, setAmount] = useState(editing && !editing.items.length ? toInput(editing.amount) : "");
-  const total = lines.length ? linesTotal(lines) : Math.round(Number(amount) * 100) || 0;
+  const total = lines.length ? linesTotal(lines) : fromInput(amount) || 0;
   const [mode, setMode] = useState<PaymentMode>(editing?.payment_mode ?? "cash");
   const [name, setName] = useState(editing && !autoLabel ? editing.customer_label : "");
   const initialPhone = splitPhone(editing?.customer_phone ?? null);
@@ -148,7 +153,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
     setTarget(t);
     setFresh(true);
     const line = lines.find((l) => priceTarget(l) === t);
-    if (line) setPriceText(String(line.price / 100));
+    if (line) setPriceText(toInput(line.price));
     // The field being typed into stays visible above the pad.
     requestAnimationFrame(() => reveal(document.querySelector(`[data-pad="${t}"]`)));
   }
@@ -160,7 +165,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
       // A new service: the pad now changes its price (the catalogue price stays until a key is pressed).
       setTarget(priceTarget(added));
       setFresh(true);
-      setPriceText(String(added.price / 100));
+      setPriceText(toInput(added.price));
     } else if (!next.length && target?.startsWith("price:")) {
       setTarget("amount");
       setFresh(true);
@@ -177,8 +182,8 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
     else {
       const next = applyKey(priceText, k, "money", fresh);
       setPriceText(next);
-      const fils = Math.round(Number(next) * 100);
-      if (fils > 0) setLines((ls) => ls.map((l) => (priceTarget(l) === target ? { ...l, price: fils } : l)));
+      const minor = fromInput(next);
+      if (minor > 0) setLines((ls) => ls.map((l) => (priceTarget(l) === target ? { ...l, price: minor } : l)));
     }
     setFresh(false);
   }
@@ -198,7 +203,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
   function clearCustomer() {
     setName("");
     setPhone("");
-    setCc("971");
+    setCc(getFormat().phoneCountry);
     setFormError(null);
   }
 
@@ -213,7 +218,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
     try {
       const body = {
         ...(lines.length
-          ? { items: lines.map((l) => (l.service_id ? { service_id: l.service_id, price: l.price / 100, qty: l.qty } : { name: l.name, price: l.price / 100, qty: l.qty })) }
+          ? { items: lines.map((l) => (l.service_id ? { service_id: l.service_id, price: l.price / getFormat().minor, qty: l.qty } : { name: l.name, price: l.price / getFormat().minor, qty: l.qty })) }
           : { amount }),
         payment_mode: mode,
         customer_name: name || null,
@@ -230,7 +235,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
         return;
       }
       // Show the bill at once; the server fills in the bill number a moment later.
-      const fils = total;
+      const minorTotal = total;
       const vatRate = settings?.vat_enabled ? settings.vat_rate : 0;
       const barberName = isAdmin ? (users.data?.find((u) => String(u.id) === barberId)?.name ?? user?.name ?? "") : (user?.name ?? "");
       setSaved({
@@ -243,13 +248,14 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
         customer_id: null,
         customer_label: name.trim() || "Customer",
         customer_phone: phoneCheck.value,
-        amount: fils,
+        amount: minorTotal,
         payment_mode: mode,
         note: note.trim() || null,
         commission_pct: 0,
         commission: 0,
         vat_rate: vatRate,
-        vat_amount: vatRate ? Math.round((fils * vatRate) / (1 + vatRate)) : 0,
+        // VAT is included in the price; vat_rate is a percent (same formula as the API's vatOf).
+        vat_amount: includedVat(minorTotal, vatRate),
         created_at: nowMs(),
         items: lines.map((l) => ({ service_id: l.service_id, name: l.name, price: l.price, qty: l.qty })),
       });
@@ -262,6 +268,8 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
       setSaved(null);
       haptic("error");
       setFormError(errorMessage(err));
+      // Someone else changed this sale at the same moment: refresh the lists behind the sheet; the form stays open.
+      if (isStale(err)) notifyDataChanged();
     } finally {
       setSaving(false);
     }
@@ -278,6 +286,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
     } catch (err) {
       haptic("error");
       toast.error(errorMessage(err));
+      if (isStale(err)) notifyDataChanged();
     }
   }
 
@@ -383,7 +392,7 @@ function SaleForm({ editing, onClose, onAnother }: { editing: Sale | null; onClo
               />
               {!lines.length && (
                 <>
-                  <Field label="Or just the amount (AED)" htmlFor="sale-amount">
+                  <Field label={`Or just the amount (${currencyCode()})`} htmlFor="sale-amount">
                     <button
                       id="sale-amount"
                       data-pad="amount"

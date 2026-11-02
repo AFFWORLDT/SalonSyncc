@@ -17,8 +17,8 @@ interface AppThemeValue extends UiPrefsValue {
 }
 
 const DEFAULTS: UiPrefsValue = { appearance: "system", accent: DEFAULT_ACCENT };
-const PREFS_KEY = "fm_ui_prefs";
-const PREFS_EVENT = "fm-ui-prefs";
+const PREFS_KEY = "ss_ui_prefs";
+const PREFS_EVENT = "ss-ui-prefs";
 
 const AppThemeContext = createContext<AppThemeValue | null>(null);
 

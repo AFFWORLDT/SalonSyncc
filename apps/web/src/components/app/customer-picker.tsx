@@ -9,12 +9,13 @@ import { Input } from "@/components/ui/input";
 import { PhoneField } from "@/components/app/phone-field";
 import { useCustomerSuggest, type CustomerHit } from "@/components/app/customer-suggest";
 import { haptic } from "@/lib/haptics";
+import { usesUaeTrn } from "@/lib/phone-countries";
 
-/** Phone for the trigger label: UAE shows the familiar 05x grouping, others +code national. */
+/** Phone for the trigger label: the salon's own country in its local grouping (phoneLabel), others +code national. */
 function phoneDisplay(cc: string, local: string): string {
   const l = local.replace(/\D/g, "");
   if (!l) return "";
-  if (cc === "971") return phoneLabel("0" + l);
+  if (usesUaeTrn(cc)) return phoneLabel("0" + l);
   return `+${cc} ${l}`;
 }
 

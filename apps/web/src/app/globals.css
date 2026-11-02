@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * FM Salon uses the deHertz admin design system: the shadcn tokens are written
+ * The dashboard uses the deHertz admin design system: the shadcn tokens are written
  * inline by AppThemeProvider (src/components/theme) on the app root and
  * mirrored on <html>, so portalled popovers and dialogs inherit them.
  */

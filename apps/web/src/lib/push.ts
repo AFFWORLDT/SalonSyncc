@@ -8,28 +8,21 @@
  * iPhone: web push only works when the app was added to the Home Screen (iOS 16.4+).
  */
 import { api } from "@/lib/api";
+import { BRAND_NAME } from "@/lib/brand";
+import { firebaseWebConfig, VAPID_KEY } from "@/lib/firebase-config";
 
-/** Public web config of the Firebase project "fm-salon-app" (safe to ship; it only identifies the project). */
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBBs6uskXPhfFfl8uUArVrH68JwOJ8g_8o",
-  authDomain: "fm-salon-app.firebaseapp.com",
-  projectId: "fm-salon-app",
-  storageBucket: "fm-salon-app.firebasestorage.app",
-  messagingSenderId: "923048894140",
-  appId: "1:923048894140:web:e77825768e83f61a09fab9",
-};
+const FIREBASE_CONFIG = firebaseWebConfig();
+/** Push needs the build's Firebase config and VAPID key; without them it is simply unsupported. */
+export const PUSH_CONFIGURED = !!FIREBASE_CONFIG && !!VAPID_KEY;
 
-const TOKEN_KEY = "fm_push_token";
-const OPTOUT_KEY = "fm_push_optout"; // set when the user turns notifications off here, so the home screen stops auto-asking.
-
-/** Web Push certificate "Key pair" (public VAPID key) from Firebase → Cloud Messaging. Public: identifies the project. */
-const VAPID_KEY = "BF4WmhZLO9Oi4OFQGp0MzddleViaPbB32ZapWjE1YQ_VLJwblWsfKdl4dGQ9VuOa0D3FmcMnNWafoXshfyWuUmE";
+const TOKEN_KEY = "ss_push_token";
+const OPTOUT_KEY = "ss_push_optout"; // set when the user turns notifications off here, so the home screen stops auto-asking.
 
 export type PushState = "unsupported" | "needs-install" | "blocked" | "off" | "on";
 
 async function messaging() {
   const [{ initializeApp, getApps }, m] = await Promise.all([import("firebase/app"), import("firebase/messaging")]);
-  const app = getApps()[0] ?? initializeApp(FIREBASE_CONFIG);
+  const app = getApps()[0] ?? initializeApp(FIREBASE_CONFIG!);
   return { m, messaging: m.getMessaging(app) };
 }
 
@@ -67,6 +60,7 @@ const isInstalled = () => matchMedia("(display-mode: standalone)").matches || (n
 
 /** Where this device stands, for the Notifications switch. */
 export async function pushState(): Promise<PushState> {
+  if (!PUSH_CONFIGURED) return "unsupported";
   if (typeof window === "undefined" || !("Notification" in window) || !("serviceWorker" in navigator)) {
     return isIos() && !isInstalled() ? "needs-install" : "unsupported";
   }
@@ -122,6 +116,7 @@ export async function disablePush(): Promise<void> {
 
 /** Before signing out: stop this device getting the old user's notifications. */
 export async function forgetPushToken(): Promise<void> {
+  if (!PUSH_CONFIGURED) return;
   const token = savedToken();
   if (token) await api("/api/push/tokens", { method: "DELETE", body: { token }, redirectOn401: false }).catch(() => {});
 }
@@ -131,12 +126,12 @@ export async function forgetPushToken(): Promise<void> {
  * now belong to a different user), and show notifications that arrive while the app is open as toasts.
  */
 export async function startPush(onForeground: (title: string, body: string) => void): Promise<() => void> {
-  if ((await pushState()) !== "on") return () => {};
+  if (!PUSH_CONFIGURED || (await pushState()) !== "on") return () => {};
   await register().catch(() => {});
   const { m, messaging: msg } = await messaging();
   const reg = await navigator.serviceWorker.ready.catch(() => null);
   return m.onMessage(msg, (p) => {
-    const title = p.notification?.title ?? "FM Salon";
+    const title = p.notification?.title ?? BRAND_NAME;
     const body = p.notification?.body ?? "";
     // In-app toast for immediate context while you're looking at the app…
     onForeground(title, body);
@@ -145,8 +140,8 @@ export async function startPush(onForeground: (title: string, body: string) => v
       const data = p.data as { link?: string } | undefined;
       reg?.showNotification(title, {
         body,
-        icon: "/icon-192.png",
-        badge: "/icon-192.png",
+        icon: "/icon.svg",
+        badge: "/icon.svg",
         tag: p.messageId,
         data: { url: p.fcmOptions?.link ?? data?.link ?? "/" },
       });

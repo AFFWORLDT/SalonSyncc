@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { money } from "@/lib/format";
 
-/** A labelled AED figure. `tone` colours the value; `hint` is a small line under it; `action` sits at the top right. */
+/** A labelled money figure (salon currency). `tone` colours the value; `hint` is a small line under it; `action` sits at the top right. */
 export function MoneyTile({
   label,
   value,

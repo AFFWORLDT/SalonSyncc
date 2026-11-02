@@ -6,7 +6,7 @@
 import { COUNTRIES, type Country } from "./phone-countries";
 
 export interface FormatConfig {
-  currency: string; // ISO 4217, e.g. "AED"
+  currency: string; // ISO 4217, e.g. "INR"
   minor: number; // minor units per major unit: 100, 1000, 1
   locale: string;
   timezone: string; // IANA
@@ -53,14 +53,14 @@ function fmts() {
   return nf;
 }
 
-/** 2500 -> "AED 25", 2550 -> "AED 25.50" (for a 2-decimal currency). */
+/** 2500 -> "INR 25", 2550 -> "INR 25.50" (for a 2-decimal currency). */
 export function money(minorUnits: number): string {
   const v = minorUnits / cfg.minor;
   const body = Number.isInteger(v) ? fmts().whole.format(v) : fmts().frac.format(v);
   return cfg.currency ? `${cfg.currency} ${body}` : body;
 }
 
-/** The currency code for labels ("Price (AED)"). */
+/** The currency code for labels ("Price (INR)"). */
 export function currencyCode(): string {
   return cfg.currency;
 }
@@ -69,6 +69,11 @@ export function currencyCode(): string {
 export function num(minorUnits: number, dash = false): string {
   if (dash && !minorUnits) return "–";
   return fmts().whole.format(minorUnits / cfg.minor);
+}
+
+/** VAT inside a VAT-inclusive total; `ratePct` is a percent (5 = 5%). Same rounding as the API's vatOf. */
+export function includedVat(totalMinor: number, ratePct: number): number {
+  return ratePct ? Math.round((totalMinor * ratePct) / (100 + ratePct)) : 0;
 }
 
 /** Fixed decimals, no grouping or code, for bill tables: 2550 -> "25.50". */
@@ -114,8 +119,16 @@ export function businessDay(ms: number): string {
   return w.hour < cfg.dayStartHour ? prevDay(w.day) : w.day;
 }
 
-/** Today as the salon counts it. */
+/** The API's business day from the last /api/me (its clock wins over a wrong device clock) and when it arrived. */
+let serverToday: { day: string; at: number } | null = null;
+const SERVER_TODAY_TTL = 3 * 3_600_000;
+export function setServerToday(day: string | null): void {
+  serverToday = day ? { day, at: Date.now() } : null;
+}
+
+/** Today as the salon counts it: the API's answer while fresh, else computed from the device clock in the salon zone. */
 export function businessToday(): string {
+  if (serverToday && Date.now() - serverToday.at < SERVER_TODAY_TTL) return serverToday.day;
   return businessDay(Date.now());
 }
 
