@@ -109,6 +109,7 @@ export interface AuthSplitProps {
 function useReducedMotion(): boolean {
   const [reduce, setReduce] = useState(false);
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
     const m = window.matchMedia("(prefers-reduced-motion: reduce)");
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setReduce(m.matches);

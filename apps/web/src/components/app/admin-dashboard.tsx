@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CompanyExpenseDialog } from "./company-expenses";
 import { useAuth } from "@/lib/auth-context";
+import { SetupChecklist } from "./setup-checklist";
 import { DateInput } from "./date-input";
 import { MoneyTile } from "./money-tile";
 import { HomePushPrompt } from "./push-prompt";
@@ -77,6 +78,7 @@ export function AdminDashboard() {
   return (
     <div className="flex flex-col gap-5">
       {has("push") && !readOnly && <HomePushPrompt />}
+      <SetupChecklist />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl">Dashboard</h1>

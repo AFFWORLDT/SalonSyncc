@@ -182,6 +182,9 @@ settings.use("*", requireFeature("core_sales"));
 
 settings.get("/", async (c) => c.json(await withReady(c, await settingsRepo(c.env.DB, c.var.tenant.org.id).get())));
 
+/** GET /api/settings/setup — the dashboard's setup checklist (owner/admin). */
+settings.get("/setup", requireAdmin, async (c) => c.json(await settingsRepo(c.env.DB, c.var.tenant.org.id).setup()));
+
 settings.put("/", requireAdmin, async (c) => {
   let body: unknown;
   try {

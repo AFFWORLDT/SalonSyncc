@@ -79,7 +79,31 @@ export async function withWaReady(db: D1Database, orgId: string, features: reado
   return { ...s, wa_ready };
 }
 
+/** What a new salon has set up yet (the dashboard's setup checklist). */
+export interface SetupStatus {
+  logo: boolean;
+  services: boolean;
+  staff: boolean;
+  vat: boolean;
+  google_review: boolean;
+}
+
 export function settingsRepo(db: D1Database, orgId: string) {
+  /** The setup checklist in one statement. */
+  async function setup(): Promise<SetupStatus> {
+    const r = await db
+      .prepare(
+        `SELECT (SELECT COUNT(*) FROM org_assets WHERE org_id = ?1 AND kind = 'logo') AS logo,
+                (SELECT COUNT(*) FROM services WHERE org_id = ?1) AS services,
+                (SELECT COUNT(*) FROM users WHERE org_id = ?1 AND role != 'owner') AS staff,
+                vat_enabled AS vat, google_review_url AS google
+         FROM org_settings WHERE org_id = ?1`,
+      )
+      .bind(orgId)
+      .first<{ logo: number; services: number; staff: number; vat: number; google: string | null }>();
+    return { logo: !!r?.logo, services: !!r?.services, staff: !!r?.staff, vat: !!r?.vat, google_review: !!r?.google };
+  }
+
   async function get(): Promise<Settings> {
     // logo_url is derived from the org_assets version (the old org_settings.logo_url column is unused).
     const r = await db
@@ -99,6 +123,7 @@ export function settingsRepo(db: D1Database, orgId: string) {
   };
 
   return {
+    setup,
     get,
     /** True when the org has a WhatsApp number connected (an org_whatsapp row); the feature check is the caller's. */
     async hasWhatsappConfig(): Promise<boolean> {
