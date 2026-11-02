@@ -68,10 +68,10 @@ body {
 html {
   background-color: var(--background);
   background-image:
-    radial-gradient(at 8% 6%, color-mix(in oklab, var(--primary) 42%, transparent) 0, transparent 50%),
-    radial-gradient(at 92% 12%, color-mix(in oklab, var(--primary) 26%, transparent) 0, transparent 45%),
-    radial-gradient(at 70% 96%, color-mix(in oklab, var(--primary) 30%, transparent) 0, transparent 52%),
-    radial-gradient(at 12% 88%, color-mix(in oklab, var(--success, #14935a) 18%, transparent) 0, transparent 44%);
+    radial-gradient(at 8% 6%, color-mix(in oklab, var(--mesh-a, var(--primary)) 34%, transparent) 0, transparent 50%),
+    radial-gradient(at 92% 10%, color-mix(in oklab, var(--mesh-b, var(--primary)) 30%, transparent) 0, transparent 46%),
+    radial-gradient(at 72% 96%, color-mix(in oklab, var(--mesh-c, var(--primary)) 26%, transparent) 0, transparent 52%),
+    radial-gradient(at 10% 90%, color-mix(in oklab, var(--mesh-b, var(--primary)) 16%, transparent) 0, transparent 42%);
   background-attachment: fixed;
 }
 .bg-card,

@@ -5,11 +5,15 @@
 
 export type Appearance = "system" | "light" | "dark";
 
-/** Default accent: the rose gold of the SalonKit logo; a user can pick another per device. */
+/** Default accent (the "SalonKit" choice): deep green on the cream light theme, the logo's rose gold in dark. */
 export const DEFAULT_ACCENT = "#C08A5B";
+/** The light-mode colour of the default accent. */
+export const LIGHT_BRAND = "#1F7A6A";
+/** Glow colours of the light background mesh: teal, the logo's gold, deep green. */
+const LIGHT_MESH = ["#2A9D88", "#B8935A", "#1D4A42"] as const;
 
 export const ACCENTS: { name: string; hex: string }[] = [
-  { name: "SalonKit gold", hex: "#C08A5B" },
+  { name: "SalonKit (green / gold)", hex: "#C08A5B" },
   { name: "Salon blue", hex: "#3B4CCA" },
   { name: "Red", hex: "#D71921" },
   { name: "Gold", hex: "#D4AF37" },
@@ -101,14 +105,15 @@ const PALETTE = {
     warning: "#FFB020",
     destructive: "#FF5A5F",
   },
+  // Light: the creamy canvas with deep green (deHertz Type palette).
   light: {
-    bg: "#F4F4F2",
-    card: "#FFFFFF",
-    muted: "#EAEAE7",
-    border: "#DCDCD8",
-    fg: "#111111",
-    mutedFg: "#6B6B6B",
-    faint: "#9A9A96",
+    bg: "#F6F2E9",
+    card: "#FFFDF8",
+    muted: "#ECE6D9",
+    border: "#E0D9CB",
+    fg: "#1C1B18",
+    mutedFg: "#67635B",
+    faint: "#9A958B",
     success: "#14935A",
     warning: "#B86E00",
     destructive: "#D92D20",
@@ -128,7 +133,10 @@ const GLASS = { light: { card: 0.62, popover: 0.86, border: 0.55 }, dark: { card
 /** The shadcn variable set for a resolved mode and accent. */
 export function themeVars(mode: "light" | "dark", accent: string): Record<string, string> {
   const p = PALETTE[mode];
-  const a = mode === "light" ? accentForLight(accent) : accent.toUpperCase();
+  const brand = accent.toUpperCase() === DEFAULT_ACCENT;
+  const a = mode === "light" ? (brand ? LIGHT_BRAND : accentForLight(accent)) : accent.toUpperCase();
+  // Background mesh: cream with teal and gold glows in light (brand), accent glows otherwise.
+  const mesh = mode === "light" && brand ? LIGHT_MESH : [a, a, a];
   const onA = onAccent(a);
   return {
     "--background": p.bg,
@@ -147,6 +155,9 @@ export function themeVars(mode: "light" | "dark", accent: string): Record<string
     "--accent-foreground": p.fg,
     "--destructive": p.destructive,
     "--border": withAlpha(p.border, GLASS[mode].border),
+    "--mesh-a": mesh[0],
+    "--mesh-b": mesh[1],
+    "--mesh-c": mesh[2],
     "--glass-highlight": mode === "light" ? "rgb(255 255 255 / 0.55)" : "rgb(255 255 255 / 0.08)",
     "--input": p.border,
     "--ring": a,
