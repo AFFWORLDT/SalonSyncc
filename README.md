@@ -98,3 +98,30 @@ npm run typecheck
 
 - Spec: [docs/superpowers/specs/2026-11-02-salonsync-saas-design.md](docs/superpowers/specs/2026-11-02-salonsync-saas-design.md)
 - Plan 1: [docs/superpowers/plans/2026-11-02-plan-1-foundation.md](docs/superpowers/plans/2026-11-02-plan-1-foundation.md)
+
+## Salon dashboard (apps/web)
+
+FM Salon's web app, ported per salon. It is a Next static export that the API Worker serves on the same origin (`wrangler.jsonc` `assets`, `run_worker_first: ["/api/*"]`). Menus, pages and buttons follow `GET /api/me`:
+- the user's role (the owner counts as admin)
+- the salon's features: locked pages show an Upgrade card and make no API calls
+- the subscription: a trial or grace banner, and a read-only screen once expired
+- the salon's settings: currency and its decimals, time zone, day start, phone country, name and logo
+
+```bash
+npm run build -w @ss/web                 # -> apps/web/out, served by `npm run dev -w @ss/api` on :8787
+npm run dev -w @ss/web                   # next dev on :3000, /api proxied to :8787
+                                         # needs DEV_ALLOWED_ORIGINS=http://localhost:3000 in apps/api/.dev.vars
+npm run e2e -w @ss/web                   # Playwright smoke (build + migrate + seed first)
+```
+
+Build env (`NEXT_PUBLIC_*`, not secret):
+- `NEXT_PUBLIC_BRAND_NAME` (default SalonStation)
+- `NEXT_PUBLIC_ROOT_DOMAIN`: `salonkit.online` in `.env.production`. On `<slug>.salonkit.online` login needs no salon ID.
+- `NEXT_PUBLIC_SUPPORT_EMAIL`: the Upgrade card's contact address.
+- `NEXT_PUBLIC_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_STORAGE_BUCKET`, `_MESSAGING_SENDER_ID`, `_APP_ID`, `_VAPID_KEY`: one SalonStation Firebase project. While these are unset, push is off and the service worker does nothing.
+
+`test/brand-guard.test.ts` fails the build if FM, AED, Dubai or +971 values are hardcoded in `apps/web/src`.
+
+## Domain
+
+Salons live at `<slug>.salonkit.online` and the super admin at `admin.salonkit.online`. The zone is on the Affworld0 Cloudflare account, and the route `*.salonkit.online/*` is in `wrangler.jsonc`. The zone needs one proxied DNS record, `*` → AAAA `100::`, so the subdomains reach the Worker. The apex is kept for the marketing site (Plan 4).

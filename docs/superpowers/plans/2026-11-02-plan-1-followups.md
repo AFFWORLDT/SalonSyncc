@@ -36,7 +36,7 @@ These come from the Plan 1 per-task reviews and the final review. Each was triag
   - Test probes (`_whoami`, `_probe/*`) are registered in production behind auth and return 404 there.
 
 
-## From the Plan 2a final review: do at the start of Plan 3
+## From the Plan 2a final review: do at the start of Plan 3 (done in Plan 3 Task 1)
 - **Stale avatar after clear and re-upload:** `clearAvatar` resets `avatar_v` to 0, so a new upload gets the same immutable URL again.
   - Fix: never reset `avatar_v`; always increment it.
   - Derive `has_avatar` from `avatar IS NOT NULL` instead of from `v`.
