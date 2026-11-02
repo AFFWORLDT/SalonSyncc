@@ -7,3 +7,4 @@ export * from "./tenant/customers";
 export * from "./tenant/sales";
 export * from "./tenant/ledger";
 export * from "./tenant/reports";
+export * from "./tenant/expenses";

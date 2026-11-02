@@ -1,3 +1,5 @@
+import type { Customer, CustomerDetail } from "@ss/contract";
+
 /** One customer as the sale form's autocomplete sees it. */
 export interface CustomerSuggestionRow {
   id: number;
@@ -10,9 +12,70 @@ const LIMIT = 8;
 /** Escapes LIKE wildcards for `ESCAPE '\'`. */
 export const likeEscape = (s: string): string => s.replace(/[\\%_]/g, (m) => `\\${m}`);
 
+type CustomerRow = Omit<Customer, "wa_opt_out"> & { wa_opt_out: number };
+const CUSTOMER_COLS = "id, name, phone, visits, spent, last_visit_at, wa_opt_out";
+const toCustomer = (r: CustomerRow): Customer => ({ ...r, wa_opt_out: !!r.wa_opt_out });
+
 /** Every query here is scoped by org_id; test/sql-guard.test.ts enforces it. */
 export function customersRepo(db: D1Database, orgId: string) {
   return {
+    /**
+     * FM's admin list (customers_crm): every customer of the org, most recent visit first. `q` matches the name or the
+     * digits of the phone, at any length.
+     */
+    async adminList(q: string, page: number, pageSize: number): Promise<{ items: Customer[]; total: number }> {
+      const digits = q.replace(/\D/g, "").replace(/^0+/, "");
+      const match = q
+        ? ` AND (CASE WHEN name LIKE ?2 ESCAPE '\\' THEN 1 WHEN ?3 <> '' AND phone LIKE '%' || ?3 || '%' THEN 1 ELSE 0 END) = 1`
+        : "";
+      const qb = q ? [`%${likeEscape(q)}%`, digits] : [];
+      const lim = q ? "?4 OFFSET ?5" : "?2 OFFSET ?3";
+      const [rows, count] = await db.batch([
+        db
+          .prepare(`SELECT ${CUSTOMER_COLS} FROM customers WHERE org_id = ?1${match} ORDER BY last_visit_at DESC, id DESC LIMIT ${lim}`)
+          .bind(orgId, ...qb, pageSize, (page - 1) * pageSize),
+        db.prepare(`SELECT COUNT(*) AS n FROM customers WHERE org_id = ?1${match}`).bind(orgId, ...qb),
+      ]);
+      return { items: (rows!.results as CustomerRow[]).map(toCustomer), total: (count!.results[0] as { n: number }).n };
+    },
+
+    /** FM GET /customers/:id: the profile, with its visit mix, barbers and top services, from this org's live sales. */
+    async detail(id: number): Promise<CustomerDetail | null> {
+      const row = await db.prepare(`SELECT ${CUSTOMER_COLS} FROM customers WHERE org_id = ? AND id = ?`).bind(orgId, id).first<CustomerRow>();
+      if (!row) return null;
+      const [agg, barbers, services] = await db.batch([
+        db
+          .prepare(
+            `SELECT MIN(s.created_at) AS first_visit_at, COALESCE(AVG(s.amount), 0) AS avg_bill,
+                    SUM(s.payment_mode = 'cash') AS cash_visits, SUM(s.payment_mode = 'card') AS card_visits
+             FROM sales s WHERE s.org_id = ?1 AND s.customer_id = ?2 AND s.deleted_at IS NULL`,
+          )
+          .bind(orgId, id),
+        db
+          .prepare(
+            `SELECT u.id, u.name, COUNT(*) AS visits FROM sales s JOIN users u ON u.org_id = s.org_id AND u.id = s.barber_id
+             WHERE s.org_id = ?1 AND s.customer_id = ?2 AND s.deleted_at IS NULL GROUP BY u.id ORDER BY visits DESC, MAX(s.created_at) DESC`,
+          )
+          .bind(orgId, id),
+        db
+          .prepare(
+            `SELECT i.name, SUM(i.qty) AS qty FROM sale_items i JOIN sales s ON s.org_id = i.org_id AND s.id = i.sale_id
+             WHERE i.org_id = ?1 AND s.org_id = ?1 AND s.customer_id = ?2 AND s.deleted_at IS NULL GROUP BY i.name ORDER BY qty DESC, i.name LIMIT 5`,
+          )
+          .bind(orgId, id),
+      ]);
+      const a = agg!.results[0] as { first_visit_at: number | null; avg_bill: number; cash_visits: number | null; card_visits: number | null };
+      return {
+        ...toCustomer(row),
+        first_visit_at: a.first_visit_at,
+        avg_bill: Math.round(a.avg_bill),
+        cash_visits: a.cash_visits ?? 0,
+        card_visits: a.card_visits ?? 0,
+        barbers: barbers!.results as CustomerDetail["barbers"],
+        services: services!.results as CustomerDetail["services"],
+      };
+    },
+
     byPhone(phone: string): Promise<{ id: number; name: string | null } | null> {
       return db.prepare("SELECT id, name FROM customers WHERE org_id = ? AND phone = ?").bind(orgId, phone).first();
     },

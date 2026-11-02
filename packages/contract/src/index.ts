@@ -18,9 +18,13 @@
  *   GET    /api/public/receipt/:token                             -> Receipt   (no sign-in)
  *   GET    /api/public/services                                   -> {category,name,description,price}[]  (no sign-in, CORS *, for the website)
  *
- * Expenses (one per barber per day)
- *   GET  /api/expenses?month=&barber_id=                          -> Expense[]
+ * Expenses (one per barber per day; a barber needs can_add_expense, logs only their own, only today)
+ *   GET  /api/expenses?month=&day=&barber_id=                     -> Expense[]   (barbers: own only)
  *   PUT  /api/expenses          ExpenseInput                      -> Expense | { ok, deleted: true }
+ *   GET  /api/company-expenses?month=                             -> CompanyExpense[]   (admin)
+ *   POST /api/company-expenses  CompanyExpenseInput               -> CompanyExpense     (admin)
+ *   PUT  /api/company-expenses/:id  CompanyExpenseInput           -> CompanyExpense · DELETE /api/company-expenses/:id -> { ok }
+ *   Edits and deletes are compare-and-set: 409 { error, code: "stale" } when someone else changed the row first (reload).
  *
  * Reports
  *   GET /api/reports/me?month=YYYY-MM                             -> MyReport
@@ -30,8 +34,10 @@
  *
  * Admin
  *   GET/POST /api/users, PUT/DELETE /api/users/:id, POST /api/users/:id/reset-password { password }
- *   GET /api/customers?q=&page=       -> Paged<CustomerSuggestion> for barbers (and, until the admin list lands, everyone):
+ *   GET /api/customers?q=&page=&page_size=  -> admin with customers_crm: Paged<Customer> (full list, q = name or phone digits)
+ *                                        otherwise (barbers, and admins without customers_crm): Paged<CustomerSuggestion>,
  *                                        q of 3+ chars or an exact phone, max 8 results, own customers only, name + phone only
+ *   GET /api/customers/:id            -> CustomerDetail   (admin, customers_crm)
  *   GET/PUT /api/settings
  *
  * Services catalogue

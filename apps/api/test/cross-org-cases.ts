@@ -85,3 +85,39 @@ const saleCase = (method: string, body?: unknown): CrossOrgCase => ({
   read: readSale,
 });
 CASES.push(saleCase("PUT", { amount: 25, payment_mode: "card", note: "Pwned" }), saleCase("DELETE"));
+
+// ---- Task 9: company expenses, customers CRM ----
+const seedCompanyExpense = async (orgId: string): Promise<number> => {
+  const r = await env.DB.prepare("INSERT INTO company_expenses(org_id,uid,day,amount,note,paid_from,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id")
+    .bind(orgId, randomToken(9), "2026-11-01", 1000, "rent", "cash", 1, 1)
+    .first<{ id: number }>();
+  return r!.id;
+};
+const readCompanyExpense = async (orgId: string, id: number) => ({
+  row: await env.DB.prepare("SELECT * FROM company_expenses WHERE org_id = ? AND id = ?").bind(orgId, id).first(),
+  ledger: (await env.DB.prepare("SELECT * FROM ledger_entries WHERE source = 'company_expense' AND source_id = ?").bind(id).all()).results,
+  audit: (await env.DB.prepare("SELECT * FROM audit_log WHERE entity = 'company_expense' AND entity_id = ?").bind(id).all()).results,
+});
+const companyCase = (method: string, body?: unknown): CrossOrgCase => ({
+  name: `${method} /api/company-expenses/:id`,
+  method,
+  path: (id) => `/api/company-expenses/${id}`,
+  body,
+  seed: seedCompanyExpense,
+  read: readCompanyExpense,
+});
+CASES.push(companyCase("PUT", { amount: 5, note: "Pwned", paid_from: "bank" }), companyCase("DELETE"));
+
+const seedCustomer = async (orgId: string): Promise<number> => {
+  const r = await env.DB.prepare("INSERT INTO customers(org_id,name,phone,created_at) VALUES(?,?,?,?) RETURNING id")
+    .bind(orgId, "Ali", `05${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`, 1)
+    .first<{ id: number }>();
+  return r!.id;
+};
+CASES.push({
+  name: "GET /api/customers/:id",
+  method: "GET",
+  path: (id) => `/api/customers/${id}`,
+  seed: seedCustomer,
+  read: (orgId, id) => env.DB.prepare("SELECT * FROM customers WHERE org_id = ? AND id = ?").bind(orgId, id).first(),
+});

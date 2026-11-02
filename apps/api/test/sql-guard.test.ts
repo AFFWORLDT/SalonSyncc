@@ -25,7 +25,7 @@ it("infra.ts (rate_hits) is global and not flagged", () => {
 it("every tenant table has a checked statement somewhere", () => {
   const stmts = Object.values(files).flatMap((code) => tenantStatements(code));
   // Tables added by later tasks get their repo statements in their own task; they are listed here as they gain one.
-  // expenses/company_expenses are covered by reports.ts SELECTs (Task 8); Task 9 adds their write SQL (not tracked here).
+  // expenses/company_expenses: reports.ts SELECTs (Task 8) and expenses.ts reads/writes (Task 9).
   const pending: string[] = [];
   // Pending tables must really have no statement yet; once a task adds SQL for one, remove it from `pending`.
   for (const t of pending) {
