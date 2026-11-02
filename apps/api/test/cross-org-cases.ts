@@ -186,3 +186,17 @@ CASES.push(
     read: readStaff,
   },
 );
+
+// ---- Plan 2b Task 2: audit viewer ----
+CASES.push({
+  name: "GET /api/sales/:id/history",
+  method: "GET",
+  path: (id) => `/api/sales/${id}/history`,
+  seed: async (orgId) => {
+    const id = await seedSale(orgId);
+    await env.DB.prepare("INSERT INTO audit_log(org_id,at,actor_name,entity,entity_id,ref,action) VALUES(?,?,?,?,?,?,?)")
+      .bind(orgId, 1, "Owner", "sale", id, "XO", "create").run();
+    return id;
+  },
+  read: async (orgId, id) => (await env.DB.prepare("SELECT * FROM audit_log WHERE org_id = ? AND entity = 'sale' AND entity_id = ?").bind(orgId, id).all()).results,
+});
