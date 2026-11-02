@@ -24,6 +24,7 @@ import { Field } from "@/components/app/field";
 import { SimpleSelect } from "@/components/app/simple-select";
 import { UserAvatar } from "@/components/app/user-avatar";
 import { AvatarPicker } from "@/components/app/avatar-picker";
+import { StaffTree } from "@/components/app/staff-tree";
 import { cn } from "@/lib/utils";
 
 export default function BarbersPage() {
@@ -33,6 +34,7 @@ export default function BarbersPage() {
   const [form, setForm] = useState<{ user: User | null } | null>(null);
   const [reset, setReset] = useState<User | null>(null);
   const [remove, setRemove] = useState<User | null>(null);
+  const [view, setView] = useState<"tree" | "list">("tree");
   const def = settings?.default_commission_pct ?? 0;
   // The plan's staff limit counts active staff, not the owner (same as the API).
   const activeStaff = (data ?? []).filter((u) => u.active && u.role !== "owner").length;
@@ -61,35 +63,7 @@ export default function BarbersPage() {
     }
   }
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl">Staff</h1>
-          <p className="text-sm text-muted-foreground">Shop default commission: {pctLabel(def)} (change in Settings)</p>
-          {maxStaff !== null && (
-            <p data-testid="staff-limit" className="text-xs text-muted-foreground">
-              {activeStaff} of {maxStaff} staff on your plan{atLimit ? " · upgrade your plan to add more" : ""}
-            </p>
-          )}
-        </div>
-        <Button onClick={() => setForm({ user: null })} disabled={atLimit || readOnly}>
-          <Plus />
-          Add staff
-        </Button>
-      </div>
-
-      {error && !data ? (
-        <ErrorState message={error} onRetry={reload} />
-      ) : !data ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {data.map((u) => (
+  const card = (u: User) => (
             <Card key={u.id} className={cn("flex-row items-center gap-3 p-4", !u.active && "opacity-60")}>
               <UserAvatar name={u.name} url={u.avatar_url} size={48} />
               <div className="min-w-0 flex-1">
@@ -133,8 +107,56 @@ export default function BarbersPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </Card>
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl">Staff</h1>
+          <p className="text-sm text-muted-foreground">Shop default commission: {pctLabel(def)} (change in Settings)</p>
+          {maxStaff !== null && (
+            <p data-testid="staff-limit" className="text-xs text-muted-foreground">
+              {activeStaff} of {maxStaff} staff on your plan{atLimit ? " · upgrade your plan to add more" : ""}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <div role="radiogroup" aria-label="View" className="flex rounded-lg bg-muted p-0.5">
+            {(["tree", "list"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                role="radio"
+                aria-checked={view === v}
+                onClick={() => setView(v)}
+                className={cn("h-8 rounded-md px-3 text-sm font-medium", view === v ? "bg-background text-foreground shadow-sm" : "text-muted-foreground")}
+              >
+                {v === "tree" ? "Tree" : "List"}
+              </button>
+            ))}
+          </div>
+        <Button onClick={() => setForm({ user: null })} disabled={atLimit || readOnly}>
+          <Plus />
+          Add staff
+        </Button>
+        </div>
+      </div>
+
+      {error && !data ? (
+        <ErrorState message={error} onRetry={reload} />
+      ) : !data ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
+      ) : (
+        view === "tree" ? (
+          <StaffTree users={data} node={card} />
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.map((u) => card(u))}</div>
+        )
       )}
 
       <UserDialog state={form} onClose={() => setForm(null)} defaultPct={def} maxStaff={maxStaff} />
