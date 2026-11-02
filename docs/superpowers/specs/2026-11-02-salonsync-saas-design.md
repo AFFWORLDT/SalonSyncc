@@ -1,7 +1,7 @@
 # SalonStation — White-label Salon SaaS: Design Spec
 
 - **Date:** 2026-11-02
-- **Status:** Draft v2, waiting for review (user answers from 2026-11-02 included)
+- **Status:** v3 — all open questions answered by the user on 2026-11-02
 - **Repo:** `ERP/salonsync`, remote `github.com/AFFWORLDT/SalonSyncc` (`main`)
 - **Built from:** `ERP/gents-salon` (FM Salon, live in production)
 - **Multi-tenancy ideas from:** `ERP/Properties-Admin-API` and `ERP/crm-propfusion` (PropFusion)
@@ -39,6 +39,8 @@ The system should handle 30–40 salons comfortably on one Worker and one D1 dat
 | D13 | Grace period: the salon **keeps working** for 7 days, with a banner and daily emails. |
 | D14 | **Only the super admin** turns features on and off. Salon owners cannot change features. |
 | D15 | Three plans: **Free, Pro, Pro Max** (§7.1). |
+| D17 | **Free is a permanent plan** with limited features. Signup starts a 7-day Pro Max trial. Before day 14 the owner picks Free, Pro or Pro Max; if they pick nothing, the salon is `expired` (D8). |
+| D18 | Prices: **Free AED 0, Pro AED 200/month, Pro Max AED 499/month.** Anything else (yearly, discounts, custom bundles) is agreed by sales or customer success and set by the super admin as a manual plan (`provider=manual`). |
 | D16 | **FM Salon moves onto SalonStation** as an org, with its production data imported (§12, P1b). |
 
 ### Not in scope for v1
@@ -170,7 +172,7 @@ Super admins have a separate session (`ss_platform`) that only works on `admin.`
 |-------|-------------|
 | `orgs` | `id` (ulid), `slug` UNIQUE, `name`, `status` (see §6), `plan_id`, `trial_ends_at`, `grace_ends_at`, `owner_user_id`, `country`, `created_at`, `deactivated_at`, `deleted_at` |
 | `reserved_slugs` | `slug` (admin, www, api, app, platform, mail, support, …) |
-| `plans` | `id` (`free`, `pro`, `pro_max`), `name`, `price_monthly`, `currency`, `stripe_price_id`, `limits_json` (`max_staff`, `max_wa_msgs_month`), `active`, `sort` |
+| `plans` | `id` (`free`, `pro`, `pro_max`), `name`, `price_monthly` (0 / 200 / 499), `currency` (AED), `stripe_price_id`, `limits_json` (`max_staff`, `max_wa_msgs_month`), `active`, `sort` |
 | `plan_features` | `plan_id`, `feature_key`. A row means the plan includes that feature. |
 | `org_feature_overrides` | `org_id`, `feature_key`, `enabled` (1 forces on, 0 forces off), `reason`, `set_by`, `set_at` |
 | `subscriptions` | `org_id` PK, `provider` (`none` or `stripe`), `stripe_customer_id`, `stripe_subscription_id`, `status`, `current_period_end`, `cancel_at` |
@@ -401,11 +403,9 @@ P0 to P5 make up the **launchable trial product**. Stripe (P6) must ship before 
 - **Staging:** a Worker `salonsync-staging` with its own D1, as FM does.
 
 ## 14. Open questions
-1. **What does "Free" mean after the trial?** Default:
-   - **Free** is a permanent plan with limited features and 2 staff.
-   - Signup starts a **7-day Pro Max trial**.
-   - During trial or grace, the owner picks Free, or pays for Pro or Pro Max.
-   - If they pick nothing by day 14, the salon is `expired` (D8).
+None. All were answered on 2026-11-02 (D12–D18).
 
-   *Alternative:* "Free" is just the 7-day trial, with no forever-free plan. Then Pro and Pro Max are the only paid plans.
-2. **Prices** for Pro and Pro Max, and the currency (AED? INR? both)? These are needed for Stripe in P6, not before.
+**Downgrading to Free:**
+- Free is permanent, so Free salons never go through the grace or expiry path.
+- When a paid salon downgrades, or a trial salon picks Free, the salon keeps all its data. Features above Free are locked (data hidden, not deleted).
+- If staff exceed 2, the extra staff are deactivated by the owner's choice. Nobody is deleted.
