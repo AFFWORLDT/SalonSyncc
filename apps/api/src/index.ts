@@ -18,6 +18,7 @@ import { audit } from "./tenant/audit/routes";
 import { notifications } from "./tenant/notifications/routes";
 import { announcements } from "./tenant/announcements/routes";
 import { ratings } from "./tenant/ratings/routes";
+import { whatsapp } from "./tenant/whatsapp/routes";
 
 const app = new Hono<AppEnv>();
 
@@ -79,6 +80,8 @@ tenantApi.route("/", notifications);
 tenantApi.route("/", announcements);
 // /ratings; gated per route (feature ratings, admin).
 tenantApi.route("/", ratings);
+// /whatsapp/config; gated per route (feature whatsapp, admin).
+tenantApi.route("/", whatsapp);
 app.route("/api", tenantApi);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

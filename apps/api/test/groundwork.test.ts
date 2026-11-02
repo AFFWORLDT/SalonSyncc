@@ -121,14 +121,15 @@ describe("orgAppUrl", () => {
 
 describe("services seam", () => {
   afterEach(() => fakeServices().uninstall());
-  it("real clients by default (WhatsApp stub until Task 6); a test override swaps them", async () => {
+  it("real clients by default; a test override swaps them", async () => {
     const real = services(env);
     // Real FCM client without FCM_SERVICE_ACCOUNT: a no-op, no network.
     await expect(real.push.send({ ...env, FCM_SERVICE_ACCOUNT: undefined }, ["t"], { title: "x", body: "y" })).resolves.toEqual({ dead: [] });
-    await expect(real.wa.listTemplates({ phoneNumberId: "p", wabaId: "w", token: "t" })).rejects.toThrow(/not implemented/);
+    // Real WhatsApp client is the Graph client (exercised with a fake fetch in wa-config.test.ts; never called here).
+    expect(typeof real.wa.sendTemplate).toBe("function");
     const f = fakeServices();
     f.install();
-    const r = await services(env).wa.sendTemplate({ phoneNumberId: "p", wabaId: "w", token: "t" }, "0501234567", "ss_bill", "en", ["Ali"]);
+    const r = await services(env).wa.sendTemplate({ phoneNumberId: "p", wabaId: "w", token: "t", testNumbers: null, callingCode: "971" }, "0501234567", "ss_bill", "en", ["Ali"]);
     expect(r).toMatchObject({ status: "sent" });
     expect(f.wa).toHaveLength(1);
     // the override is ignored outside the test environment

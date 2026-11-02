@@ -3,7 +3,7 @@
  * Pure helpers and types; the SQL (auditStmt) lives in data/tenant/audit.ts.
  */
 
-export type AuditEntity = "sale" | "expense" | "company_expense" | "payout" | "transfer" | "opening" | "user" | "service" | "settings";
+export type AuditEntity = "sale" | "expense" | "company_expense" | "payout" | "transfer" | "opening" | "user" | "service" | "settings" | "whatsapp";
 export type AuditAction = "create" | "update" | "delete" | "password_reset";
 
 /** An id known only inside the batch, e.g. `(SELECT id FROM sales WHERE org_id = ? AND uid = ?)`. */

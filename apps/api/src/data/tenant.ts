@@ -14,3 +14,4 @@ export * from "./tenant/audit-view";
 export * from "./tenant/notifications";
 export * from "./tenant/announcements";
 export * from "./tenant/ratings";
+export * from "./tenant/whatsapp";

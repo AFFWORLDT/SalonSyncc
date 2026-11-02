@@ -489,7 +489,25 @@ export interface AuditEntry {
  *   POST /api/public/feedback/:token FeedbackInput -> FeedbackPage (public; one rating per bill, sending again updates it)
  *   PUT  /api/customers/:id/whatsapp {opt_out} -> Customer  (admin)
  *   GET/POST /api/wa/webhook                   Meta's callback (public): verification, delivery receipts, STOP replies
+ *   GET    /api/whatsapp/config                -> WaConfigView | null (owner/admin; never the token)
+ *   PUT    /api/whatsapp/config WaConfigInput  -> { wa_ready: true }  (owner/admin; 409 when another salon has the number)
+ *   DELETE /api/whatsapp/config                -> { wa_ready: false } (owner/admin)
  */
+/** The salon's own Meta WhatsApp number. The token is write-only: stored encrypted, never returned. */
+export interface WaConfigInput {
+  phone_number_id: string; // 5-25 digits
+  waba_id: string; // 5-25 digits
+  token: string; // non-empty, at most 512 chars, no whitespace
+  test_numbers?: string | null; // comma-separated phones (at most 20); when set only these are messaged
+}
+
+export interface WaConfigView {
+  phone_number_id: string;
+  waba_id: string;
+  test_numbers: string[]; // canonical phones; empty = everyone is messaged
+  has_token: true;
+}
+
 export type WaStatus = "queued" | "sent" | "failed" | "skipped";
 
 export interface WaMessage {

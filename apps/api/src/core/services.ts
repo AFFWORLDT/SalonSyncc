@@ -1,9 +1,12 @@
 import type { Env } from "../env";
+import type { WaSlot } from "@ss/contract";
 import { fcmPush } from "../integrations/push-client";
+import { graphWaClient } from "../integrations/wa-client";
+import type { WaValue } from "../lib/whatsapp";
 
 /**
  * Outbound service clients (WhatsApp Cloud API, FCM push) behind one seam so tests swap in fakes
- * (test/fakes.ts) and no test ever reaches Meta or Google. The real push client is integrations/push-client.ts; WhatsApp lands in Task 6.
+ * (test/fakes.ts) and no test ever reaches Meta or Google. Real clients: integrations/push-client.ts and integrations/wa-client.ts.
  */
 
 /** One org's WhatsApp number: from org_whatsapp with the token decrypted. Never logged or returned. */
@@ -11,13 +14,14 @@ export interface WaConfig {
   phoneNumberId: string;
   wabaId: string;
   token: string;
+  /** Comma-separated canonical phones; when set only these are messaged (the rest are "skipped"). */
+  testNumbers: string | null;
+  /** The org's calling code (settings phone_country), to turn canonical phones into Meta's digits. */
+  callingCode: string;
 }
 
 /** A template's blank filled per send (FM WaValue): a plain numbered body value, a header/body slot, or a button suffix. */
-export type WaValue =
-  | string
-  | { part: "header" | "body"; key?: string; media?: "image" | "video" | "document"; text: string; filename?: string }
-  | { part: "button"; index: number; text: string };
+export type { WaValue };
 
 export type SendResult = { status: "sent"; wa_id: string } | { status: "failed"; error: string } | { status: "skipped"; error: string };
 
@@ -31,7 +35,7 @@ export interface WaTemplateInfo {
   header: string | null;
   body: string;
   vars: number;
-  slots: unknown[];
+  slots: WaSlot[];
   sendable: boolean;
 }
 
@@ -72,18 +76,9 @@ export interface Services {
   push: PushClient;
 }
 
-const notImplemented = (what: string) => async (): Promise<never> => {
-  throw new Error(`${what}: not implemented`);
-};
-
-/** Real clients. WhatsApp is a stub until Task 6 implements it. */
+/** Real clients: Meta Graph (v21.0) and FCM v1. */
 const REAL: Services = {
-  wa: {
-    sendTemplate: notImplemented("wa.sendTemplate"),
-    uploadMedia: notImplemented("wa.uploadMedia"),
-    listTemplates: notImplemented("wa.listTemplates"),
-    createTemplate: notImplemented("wa.createTemplate"),
-  },
+  wa: graphWaClient(),
   push: fcmPush,
 };
 

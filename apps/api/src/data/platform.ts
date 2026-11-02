@@ -60,6 +60,20 @@ export function platformRepo(db: D1Database) {
         .first<OrgRow>();
       return r ? toOrg(r) : null;
     },
+    /**
+     * The org a WhatsApp phone_number_id belongs to (globally UNIQUE). Platform-level on purpose: only the webhook uses
+     * it, to find the org for Meta's callback before any org-scoped work. Never reads the token.
+     */
+    async orgByPhoneNumberId(phoneNumberId: string): Promise<Org | null> {
+      const r = await db
+        .prepare(
+          `SELECT o.id, o.slug, o.name, o.status, o.plan_id, o.trial_ends_at, o.grace_ends_at
+           FROM org_whatsapp w JOIN orgs o ON o.id = w.org_id WHERE w.phone_number_id = ?`,
+        )
+        .bind(phoneNumberId)
+        .first<OrgRow>();
+      return r ? toOrg(r) : null;
+    },
     async planFeatures(planId: string): Promise<string[]> {
       const { results } = await db
         .prepare("SELECT feature_key FROM plan_features WHERE plan_id = ?")
