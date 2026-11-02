@@ -52,3 +52,24 @@ These come from the Plan 1 per-task reviews and the final review. Each was triag
   - [x] remove the `MAX(id)` lookup from `wa_campaigns` (no `MAX(id)` anywhere in `src/`, enforced by a test)
 - [ ] **Free plan:** no Queues. Send email via `waitUntil`, and have the hourly cron retry rows in `email_log` with status `failed` (spec D19). Still open: `email_log` arrives in Plan 6, so this moves there.
 
+
+## From the Plan 2b final review (parked)
+
+### Plan 2c (FM import)
+- Set `wa_bill_pdf_template`, which defaults to `ss_bill_pdf`, to a template that exists on FM's WABA.
+- FM templates may embed "AED" in their text. Decide between editing the template text and adding a `wa_amount_plain` setting.
+
+### Plan 5 (super admin usage view)
+- A push to about 39 devices uses a whole cron tick's subrequests and can starve barber reminders. Surface the device counts.
+- Per-tick CPU grows with the total org count, because the loader parses every org. Revisit when moving off the free plan.
+
+### Hardening pass
+- **AES-GCM:** bind the ciphertext to `org_id` with `additionalData`, using a v2 format.
+- **Webhook:** cap the body while streaming it, and compute the HMAC over the raw bytes.
+- **PNG logos:** the cap is by pixel count only; also cap by bytes.
+- **Expired orgs:** `GET /public/review/:token` still records a click for expired orgs. It is harmless.
+- **Graph calls:** `checkNumber` and the other Graph calls have no fetch timeout.
+- **Webhook STOPs:** a payload with STOPs for more than about 22 distinct salon numbers logs the overflow instead of applying it.
+- **Tests:** add a stale edit-vs-edit 409 test whose losing PUT carries items.
+- **Campaigns:** a fast `failed` receipt can arrive before its `wa_id` is stored and gets dropped. Today this only logs a warning.
+- **Auth reserve:** `TENANT_AUTH_STMTS = 6` is a constant. The counting tests guard it.
