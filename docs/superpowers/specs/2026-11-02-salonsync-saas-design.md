@@ -125,8 +125,8 @@ salonsync/
 │  ├─ features/            feature keys, plan catalog defaults, gating helpers
 │  └─ ui/                  shadcn components + FM design tokens (shared by web & site)
 ├─ docs/superpowers/{specs,plans}/
-├─ pnpm-workspace.yaml
-└─ package.json            (turbo or plain pnpm scripts)
+├─ (npm workspaces, as in FM Salon)
+└─ package.json            (workspaces: apps/*, packages/*)
 ```
 
 **Where the boundaries are:**
