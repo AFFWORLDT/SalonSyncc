@@ -238,7 +238,9 @@ sales.put("/:id", async (c) => {
   const label =
     name ?? existing?.name ?? (WALK_IN.test(sale.customer_label) ? sale.customer_label : `Customer ${await c.var.tenant.repo.nextSeq(`cust_${dayStamp(day)}`)}`);
 
-  const applied = await repo.update(
+  let applied: boolean;
+  try {
+    applied = await repo.update(
     sale,
     {
       day,
@@ -255,6 +257,11 @@ sales.put("/:id", async (c) => {
     },
     { id: me.id, name: me.name },
   );
+  } catch (e) {
+    // As in create: a catalogue service deleted mid-request fails sale_items' FK and the batch writes nothing.
+    if (/FOREIGN KEY constraint failed/i.test(String((e as Error)?.message ?? e))) throw bad(SERVICE_GONE);
+    throw e;
+  }
   if (!applied) await lostRace(repo, sale.id);
   const updated = await repo.byId(sale.id);
   if (!updated) throw new HttpError(404, "Not found"); // deleted right after our write

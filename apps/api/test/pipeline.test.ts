@@ -62,3 +62,24 @@ describe("writeGuard", () => {
     expect((await call("/api/nope", "GET", cookie)).status).toBe(404);
   });
 });
+
+describe("DEV_ALLOWED_ORIGINS (local next dev only)", () => {
+  const write = async (origin: string, extra: Record<string, string> = {}) => {
+    const { cookie } = await setup(`pl-dev-${Math.random().toString(36).slice(2, 8)}`);
+    return app.fetch(
+      new Request("https://x.test/api/auth/logout", { method: "POST", headers: { cookie, origin } }),
+      { ...env, ROOT_DOMAIN: "", ...extra },
+      ctx,
+    );
+  };
+  it("blocks a foreign origin without the var", async () => {
+    const r = await write("http://localhost:3000");
+    expect(r.status).toBe(403);
+    expect(await r.json()).toMatchObject({ code: "bad_origin" });
+  });
+  it("lets a listed origin through and still blocks others", async () => {
+    expect((await write("http://localhost:3000", { DEV_ALLOWED_ORIGINS: "http://localhost:3000, http://127.0.0.1:3000" })).status).not.toBe(403);
+    expect((await write("http://evil.test", { DEV_ALLOWED_ORIGINS: "http://localhost:3000" })).status).toBe(403);
+    expect((await write("http://localhost:3000.evil.test", { DEV_ALLOWED_ORIGINS: "http://localhost:3000" })).status).toBe(403);
+  });
+});

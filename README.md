@@ -60,6 +60,7 @@ Set with `wrangler secret put <NAME>` (never commit values; local ones go in the
 | `FCM_SERVICE_ACCOUNT` | Firebase service-account JSON, one FCM project for all salons. Unset: push sends are skipped |
 | `WA_APP_SECRET` | Meta app secret; verifies the `X-Hub-Signature-256` on webhook POSTs (503 without it) |
 | `WA_VERIFY_TOKEN` | Token for Meta's webhook GET handshake |
+| `DEV_ALLOWED_ORIGINS` | **Local only, in `.dev.vars`; never set in production.** Comma-separated origins allowed to write cross-origin, e.g. `http://localhost:3000` for `next dev` |
 
 ## WhatsApp webhook
 

@@ -27,6 +27,7 @@ import type { Env } from "./env";
 /** The Hono app (also exported by name: tests read its route table). */
 export const app = new Hono<AppEnv>();
 
+
 app.get("/api/health", (c) => c.json({ ok: true, brand: c.env.BRAND_NAME }));
 
 app.route("/api/auth", auth);
@@ -106,8 +107,24 @@ app.onError((err, c) => {
 });
 
 // The Worker: HTTP through Hono, and the cron (wrangler.jsonc triggers, every 10 minutes) through jobs/hourly.ts.
+/**
+ * Security headers on every API answer (FM index.ts). Added outside Hono: an app.use("/api/*") would count as a matched
+ * route and defeat tenantGuard's "unknown path stays 404" check. Routes that set their own Cache-Control keep it.
+ */
+async function fetchWithHeaders(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const res = await app.fetch(req, env, ctx);
+  if (!new URL(req.url).pathname.startsWith("/api/")) return res;
+  const out = new Response(res.body, res);
+  const h = out.headers;
+  if (!h.has("Cache-Control")) h.set("Cache-Control", "no-store");
+  h.set("X-Content-Type-Options", "nosniff");
+  h.set("X-Frame-Options", "DENY");
+  h.set("Referrer-Policy", "same-origin");
+  return out;
+}
+
 export default {
-  fetch: app.fetch,
+  fetch: fetchWithHeaders,
   scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(hourly(env, event.scheduledTime).catch((err) => console.error("cron failed", err)));
   },

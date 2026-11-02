@@ -32,9 +32,13 @@ export interface StaffWrite {
 const COLS =
   "id, org_id, username, name, phone, role, commission_pct, sort_order, active, can_add_expense, avatar_v, created_at, updated_at";
 
-/** Where the browser fetches a user's photo; null when there is none. `slug` is needed on workers.dev (no tenant host). */
-export function avatarUrl(id: number, v: number | null | undefined, slug: string): string | null {
-  return v ? `/api/public/avatar/${id}/${v}?org=${encodeURIComponent(slug)}` : null;
+/**
+ * Where the browser fetches a user's photo; null when there is none or the user is inactive (the public route 404s then).
+ * avatar_v only ever grows: positive = a photo at that version, zero or negative = cleared (clearAvatar negates it), so a
+ * re-upload after a clear never reuses an immutable URL. `slug` is needed on workers.dev (no tenant host).
+ */
+export function avatarUrl(id: number, v: number | null | undefined, slug: string, active: boolean | number = true): string | null {
+  return v && v > 0 && active ? `/api/public/avatar/${id}/${v}?org=${encodeURIComponent(slug)}` : null;
 }
 
 /** A user as the audit log keeps it: no secrets, photo or counters. */
@@ -207,13 +211,13 @@ export function usersRepo(db: D1Database, orgId: string) {
     /** Stores a photo and returns the new version, or null when the user isn't in this org. */
     async setAvatar(id: number, bytes: ArrayBuffer, type: string): Promise<number | null> {
       const r = await db
-        .prepare("UPDATE users SET avatar = ?, avatar_type = ?, avatar_v = avatar_v + 1, updated_at = ? WHERE org_id = ? AND id = ? RETURNING avatar_v")
+        .prepare("UPDATE users SET avatar = ?, avatar_type = ?, avatar_v = abs(avatar_v) + 1, updated_at = ? WHERE org_id = ? AND id = ? RETURNING avatar_v")
         .bind(bytes, type, Date.now(), orgId, id)
         .first<{ avatar_v: number }>();
       return r?.avatar_v ?? null;
     },
     async clearAvatar(id: number): Promise<void> {
-      await db.prepare("UPDATE users SET avatar = NULL, avatar_type = NULL, avatar_v = 0, updated_at = ? WHERE org_id = ? AND id = ?").bind(Date.now(), orgId, id).run();
+      await db.prepare("UPDATE users SET avatar = NULL, avatar_type = NULL, avatar_v = -(abs(avatar_v) + 1), updated_at = ? WHERE org_id = ? AND id = ?").bind(Date.now(), orgId, id).run();
     },
     /** The photo of an active user of this org at version `v` (its current avatar_v); null otherwise. */
     async avatar(id: number, v: number): Promise<{ bytes: Uint8Array; type: string } | null> {

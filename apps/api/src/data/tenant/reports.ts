@@ -83,7 +83,7 @@ export function reportsRepo(db: D1Database, orgId: string) {
       .all<{ id: number; name: string; role: string; active: number; avatar_v: number }>();
     return results
       .filter((u) => (u.role === "barber" && u.active) || withData.has(u.id))
-      .map((u) => ({ id: u.id, name: u.name, active: !!u.active, avatar_url: avatarUrl(u.id, u.avatar_v, slug) }));
+      .map((u) => ({ id: u.id, name: u.name, active: !!u.active, avatar_url: avatarUrl(u.id, u.avatar_v, slug, u.active) }));
   }
 
   async function totalsBetween(from: string, to: string): Promise<Range> {

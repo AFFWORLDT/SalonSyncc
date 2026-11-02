@@ -60,6 +60,9 @@ export interface MeUser {
   name: string;
   username: string;
   role: Role;
+  commission_pct: number | null; // percent; null = the salon default
+  avatar_url: string | null;
+  can_add_expense: boolean;
 }
 
 /** GET /api/me */

@@ -363,6 +363,41 @@ describe("a service deleted between resolving the items and the write batch (M7)
   });
 });
 
+describe("a service deleted mid-request on PUT /sales/:id (Plan 3 start follow-up)", () => {
+  it("answers 400 like create, not 500", async () => {
+    const a = await setup("svc-race-put");
+    const svc = await json(await call("POST", "/services", a.ck, { category: "Haircuts", name: "Cut", price: 20 }));
+    const sale = await json(await post(a.ck, { payment_mode: "cash", items: [{ service_id: svc.id, qty: 1 }] }));
+    let done = false;
+    const DB = new Proxy(env.DB, {
+      get(t, k) {
+        if (k === "batch")
+          return async (stmts: D1PreparedStatement[]) => {
+            if (!done) {
+              done = true;
+              await env.DB.prepare("DELETE FROM services WHERE org_id = ? AND id = ?").bind(a.org.id, svc.id).run();
+            }
+            return t.batch(stmts);
+          };
+        const v = (t as any)[k];
+        return typeof v === "function" ? v.bind(t) : v;
+      },
+    });
+    const r = await app.fetch(
+      new Request(`https://x.test/api/sales/${sale.id}`, {
+        method: "PUT",
+        headers: { cookie: a.ck, "content-type": "application/json" },
+        body: JSON.stringify({ payment_mode: "card", items: [{ service_id: svc.id, qty: 2 }] }),
+      }),
+      { ...E, DB },
+      ctx,
+    );
+    expect(done).toBe(true);
+    expect(r.status).toBe(400);
+    expect(await json(r)).toEqual({ error: "One of the services no longer exists. Refresh and pick again." });
+  });
+});
+
 describe("ledger data layer and hooks", () => {
   it("reverseStmts only touches the caller's org (INV§8.4)", async () => {
     const a = await setup("lg-rev-a");

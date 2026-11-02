@@ -6,6 +6,7 @@ import { issueSession } from "../core/session";
 import { LOGIN_WINDOW_MS, isLocked, loginLimits } from "../lib/limits";
 import { businessDay } from "../lib/clock";
 import { clockOf, settingsRepo, withWaReady } from "../data/tenant";
+import { avatarUrl } from "../data/tenant/users";
 
 /** Registers /me routes on the tenant router. Auth, origin and write guards come from the router-level tenantGuard; do not add them here. */
 export function registerMe(tenantApi: App): void {
@@ -13,7 +14,15 @@ export function registerMe(tenantApi: App): void {
     const { org, user, features, limits } = c.var.tenant;
     const settings = await settingsRepo(c.env.DB, org.id).get();
     const body: MeResponse = {
-      user: { id: user.id, name: user.name, username: user.username, role: user.role },
+      user: {
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        role: user.role,
+        commission_pct: user.commission_pct,
+        avatar_url: avatarUrl(user.id, user.avatar_v, org.slug),
+        can_add_expense: !!user.can_add_expense,
+      },
       org: { id: org.id, slug: org.slug, name: org.name, status: org.status, planId: org.planId },
       settings: await withWaReady(c.env.DB, org.id, features, settings),
       features,

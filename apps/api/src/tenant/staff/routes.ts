@@ -46,7 +46,7 @@ const toUser = (r: StaffRow, slug: string): User => ({
   sort_order: r.sort_order,
   active: !!r.active,
   can_add_expense: !!r.can_add_expense,
-  avatar_url: avatarUrl(r.id, r.avatar_v, slug),
+  avatar_url: avatarUrl(r.id, r.avatar_v, slug, r.active),
   created_at: r.created_at,
 });
 

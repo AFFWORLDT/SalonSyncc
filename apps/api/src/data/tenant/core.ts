@@ -10,6 +10,9 @@ export interface UserRow {
   password_hash: string;
   active: 0 | 1;
   session_version: number;
+  commission_pct: number | null;
+  can_add_expense: 0 | 1;
+  avatar_v: number;
 }
 
 export interface OrgSettings {
@@ -35,7 +38,7 @@ export interface OrgSettings {
   googleReviewUrl: string | null;
 }
 
-const USER_COLS = "id, org_id, username, name, role, password_hash, active, session_version";
+const USER_COLS = "id, org_id, username, name, role, password_hash, active, session_version, commission_pct, can_add_expense, avatar_v";
 
 /** Every query here is scoped by org_id; tests/sql-guard.test.ts enforces it. */
 export function tenantRepo(db: D1Database, orgId: string) {

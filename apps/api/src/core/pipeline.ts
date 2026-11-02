@@ -14,6 +14,12 @@ import type { FeatureKey } from "@ss/features";
  * Rejects when Origin is present and its host differs from the request host (or is the literal "null"), or when
  * Sec-Fetch-Site is present and not same-origin/none. Requests with neither header (curl, server-to-server) pass.
  */
+/** True when `origin` exactly matches one entry of the comma-separated dev allow-list. */
+function devAllowed(list: string | undefined, origin: string): boolean {
+  if (!list) return false;
+  return list.split(",").map((x) => x.trim()).filter(Boolean).includes(origin);
+}
+
 export const originGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
   const bad = () => new HttpError(403, "Cross-site request blocked", "bad_origin");
   const origin = c.req.header("origin");
@@ -24,7 +30,13 @@ export const originGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
     } catch {
       /* unparseable, including "null" */
     }
-    if (host === null || host !== new URL(c.req.url).host) throw bad();
+    if (host === null) throw bad();
+    if (host !== new URL(c.req.url).host) {
+      // Local `next dev` (localhost:3000 proxying to wrangler) only: DEV_ALLOWED_ORIGINS is never set in wrangler vars.
+      if (!devAllowed(c.env.DEV_ALLOWED_ORIGINS, origin)) throw bad();
+      await next();
+      return;
+    }
   }
   const site = c.req.header("sec-fetch-site");
   if (site !== undefined && site !== "same-origin" && site !== "none") throw bad();

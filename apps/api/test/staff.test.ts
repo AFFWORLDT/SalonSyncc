@@ -340,3 +340,29 @@ describe("case-insensitive username index", () => {
     await ins(b.id, "sam");
   });
 });
+
+describe("avatar versions (Plan 3 start follow-ups)", () => {
+  const png = (n: number) => new Uint8Array(n).fill(7);
+  const put = (ck: string) => call("PUT", "/me/avatar", ck, png(20), { "content-type": "image/png" });
+
+  it("a re-upload after a clear gets a new, never-reused URL", async () => {
+    const { owner, ck } = await setup("st-avver");
+    const u1 = ((await (await put(ck)).json()) as any).avatar_url;
+    await call("DELETE", "/me/avatar", ck);
+    const list0: any[] = await (await call("GET", "/users", ck)).json();
+    expect(list0.find((u) => u.id === owner.id).avatar_url).toBeNull();
+    const u2 = ((await (await put(ck)).json()) as any).avatar_url;
+    expect(u2).not.toBe(u1);
+    expect(u2).toBe(`/api/public/avatar/${owner.id}/3?org=st-avver`);
+    expect((await pub(u1.replace("/api/public", ""))).status).toBe(404);
+    expect((await pub(u2.replace("/api/public", ""))).status).toBe(200);
+  });
+
+  it("an inactive user's avatar_url is null", async () => {
+    const { org, ck } = await setup("st-avi");
+    const b = await makeUser(org.id, { username: "bb", role: "barber" });
+    await env.DB.prepare("UPDATE users SET avatar = x'00', avatar_type = 'image/png', avatar_v = 1, active = 0 WHERE id = ?").bind(b.id).run();
+    const list: any[] = await (await call("GET", "/users", ck)).json();
+    expect(list.find((u) => u.id === b.id).avatar_url).toBeNull();
+  });
+});

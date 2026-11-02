@@ -212,7 +212,7 @@ export function ledgerBooks(db: D1Database, orgId: string) {
         .all<{ id: number; name: string; role: string; avatar_v: number | null; active: number; earned: number; paid: number; balance: number; n: number }>();
       return r.results
         .filter((x) => only !== undefined || x.n > 0 || (x.active && x.role === "barber"))
-        .map((x) => ({ id: x.id, name: x.name, avatar_url: avatarUrl(x.id, x.avatar_v, slug), active: !!x.active, earned: x.earned, paid: x.paid, balance: x.balance }));
+        .map((x) => ({ id: x.id, name: x.name, avatar_url: avatarUrl(x.id, x.avatar_v, slug, x.active), active: !!x.active, earned: x.earned, paid: x.paid, balance: x.balance }));
     },
 
     /** FM GET /ledger/barbers/:id lines: what the barber was owed before `from`, then each line with the running balance. */
