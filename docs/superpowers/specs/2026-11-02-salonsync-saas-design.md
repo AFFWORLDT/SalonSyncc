@@ -40,6 +40,7 @@ The system should handle 30–40 salons comfortably on one Worker and one D1 dat
 | D14 | **Only the super admin** turns features on and off. Salon owners cannot change features. |
 | D15 | Three plans: **Free, Pro, Pro Max** (§7.1). |
 | D17 | **Free is a permanent plan** with limited features. Signup starts a 7-day Pro Max trial. Before day 14 the owner picks Free, Pro or Pro Max; if they pick nothing, the salon is `expired` (D8). |
+| D19 | Stay on the **Workers FREE plan** until more than 8 salons are onboarded. Design within the free limits: 10 ms CPU per request, no Queues, daily quotas. |
 | D18 | Prices: **Free AED 0, Pro AED 200/month, Pro Max AED 499/month.** Anything else (yearly, discounts, custom bundles) is agreed by sales or customer success and set by the super admin as a manual plan (`provider=manual`). |
 | D16 | **FM Salon moves onto SalonStation** as an org, with its production data imported (§12, P1b). |
 
@@ -57,7 +58,7 @@ The system should handle 30–40 salons comfortably on one Worker and one D1 dat
                     propfusion.io (Vercel, existing)
                     └─ /for/salon-software  ──"Start free trial"──┐
                                                                    ▼
-┌───────────────────────────── Cloudflare (Affworld0, Workers Paid) ─────────────────────────────┐
+┌───────────────────────────── Cloudflare (Affworld0, Workers FREE) ─────────────────────────────┐
 │                                                                                                 │
 │  salonsync-site  (static Worker)          salonsync-app  (one Worker: Hono API + static assets) │
 │  salonstation.online                      *.salonstation.online   admin.salonstation.online     │
@@ -67,7 +68,7 @@ The system should handle 30–40 salons comfortably on one Worker and one D1 dat
 │                                           ├─ /api/stripe/webhook                                │
 │                                           ├─ static: salon dashboard + super admin UI           │
 │                                           ├─ cron (hourly): lifecycle, reminders, WA jobs       │
-│                                           └─ Queue producer ──▶ email-queue ──▶ consumer        │
+│                                           └─ email: waitUntil + cron retry (no Queues on free)  │
 │                                                                                                 │
 │  D1: salonsync-db   (platform tables + salon tables with org_id)                                │
 │  KV: (optional) host→org cache       Turnstile: signup bot check                                │
@@ -82,7 +83,7 @@ The system should handle 30–40 salons comfortably on one Worker and one D1 dat
 |-------|----------|---------------|
 | Workers (one app Worker, one static site Worker) | API, dashboard, landing | Yes |
 | D1 (one database) | All data | Yes |
-| Queues | Sending email with retries, so cron and signup never block on email | Yes (small) |
+| Queues | Email with retries | **No** (paid only). Use `waitUntil` plus the hourly cron, which retries rows in `email_log` with status `failed`. Switch to Queues on upgrade. |
 | Cron Triggers | Trial and grace lifecycle, reminders, existing FM jobs | Yes |
 | Turnstile | Stop bot signups | Yes |
 | Email Service | Welcome, reminder and expiry emails | Yes |
@@ -90,7 +91,13 @@ The system should handle 30–40 salons comfortably on one Worker and one D1 dat
 | Durable Objects / Realtime | Live updates (e.g. owner sees a new sale instantly) | No (later) |
 | R2 | Logos and staff photos (FM stores them as D1 BLOBs) | Recommended; see §9 |
 
-**The account must be on Workers Paid (~$5/month).** The free plan's 10 ms CPU limit is already tight for FM's password hashing, and cron, queues and email for 40 salons need more room.
+**Plan: Workers FREE until more than 8 salons are onboarded (D19, 2026-11-02).** Upgrade to Workers Paid (~$5/month) then.
+
+While on free:
+- Keep per-request CPU under about 10 ms. PBKDF2 stays at 10k iterations, as in FM, and there is no heavy per-request work.
+- No Queues.
+- Stay within the daily quotas: 100k requests, and 5M D1 reads / 100k D1 writes.
+- The super admin overview shows daily usage, so the upgrade point is visible (Plan 5).
 
 ---
 
@@ -375,7 +382,7 @@ The welcome email includes the salon's portal link, the Salon ID, the trial end 
 
 | Phase | Delivers | Exit check |
 |-------|----------|------------|
-| **P0 Foundation** | Monorepo, `packages/ui` from FM, wrangler with the Affworld0 account (Workers Paid), D1 platform and salon schema, `data/` layer with `org_id` scoping and its guard test, tenant resolver, org-bound session | Two seeded orgs; the cross-org test passes |
+| **P0 Foundation** | Monorepo, `packages/ui` from FM, wrangler with the Affworld0 account (Workers free plan), D1 platform and salon schema, `data/` layer with `org_id` scoping and its guard test, tenant resolver, org-bound session | Two seeded orgs; the cross-org test passes |
 | **P1 Port FM features** | All FM modules under `tenant/*`, settings per salon (§8), FM UI working for any org | FM's full flow works for an AED org and an INR org |
 | **P1b FM Salon import** (D16) | Script that reads the `fm-salon-db` export and writes it into SalonStation as org `fm`. It adds `org_id`, maps settings to `org_settings`, re-keys counters, and keeps bill numbers and the `FM-` prefix. Carries over WhatsApp credentials, encrypted. Staff re-enable push once, because the Firebase project changes. | Dry run on staging matches FM's totals (sales, ledger balances, customers) exactly. Cutover in the early hours with FM's Worker redirecting to `fm.<domain>`. FM is on a manually assigned plan (`provider=manual`). |
 | **P2 Features and plans** | `packages/features`, plans tables, effective features, `requireFeature`, `/api/me`, dynamic nav, `FeatureGate`, banners | Turning a feature off hides it in the UI and returns 403 from the API |
