@@ -11,8 +11,8 @@
  *   PUT  /api/me/password       { current, next }                 -> { ok }
  *
  * Sales (barbers see and change only their own, and only today's)
- *   GET    /api/sales?day=&from=&to=&barber_id=&page=&page_size=  -> Paged<Sale>
- *   POST   /api/sales           SaleInput                         -> Sale
+ *   GET    /api/sales?day=&from=&to=&barber_id=&customer_id=&q=&payment_mode=&page=&page_size=  -> Paged<Sale> (with sum; page_size ≤ 200)
+ *   POST   /api/sales           SaleInput                         -> Sale (201)
  *   PUT    /api/sales/:id       SaleInput                         -> Sale
  *   DELETE /api/sales/:id                                         -> { ok }
  *   GET    /api/public/receipt/:token                             -> Receipt   (no sign-in)
@@ -30,7 +30,8 @@
  *
  * Admin
  *   GET/POST /api/users, PUT/DELETE /api/users/:id, POST /api/users/:id/reset-password { password }
- *   GET /api/customers?q=&page=       (barbers: q of 3+ chars, max 8 results, name + phone only)
+ *   GET /api/customers?q=&page=       -> Paged<CustomerSuggestion> for barbers (and, until the admin list lands, everyone):
+ *                                        q of 3+ chars or an exact phone, max 8 results, own customers only, name + phone only
  *   GET/PUT /api/settings
  *
  * Services catalogue
@@ -226,10 +227,10 @@ export interface Sale {
   amount: number;
   payment_mode: PaymentMode;
   note: string | null;
-  commission_pct: number;
-  commission: number;
-  vat_rate: number;
-  vat_amount: number;
+  commission_pct: number; // percent (20 = 20%), snapshot at sale time
+  commission: number; // minor units
+  vat_rate: number; // percent (5 = 5%); 0 when VAT was off
+  vat_amount: number; // minor units, inside amount
   created_at: number;
   items: SaleItem[]; // empty for an amount-only sale
 }
@@ -237,7 +238,7 @@ export interface Sale {
 export interface SaleInput {
   /** Major units. Ignored when items are given (the total is their sum). */
   amount?: number | string;
-  /** Catalogue services ({service_id, qty, price? (major units, when changed on the bill)}) and/or one-off items ({name, price (major units), qty}). */
+  /** At most 30. Catalogue services ({service_id, qty}; name and price come from the catalogue) and/or one-off items ({name, price (major units), qty}). qty is clamped to 1..20. */
   items?: { service_id?: number; name?: string; price?: number | string; qty?: number }[];
   payment_mode: PaymentMode;
   customer_name?: string | null;
@@ -635,6 +636,9 @@ export interface Customer {
   last_visit_at: number | null;
   wa_opt_out: boolean; // never sent WhatsApp reminders or announcements
 }
+
+/** GET /api/customers autocomplete row (the sale form). */
+export type CustomerSuggestion = Pick<Customer, "id" | "name" | "phone">;
 
 /** GET /api/customers/:id (admin): one customer's profile; their visits come from GET /api/sales?customer_id=. */
 export interface CustomerDetail extends Customer {

@@ -1,5 +1,5 @@
 /** Tables whose rows belong to a salon. The SQL guard test requires every statement touching these to be org_id scoped. Later plans extend this list. */
-export const TENANT_TABLES = ["users", "counters", "login_failures", "org_settings", "services", "audit_log"] as const;
+export const TENANT_TABLES = ["users", "counters", "login_failures", "org_settings", "services", "audit_log", "customers", "sales", "sale_items", "ledger_entries"] as const;
 
 export interface UserRow {
   id: number;

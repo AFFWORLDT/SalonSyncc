@@ -9,6 +9,8 @@ import { publicApi } from "./core/public";
 import { settings } from "./tenant/settings/routes";
 import { staff, avatarPublic } from "./tenant/staff/routes";
 import { services, servicesPublic } from "./tenant/services/routes";
+import { sales } from "./tenant/sales/routes";
+import { customers } from "./tenant/customers/routes";
 
 const app = new Hono<AppEnv>();
 
@@ -54,6 +56,8 @@ registerMe(tenantApi);
 tenantApi.route("/settings", settings);
 tenantApi.route("/", staff);
 tenantApi.route("/services", services);
+tenantApi.route("/sales", sales);
+tenantApi.route("/customers", customers);
 app.route("/api", tenantApi);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

@@ -146,10 +146,11 @@ export function servicesRepo(db: D1Database, orgId: string) {
       return (upd!.results[0] as unknown as ServiceRow | undefined) ?? null;
     },
 
-    /** Old bills keep their own copy of the name and price, so deleting a service never changes them. Task 6 adds the sale_items null-out here. */
+    /** Old bills keep their own copy of the name and price, so deleting a service never changes them: their items just lose the link. */
     async remove(target: ServiceRow, actor: Actor): Promise<void> {
       await db.batch([
         audit.stmt({ actor, entity: "service", entityId: target.id, ref: target.name, action: "delete", before: serviceAudit(target), after: null }),
+        db.prepare("UPDATE sale_items SET service_id = NULL WHERE org_id = ? AND service_id = ?").bind(orgId, target.id),
         db.prepare("DELETE FROM services WHERE org_id = ? AND id = ?").bind(orgId, target.id),
       ]);
     },
