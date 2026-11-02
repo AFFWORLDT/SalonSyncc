@@ -6,6 +6,8 @@ export interface AuditInput {
   entityId: number | { sql: string; binds: unknown[] };
   ref: string | null;
   action: string;
+  /** Optional condition (SQL returning truthy, with binds): the row is written only when it holds, e.g. when a guarded write in the same batch took effect. */
+  when?: { sql: string; binds: unknown[] };
   before: unknown;
   after: unknown;
 }
@@ -19,9 +21,9 @@ export function auditRepo(db: D1Database, orgId: string) {
       return db
         .prepare(
           `INSERT INTO audit_log (org_id, at, actor_id, actor_name, entity, entity_id, ref, action, before, after)
-           SELECT ?, ?, ?, ?, ?, ${id.sql}, ?, ?, ?, ?`,
+           SELECT ?, ?, ?, ?, ?, ${id.sql}, ?, ?, ?, ?${a.when ? ` WHERE ${a.when.sql}` : ""}`,
         )
-        .bind(orgId, Date.now(), a.actor.id, a.actor.name, a.entity, ...id.binds, a.ref, a.action, json(a.before), json(a.after));
+        .bind(orgId, Date.now(), a.actor.id, a.actor.name, a.entity, ...id.binds, a.ref, a.action, json(a.before), json(a.after), ...(a.when?.binds ?? []));
     },
   };
 }

@@ -97,12 +97,7 @@ const gate = requireFeature("core_sales");
 const actorOf = (c: Context<AppEnv>) => ({ id: c.var.tenant.user.id, name: c.var.tenant.user.name });
 const repoOf = (c: Context<AppEnv>) => usersRepo(c.env.DB, c.var.tenant.org.id);
 
-async function assertRoom(c: Context<AppEnv>): Promise<void> {
-  const max = c.var.tenant.limits.max_staff;
-  if (max !== null && (await repoOf(c).activeStaffCount()) >= max) {
-    throw new HttpError(409, "Staff limit reached for your plan", "staff_limit");
-  }
-}
+const staffLimit = () => new HttpError(409, "Staff limit reached for your plan", "staff_limit");
 
 staff.get("/users", gate, requireAdmin, async (c) => {
   const slug = c.var.tenant.org.slug;
@@ -114,7 +109,6 @@ staff.post("/users", gate, requireAdmin, async (c) => {
   if (u.role === "owner") throw bad("Choose Admin or Barber");
   const repo = repoOf(c);
   if (await repo.usernameTaken(u.username, null)) throw new HttpError(409, "Username is taken");
-  await assertRoom(c);
   const w: StaffWrite = {
     name: u.name,
     username: u.username,
@@ -126,7 +120,8 @@ staff.post("/users", gate, requireAdmin, async (c) => {
     can_add_expense: !!u.canAddExpense,
   };
   try {
-    const row = await repo.create(w, await hashPassword(u.password as string), actorOf(c));
+    const row = await repo.create(w, await hashPassword(u.password as string), actorOf(c), c.var.tenant.limits.max_staff);
+    if (!row) throw staffLimit();
     return c.json(toUser(row, c.var.tenant.org.slug), 201);
   } catch (e) {
     if (String(e).includes("UNIQUE")) throw new HttpError(409, "Username is taken");
@@ -153,7 +148,7 @@ staff.put("/users/:id", gate, requireAdmin, async (c) => {
   if (await repo.usernameTaken(u.username, id)) throw new HttpError(409, "Username is taken");
 
   const active = existing.role === "owner" ? true : (u.active ?? !!existing.active);
-  if (active && !existing.active) await assertRoom(c);
+  const reactivating = active && !existing.active;
   const w: StaffWrite = {
     name: u.name,
     username: existing.role === "owner" ? existing.username : u.username,
@@ -165,7 +160,8 @@ staff.put("/users/:id", gate, requireAdmin, async (c) => {
     can_add_expense: u.canAddExpense ?? !!existing.can_add_expense,
   };
   try {
-    const row = await repo.update(id, existing, w, !active, actorOf(c));
+    const row = await repo.update(id, existing, w, !active, actorOf(c), reactivating ? { max: c.var.tenant.limits.max_staff } : undefined);
+    if (!row) throw staffLimit();
     return c.json(toUser(row, c.var.tenant.org.slug));
   } catch (e) {
     if (String(e).includes("UNIQUE")) throw new HttpError(409, "Username is taken");
@@ -205,9 +201,12 @@ staff.delete("/users/:id", gate, requireAdmin, async (c) => {
 
 async function saveAvatar(c: Context<AppEnv>, id: number) {
   const repo = repoOf(c);
-  if (!(await repo.byId(id))) throw notFound(); // 404 before looking at the body, so a foreign id never reveals anything else
+  const target = await repo.byId(id);
+  if (!target) throw notFound(); // 404 before looking at the body, so a foreign id never reveals anything else
+  if (target.role === "owner" && id !== c.var.tenant.user.id) throw ownerLocked();
   const type = (c.req.header("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
   if (!AVATAR_TYPES.includes(type)) throw bad("Send a WebP, JPEG or PNG image");
+  if (Number(c.req.header("content-length") ?? 0) > AVATAR_MAX) throw bad("Photo is too large (max 200 KB)");
   const bytes = await c.req.arrayBuffer();
   if (!bytes.byteLength) throw bad("The photo is empty");
   if (bytes.byteLength > AVATAR_MAX) throw bad("Photo is too large (max 200 KB)");
@@ -218,7 +217,9 @@ async function saveAvatar(c: Context<AppEnv>, id: number) {
 
 async function clearAvatar(c: Context<AppEnv>, id: number) {
   const repo = repoOf(c);
-  if (!(await repo.byId(id))) throw notFound();
+  const target = await repo.byId(id);
+  if (!target) throw notFound();
+  if (target.role === "owner" && id !== c.var.tenant.user.id) throw ownerLocked();
   await repo.clearAvatar(id);
   return c.json({ avatar_url: null });
 }

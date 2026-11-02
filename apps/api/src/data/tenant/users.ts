@@ -51,6 +51,14 @@ export const staffAudit = (r: StaffRow | StaffWrite) => ({
 
 type Actor = AuditInput["actor"];
 
+/** The login-lockout keys of a username: the account key and the prefix every device key starts with. */
+function lockoutKeys(orgId: string, username: string): { accountKey: string; devicePrefix: string } {
+  const [, device, account] = loginLimits(orgId, username, "");
+  return { accountKey: account!.key, devicePrefix: device!.key };
+}
+
+const COUNT_STAFF = "(SELECT COUNT(*) FROM users WHERE org_id = ? AND role != 'owner' AND active = 1)";
+
 /** Every query here is scoped by org_id; tests/sql-guard.test.ts enforces it. */
 export function usersRepo(db: D1Database, orgId: string) {
   const audit = auditRepo(db, orgId);
@@ -70,11 +78,6 @@ export function usersRepo(db: D1Database, orgId: string) {
         .first();
       return !!r;
     },
-    /** Active non-owner users: what the plan's staff limit counts. */
-    async activeStaffCount(): Promise<number> {
-      const r = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE org_id = ? AND role != 'owner' AND active = 1").bind(orgId).first<{ n: number }>();
-      return r?.n ?? 0;
-    },
     async nextSortOrder(): Promise<number> {
       const r = await db.prepare("SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM users WHERE org_id = ?").bind(orgId).first<{ n: number }>();
       return r?.n ?? 1;
@@ -88,15 +91,17 @@ export function usersRepo(db: D1Database, orgId: string) {
       return false;
     },
 
-    async create(w: StaffWrite, passwordHash: string, actor: Actor): Promise<StaffRow> {
+    /** Creates a user; null when the plan's staff limit (`maxStaff`, null = unlimited) is already reached. Atomic: the count is inside the INSERT. */
+    async create(w: StaffWrite, passwordHash: string, actor: Actor, maxStaff: number | null): Promise<StaffRow | null> {
       const at = Date.now();
+      const guard = maxStaff === null ? "" : ` WHERE ${COUNT_STAFF} < ?`;
       const [ins] = await db.batch([
         db
           .prepare(
             `INSERT INTO users (org_id, name, username, phone, password_hash, role, commission_pct, sort_order, active, can_add_expense, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?) RETURNING ${COLS}`,
+             SELECT ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?${guard} RETURNING ${COLS}`,
           )
-          .bind(orgId, w.name, w.username, w.phone, passwordHash, w.role, w.commission_pct, w.sort_order, w.can_add_expense ? 1 : 0, at, at),
+          .bind(orgId, w.name, w.username, w.phone, passwordHash, w.role, w.commission_pct, w.sort_order, w.can_add_expense ? 1 : 0, at, at, ...(maxStaff === null ? [] : [orgId, maxStaff])),
         audit.stmt({
           actor,
           entity: "user",
@@ -105,34 +110,50 @@ export function usersRepo(db: D1Database, orgId: string) {
           action: "create",
           before: null,
           after: staffAudit(w),
+          when: { sql: "(SELECT id FROM users WHERE org_id = ? AND username = ?) IS NOT NULL", binds: [orgId, w.username] },
         }),
       ]);
-      return ins!.results[0] as unknown as StaffRow;
+      return (ins!.results[0] as unknown as StaffRow | undefined) ?? null;
     },
 
-    /** Updates the profile; `bumpSession` signs the user out everywhere (used when deactivating). */
-    async update(id: number, before: StaffRow, w: StaffWrite, bumpSession: boolean, actor: Actor): Promise<StaffRow> {
+    /**
+     * Updates the profile; `bumpSession` signs the user out everywhere (used when deactivating).
+     * `reactivateLimit` is set when this turns an inactive user active: `{max}` guards the plan's staff limit atomically (null max = unlimited).
+     * Returns null when that guard refused.
+     */
+    async update(id: number, before: StaffRow, w: StaffWrite, bumpSession: boolean, actor: Actor, reactivateLimit?: { max: number | null }): Promise<StaffRow | null> {
+      const guarded = reactivateLimit !== undefined && reactivateLimit.max !== null;
       const [upd] = await db.batch([
         db
           .prepare(
             `UPDATE users SET name = ?, username = ?, phone = ?, role = ?, commission_pct = ?, sort_order = ?, active = ?, can_add_expense = ?,
-                    session_version = session_version + ?, updated_at = ? WHERE org_id = ? AND id = ? RETURNING ${COLS}`,
+                    session_version = session_version + ?, updated_at = ? WHERE org_id = ? AND id = ?${guarded ? ` AND ${COUNT_STAFF} < ?` : ""} RETURNING ${COLS}`,
           )
-          .bind(w.name, w.username, w.phone, w.role, w.commission_pct, w.sort_order, w.active ? 1 : 0, w.can_add_expense ? 1 : 0, bumpSession ? 1 : 0, Date.now(), orgId, id),
-        audit.stmt({ actor, entity: "user", entityId: id, ref: w.name, action: "update", before: staffAudit(before), after: staffAudit(w) }),
+          .bind(w.name, w.username, w.phone, w.role, w.commission_pct, w.sort_order, w.active ? 1 : 0, w.can_add_expense ? 1 : 0, bumpSession ? 1 : 0, Date.now(), orgId, id, ...(guarded ? [orgId, reactivateLimit!.max] : [])),
+        audit.stmt({
+          actor,
+          entity: "user",
+          entityId: id,
+          ref: w.name,
+          action: "update",
+          before: staffAudit(before),
+          after: staffAudit(w),
+          // The update ran first in this batch: if it was refused, updated_at is unchanged from `before`.
+          when: { sql: "(SELECT updated_at FROM users WHERE org_id = ? AND id = ?) != ?", binds: [orgId, id, before.updated_at] },
+        }),
       ]);
-      return upd!.results[0] as unknown as StaffRow;
+      return (upd!.results[0] as unknown as StaffRow | undefined) ?? null;
     },
 
     /** New password, signs the user out everywhere and clears their lockout counters (account key + every device key). */
     async resetPassword(target: StaffRow, hash: string, actor: Actor): Promise<void> {
-      const [, devicePrefix, account] = loginLimits(orgId, target.username, "") as [unknown, { key: string }, { key: string }];
+      const { accountKey, devicePrefix } = lockoutKeys(orgId, target.username);
       await db.batch([
         db
           .prepare("UPDATE users SET password_hash = ?, session_version = session_version + 1, updated_at = ? WHERE org_id = ? AND id = ?")
           .bind(hash, Date.now(), orgId, target.id),
-        db.prepare("DELETE FROM login_failures WHERE org_id = ? AND key = ?").bind(orgId, account.key),
-        db.prepare("DELETE FROM login_failures WHERE org_id = ? AND substr(key, 1, ?) = ?").bind(orgId, devicePrefix.key.length, devicePrefix.key),
+        db.prepare("DELETE FROM login_failures WHERE org_id = ? AND key = ?").bind(orgId, accountKey),
+        db.prepare("DELETE FROM login_failures WHERE org_id = ? AND substr(key, 1, ?) = ?").bind(orgId, devicePrefix.length, devicePrefix),
         audit.stmt({ actor, entity: "user", entityId: target.id, ref: target.name, action: "password_reset", before: null, after: null }),
       ]);
     },
@@ -154,10 +175,10 @@ export function usersRepo(db: D1Database, orgId: string) {
 
     /** Deletes a user with no history. Child rows first (none yet; later tasks add theirs here). */
     async remove(target: StaffRow, actor: Actor): Promise<void> {
-      const [, devicePrefix, account] = loginLimits(orgId, target.username, "") as [unknown, { key: string }, { key: string }];
+      const { accountKey, devicePrefix } = lockoutKeys(orgId, target.username);
       await db.batch([
-        db.prepare("DELETE FROM login_failures WHERE org_id = ? AND key = ?").bind(orgId, account.key),
-        db.prepare("DELETE FROM login_failures WHERE org_id = ? AND substr(key, 1, ?) = ?").bind(orgId, devicePrefix.key.length, devicePrefix.key),
+        db.prepare("DELETE FROM login_failures WHERE org_id = ? AND key = ?").bind(orgId, accountKey),
+        db.prepare("DELETE FROM login_failures WHERE org_id = ? AND substr(key, 1, ?) = ?").bind(orgId, devicePrefix.length, devicePrefix),
         audit.stmt({ actor, entity: "user", entityId: target.id, ref: target.name, action: "delete", before: staffAudit(target), after: null }),
         db.prepare("DELETE FROM users WHERE org_id = ? AND id = ?").bind(orgId, target.id),
       ]);

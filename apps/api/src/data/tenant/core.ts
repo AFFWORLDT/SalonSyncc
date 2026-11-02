@@ -43,7 +43,7 @@ export function tenantRepo(db: D1Database, orgId: string) {
     /** Case-insensitive within the org (usernames are unique ignoring case). */
     userByUsername(username: string): Promise<UserRow | null> {
       return db
-        .prepare(`SELECT ${USER_COLS} FROM users WHERE org_id = ? AND lower(username) = lower(?)`)
+        .prepare(`SELECT ${USER_COLS} FROM users WHERE org_id = ? AND lower(username) = lower(?) ORDER BY id`)
         .bind(orgId, username)
         .first<UserRow>();
     },

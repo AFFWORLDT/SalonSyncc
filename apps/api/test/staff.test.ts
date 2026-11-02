@@ -202,7 +202,6 @@ describe("avatars", () => {
     const me: any = await (await call("DELETE", "/me/avatar", ck)).json();
     expect(me.avatar_url).toBeNull();
     expect((await pub(`/avatar/${owner.id}/2?org=st-av`)).status).toBe(404);
-    expect(org.id).toBeTruthy();
   });
 
   it("rejects over 200 KB, empty and wrong types", async () => {
@@ -224,15 +223,43 @@ describe("avatars", () => {
     expect((await call("DELETE", `/users/${bar.id}/avatar`, ck)).status).toBe(200);
   });
 
+  it("admins can't replace or clear the owner's avatar; the owner can", async () => {
+    const { org, owner, ck } = await setup("st-av4");
+    await makeUser(org.id, { username: "adm", role: "admin" });
+    const ak = await loginAs("st-av4", "adm");
+    expect((await put(`/users/${owner.id}/avatar`, ak, png(10))).status).toBe(400);
+    expect((await call("DELETE", `/users/${owner.id}/avatar`, ak)).status).toBe(400);
+    expect((await put("/me/avatar", ck, png(10))).status).toBe(200);
+  });
+
+  it("rejects an oversized content-length before reading the body", async () => {
+    const { ck } = await setup("st-av5");
+    const r = await put("/me/avatar", ck, png(10), "image/png");
+    expect(r.status).toBe(200);
+    const big = await call("PUT", "/me/avatar", ck, png(10), { "content-type": "image/png", "content-length": String(300 * 1024) });
+    expect(big.status).toBe(400);
+  });
+
   it("public avatar is 404 across orgs and for unknown ids", async () => {
     const a = await setup("st-pa-a");
-    const b = await setup("st-pa-b");
+    await setup("st-pa-b");
     await put("/me/avatar", a.ck, png(10));
     expect((await pub(`/avatar/${a.owner.id}/1?org=st-pa-a`)).status).toBe(200);
     expect((await pub(`/avatar/${a.owner.id}/1?org=st-pa-b`)).status).toBe(404);
     expect((await pub(`/avatar/${a.owner.id}/1`)).status).toBe(404);
     expect((await pub(`/avatar/999999/1?org=st-pa-a`)).status).toBe(404);
     expect((await pub(`/avatar/x/1?org=st-pa-a`)).status).toBe(404);
-    expect(b.owner.id).toBeTruthy();
+  });
+});
+
+describe("case-insensitive username index", () => {
+  it("the database refuses Sam and sam in one org, but allows them in two", async () => {
+    const a = await makeOrg({ slug: "st-ci-a" });
+    const b = await makeOrg({ slug: "st-ci-b" });
+    const ins = (org: string, u: string) =>
+      env.DB.prepare("INSERT INTO users(org_id,username,name,role,password_hash,created_at) VALUES(?,?,?,?,?,?)").bind(org, u, u, "barber", "x", 1).run();
+    await ins(a.id, "Sam");
+    await expect(ins(a.id, "sam")).rejects.toThrow(/UNIQUE/);
+    await ins(b.id, "sam");
   });
 });
