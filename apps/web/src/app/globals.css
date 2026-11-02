@@ -193,3 +193,12 @@ button,
   #print-root [data-print] { max-width: 420px; margin: 0 auto; border-radius: 0; box-shadow: none; --tw-ring-shadow: 0 0 #0000; }
   html.print-bill, html.print-bill body { background: #fff !important; height: auto !important; overflow: visible !important; }
 }
+
+/* Form fields on glass cards (login): a visible border and a light fill over the moving background. */
+.glass [data-slot="input"] {
+  background-color: color-mix(in oklab, var(--background) 85%, transparent);
+  border-color: color-mix(in oklab, var(--foreground) 22%, transparent);
+}
+.glass [data-slot="input"]:focus-visible {
+  border-color: var(--primary);
+}

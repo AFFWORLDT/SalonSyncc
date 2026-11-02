@@ -95,3 +95,30 @@ body {
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
   backdrop-filter: blur(18px) saturate(1.4);
 }
+
+/* Form fields on glass: a solid light fill and a visible warm border, green when focused. */
+.glass [data-slot="input"],
+.glass select,
+.glass .field-shell {
+  background-color: rgb(255 253 248 / 0.85);
+  border: 1px solid #c9bea6;
+  box-shadow: 0 1px 2px rgb(28 27 24 / 0.06);
+}
+.glass .field-shell [data-slot="input"] {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.glass [data-slot="input"]:focus-visible,
+.glass select:focus-visible,
+.glass .field-shell:focus-within {
+  border-color: #1f7a6a;
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(31 122 106 / 0.18);
+}
+.glass [data-slot="input"]::placeholder {
+  color: #8f897d;
+}
+.glass [data-slot="input"][aria-invalid="true"] {
+  border-color: #d92d20;
+}

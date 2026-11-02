@@ -116,7 +116,7 @@ export function SignupForm() {
       </div>
       <div className="grid gap-2">
         <Label htmlFor="slug">Salon ID</Label>
-        <div className="flex items-center rounded-lg border border-input bg-transparent pr-3 focus-within:ring-2 focus-within:ring-ring/40">
+        <div className="field-shell flex items-center rounded-lg pr-3">
           <Input
             id="slug"
             required
