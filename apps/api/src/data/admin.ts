@@ -214,10 +214,11 @@ export function adminRepo(db: D1Database) {
              (SELECT COALESCE(SUM(p.price_monthly), 0) FROM orgs o JOIN plans p ON p.id = o.plan_id WHERE o.status = 'active') AS mrr,
              (SELECT json_group_object(d, n) FROM (SELECT date(created_at / 1000, 'unixepoch') AS d, COUNT(*) AS n FROM orgs WHERE created_at >= ?1 GROUP BY d)) AS signups,
              (SELECT COUNT(*) FROM sales WHERE created_at >= ?3 AND deleted_at IS NULL) AS sales_today,
-             (SELECT COUNT(*) FROM users WHERE active = 1) AS staff`,
+             (SELECT COUNT(*) FROM users WHERE active = 1) AS staff,
+             (SELECT currency FROM plans ORDER BY sort LIMIT 1) AS currency`,
         )
         .bind(now - 30 * DAY, now + 7 * DAY, now - DAY)
-        .first<{ by_status: string; trials_ending: string; in_grace: string; mrr: number; signups: string; sales_today: number; staff: number }>();
+        .first<{ by_status: string; trials_ending: string; in_grace: string; mrr: number; signups: string; sales_today: number; staff: number; currency: string | null }>();
       return {
         byStatus: JSON.parse(r?.by_status ?? "{}") as Record<string, number>,
         trialsEnding: JSON.parse(r?.trials_ending ?? "[]") as { id: string; slug: string; name: string; at: number }[],
@@ -226,6 +227,8 @@ export function adminRepo(db: D1Database) {
         signups: JSON.parse(r?.signups ?? "{}") as Record<string, number>,
         salesLast24h: r?.sales_today ?? 0,
         activeStaff: r?.staff ?? 0,
+        /** The plans' billing currency (prices are whole units of it). */
+        currency: r?.currency ?? "",
       };
     },
   };

@@ -14,7 +14,7 @@ import { watchKeyboard } from "@/lib/keyboard";
 import { PullToRefresh } from "@/components/app/pull-to-refresh";
 import { startPush } from "@/lib/push";
 import { toast } from "sonner";
-import { SubscriptionBanner, ExpiredScreen } from "@/components/app/subscription";
+import { SubscriptionBanner, ExpiredScreen, SupportBanner } from "@/components/app/subscription";
 import { ProductTour } from "@/components/app/product-tour";
 
 /** Pages an expired salon can still open (read-only: reports, exports, its account and plan). */
@@ -40,16 +40,26 @@ function readCollapsed() {
 }
 
 /** Pages that render without sign-in or the app frame. */
-const PUBLIC_PATHS = ["/login", ...AUTH_FREE];
+const PUBLIC_PATHS = ["/login", "/platform", ...AUTH_FREE];
 /** Pages only the admin may open (barbers are sent home). */
 const ADMIN_PATHS = ["/services", "/sales", "/expenses", "/sheet", "/monthly", "/audit", "/ledger", "/barbers", "/customers", "/settings", "/ratings", "/plan"];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   useEffect(() => watchKeyboard(), []);
+  const onAdminHost = useSyncExternalStore(noop, isAdminHost, () => false);
+  const isPlatform = pathname === "/platform" || pathname.startsWith("/platform/");
+  // admin.<domain> is only the super admin panel: any salon page there goes to it.
+  useEffect(() => {
+    if (onAdminHost && !isPlatform) window.location.replace("/platform/");
+  }, [onAdminHost, isPlatform]);
+  if (onAdminHost && !isPlatform) return null;
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) return <div className="h-full overflow-y-auto">{children}</div>;
   return <Frame>{children}</Frame>;
 }
+
+const noop = () => () => {};
+const isAdminHost = () => window.location.hostname.toLowerCase().startsWith("admin.");
 
 /** Frame-shaped placeholder while the session loads (first visit only; later visits use the cached session). */
 function FrameSkeleton() {
@@ -74,7 +84,7 @@ function FrameSkeleton() {
 }
 
 function Frame({ children }: { children: React.ReactNode }) {
-  const { user, isAdmin, loading, has, readOnly } = useAuth();
+  const { me, user, isAdmin, loading, has, readOnly } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -128,8 +138,9 @@ function Frame({ children }: { children: React.ReactNode }) {
 
           <div className="flex h-full min-w-0 flex-1 flex-col">
             <TopBar onOpenMobileNav={() => setMobileOpen(true)} onToggleCollapsed={toggleCollapsed} />
+            <SupportBanner />
             <SubscriptionBanner />
-            <ProductTour />
+            {!me?.support && <ProductTour />}
             <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
               <PullToRefresh scrollRef={mainRef} />
               <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-6 sm:p-6 lg:p-8">
