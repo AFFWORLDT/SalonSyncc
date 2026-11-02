@@ -126,7 +126,7 @@ export interface Settings {
   wa_feedback_template: string; // default ss_rating
   wa_feedback_reminder_min: number; // 0-1440 minutes after an unanswered request
   wa_feedback_reminder_template: string; // default ss_rating_reminder
-  wa_rating_image_url: string | null; // https, <= 500; null = the generic SalonStation picture
+  wa_rating_image_url: string | null; // https, <= 500; null = the generic SalonKit picture
   wa_rating_reminder_image_url: string | null;
   wa_fresh_cut_image_url: string | null;
   // Read-only (ignored on PUT).

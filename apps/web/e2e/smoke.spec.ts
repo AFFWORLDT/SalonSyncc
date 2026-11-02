@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { execSync } from "node:child_process";
 
 const sql = (q: string) =>
-  execSync(`npx wrangler d1 execute salonstation-db --local --command "${q}"`, {
+  execSync(`npx wrangler d1 execute salonkit-db --local --command "${q}"`, {
     cwd: "../api",
     env: { ...process.env, XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME ?? `${process.env.HOME}/.wrangler-affworld` },
     stdio: "pipe",

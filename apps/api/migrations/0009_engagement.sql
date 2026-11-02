@@ -6,7 +6,7 @@
 -- wa_messages.campaign_id -> wa_campaigns) keep a composite FK without the cascade: sales are soft-deleted and
 -- campaigns are never deleted.
 
--- Template names default to the SalonStation set; the FM org (Plan 2c) stores its fm_* names.
+-- Template names default to the SalonKit set; the FM org (Plan 2c) stores its fm_* names.
 ALTER TABLE org_settings ADD COLUMN wa_bill_auto INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE org_settings ADD COLUMN wa_bill_template TEXT NOT NULL DEFAULT 'ss_bill';
 ALTER TABLE org_settings ADD COLUMN wa_bill_pdf_template TEXT NOT NULL DEFAULT 'ss_bill_pdf';

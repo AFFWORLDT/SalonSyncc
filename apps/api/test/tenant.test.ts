@@ -7,20 +7,20 @@ import {
 } from "../src/core/tenant";
 
 describe("tenant resolver", () => {
-  const R = "salonstation.online";
+  const R = "salonkit.online";
 
   describe("slugFromHost", () => {
     it.each([
-      ["beardsalon.salonstation.online", { kind: "tenant", slug: "beardsalon" }],
-      ["BeardSalon.SalonStation.Online", { kind: "tenant", slug: "beardsalon" }],
-      ["beardsalon.salonstation.online:443", { kind: "tenant", slug: "beardsalon" }],
-      ["beardsalon.salonstation.online.", { kind: "tenant", slug: "beardsalon" }],
-      ["admin.salonstation.online", { kind: "admin" }],
-      ["salonstation.online", { kind: "none" }],
-      ["www.salonstation.online", { kind: "none" }],
-      ["www.beardsalon.salonstation.online", { kind: "none" }],
-      ["evil-salonstation.online", { kind: "none" }],
-      ["salonstation-app.affworld0.workers.dev", { kind: "none" }],
+      ["beardsalon.salonkit.online", { kind: "tenant", slug: "beardsalon" }],
+      ["BeardSalon.SalonKit.Online", { kind: "tenant", slug: "beardsalon" }],
+      ["beardsalon.salonkit.online:443", { kind: "tenant", slug: "beardsalon" }],
+      ["beardsalon.salonkit.online.", { kind: "tenant", slug: "beardsalon" }],
+      ["admin.salonkit.online", { kind: "admin" }],
+      ["salonkit.online", { kind: "none" }],
+      ["www.salonkit.online", { kind: "none" }],
+      ["www.beardsalon.salonkit.online", { kind: "none" }],
+      ["evil-salonkit.online", { kind: "none" }],
+      ["salonkit-app.affworld0.workers.dev", { kind: "none" }],
     ])("slugFromHost(%s, R, 'admin')", (h, want) => {
       expect(slugFromHost(h, R, "admin")).toEqual(want);
     });
@@ -30,13 +30,13 @@ describe("tenant resolver", () => {
     });
 
     it("empty label with empty adminHost returns none (I1 fix)", () => {
-      expect(slugFromHost(".salonstation.online", R, "")).toEqual({
+      expect(slugFromHost(".salonkit.online", R, "")).toEqual({
         kind: "none",
       });
     });
 
     it("empty label with non-empty adminHost returns none (I1 fix)", () => {
-      expect(slugFromHost(".salonstation.online", R, "admin")).toEqual({
+      expect(slugFromHost(".salonkit.online", R, "admin")).toEqual({
         kind: "none",
       });
     });
@@ -44,8 +44,8 @@ describe("tenant resolver", () => {
     it("config normalization: uppercase rootDomain and adminHost (M1)", () => {
       expect(
         slugFromHost(
-          "admin.salonstation.online",
-          "SalonStation.Online.",
+          "admin.salonkit.online",
+          "SalonKit.Online.",
           "Admin"
         )
       ).toEqual({ kind: "admin" });
@@ -53,7 +53,7 @@ describe("tenant resolver", () => {
 
     it("config normalization: uppercase rootDomain (M1)", () => {
       expect(
-        slugFromHost("beardsalon.salonstation.online", "SalonStation.Online", "admin")
+        slugFromHost("beardsalon.salonkit.online", "SalonKit.Online", "admin")
       ).toEqual({ kind: "tenant", slug: "beardsalon" });
     });
   });

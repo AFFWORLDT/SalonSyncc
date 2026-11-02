@@ -42,7 +42,7 @@ export async function loginAs(slug: string, username: string, password = "pass12
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ org: slug, username, password }),
     }),
-    { ...env, ROOT_DOMAIN: host ? "salonstation.online" : env.ROOT_DOMAIN },
+    { ...env, ROOT_DOMAIN: host ? "salonkit.online" : env.ROOT_DOMAIN },
     { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
   );
   if (res.status !== 200) throw new Error(`loginAs failed: ${res.status} ${await res.text()}`);

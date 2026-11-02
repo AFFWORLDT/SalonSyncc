@@ -16,7 +16,7 @@ const call = (method: string, path: string, cookie: string, body?: Uint8Array, t
     E,
     ctx,
   );
-const ROOT = "salonstation.online";
+const ROOT = "salonkit.online";
 const pub = (path: string, host = "x.test", root = "") =>
   app.fetch(new Request(`https://${host}/api/public${path}`, { headers: { "CF-Connecting-IP": "9.9.9.9" } }), { ...env, ROOT_DOMAIN: root }, ctx);
 const img = (n: number, fill = 7) => new Uint8Array(n).fill(fill);
@@ -97,7 +97,7 @@ describe("schema 0009", () => {
     ).rejects.toThrow(/FOREIGN KEY/);
   });
 
-  it("org_settings gets the SalonStation WhatsApp defaults", async () => {
+  it("org_settings gets the SalonKit WhatsApp defaults", async () => {
     const o = await makeOrg({ slug: "sch-def" });
     const r = await env.DB.prepare(
       "SELECT wa_bill_auto, wa_bill_template, wa_bill_pdf_template, wa_reminder_enabled, wa_reminder_days, wa_reminder_hour, wa_reminder_template, wa_language, wa_feedback_enabled, wa_feedback_delay_min, wa_feedback_template, wa_feedback_reminder_min, wa_feedback_reminder_template, wa_rating_image_url, wa_rating_reminder_image_url, wa_fresh_cut_image_url FROM org_settings WHERE org_id = ?",
@@ -112,7 +112,7 @@ describe("schema 0009", () => {
 
 describe("orgAppUrl", () => {
   it("is the tenant subdomain when ROOT_DOMAIN is set", () => {
-    expect(orgAppUrl({ ...env, ROOT_DOMAIN: ROOT }, { slug: "fresh" })).toBe("https://fresh.salonstation.online");
+    expect(orgAppUrl({ ...env, ROOT_DOMAIN: ROOT }, { slug: "fresh" })).toBe("https://fresh.salonkit.online");
   });
   it("falls back to APP_ORIGIN (no trailing slash) without ROOT_DOMAIN", () => {
     expect(orgAppUrl({ ...env, ROOT_DOMAIN: "", APP_ORIGIN: "https://app.example.dev/" }, { slug: "fresh" })).toBe("https://app.example.dev");

@@ -1,7 +1,7 @@
 import { ROOT_DOMAIN } from "./brand";
 
 /**
- * The salon a tenant host belongs to ("superbeard" on superbeard.salonstation.online), or null on workers.dev,
+ * The salon a tenant host belongs to ("superbeard" on superbeard.salonkit.online), or null on workers.dev,
  * localhost or the root domain, where login must name the salon.
  */
 export function salonFromHost(host: string, root = ROOT_DOMAIN): string | null {

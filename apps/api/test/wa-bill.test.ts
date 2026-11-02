@@ -95,9 +95,9 @@ describe("auto bill after a sale", () => {
     const inr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(1500);
     expect(f.wa[0]!.params[2]).toBe(inr);
     // A direct send with ROOT_DOMAIN set links to the salon's own subdomain.
-    const m: any = await sendBill({ ...E, ROOT_DOMAIN: "salonstation.online" }, a.org.id, sale.id, a.own.id);
+    const m: any = await sendBill({ ...E, ROOT_DOMAIN: "salonkit.online" }, a.org.id, sale.id, a.own.id);
     expect(m.status).toBe("sent");
-    expect(f.wa[1]!.params[3]).toBe(`https://wb-inr.salonstation.online/r/?t=${sale.token}`);
+    expect(f.wa[1]!.params[3]).toBe(`https://wb-inr.salonkit.online/r/?t=${sale.token}`);
   });
 
   it("the PDF template (wa_bill_template = wa_bill_pdf_template, FM rule): document header + 8 values", async () => {

@@ -5,7 +5,7 @@ import { sign } from "../src/core/crypto";
 import { makeOrg, makeUser, loginAs } from "./helpers";
 
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
-const ROOT = "salonstation.online";
+const ROOT = "salonkit.online";
 
 function call(url: string, init: RequestInit = {}, root = "") {
   return app.fetch(new Request(url, init), { ...env, ROOT_DOMAIN: root }, ctx);
@@ -273,7 +273,7 @@ describe("auth", () => {
       const o = await makeOrg({ slug: "csrf-a" });
       await makeUser(o.id, { username: "sam" });
       const cookie = await loginAs("csrf-a", "sam");
-      const r = await writeProbe(cookie, { origin: "https://evil.salonstation.online" });
+      const r = await writeProbe(cookie, { origin: "https://evil.salonkit.online" });
       expect(r.status).toBe(403);
       expect(await r.json()).toEqual(BAD);
       expect((await writeProbe(cookie, { origin: "null" })).status).toBe(403);

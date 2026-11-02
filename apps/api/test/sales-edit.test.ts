@@ -322,7 +322,7 @@ describe("optimistic concurrency (a concurrent write lands between the read and 
 });
 
 describe("GET /api/public/receipt/:token", () => {
-  const ROOT = "salonstation.online";
+  const ROOT = "salonkit.online";
   const getReceipt = (host: string, token: string, root = ROOT) =>
     app.fetch(new Request(`https://${host}/api/public/receipt/${token}`, { headers: { "CF-Connecting-IP": "7.7.7.7" } }), { ...env, ROOT_DOMAIN: root }, ctx);
 

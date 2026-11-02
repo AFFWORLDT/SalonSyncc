@@ -1,4 +1,4 @@
-/** Same-origin JSON client for the SalonStation Worker. */
+/** Same-origin JSON client for the SalonKit Worker. */
 
 export class ApiError extends Error {
   status: number;

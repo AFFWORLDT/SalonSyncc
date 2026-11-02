@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "salonstation-app",
+  "name": "salonkit-app",
   // Affworld0@gmail.com's Cloudflare account. Never deploy this to any other account.
   "account_id": "dd501fac7d8aa896ead9530b9cd1b913",
   "main": "src/index.ts",
@@ -15,14 +15,13 @@
   "assets": { "directory": "../web/out", "binding": "ASSETS", "not_found_handling": "404-page", "run_worker_first": ["/api/*"] },
   // The cron (src/jobs/hourly.ts): every 10 minutes, each tick within the free plan's per-invocation limits.
   "triggers": { "crons": ["*/10 * * * *"] },
-  "vars": { "BRAND_NAME": "SalonStation", "ROOT_DOMAIN": "salonkit.online", "ADMIN_HOST": "admin", "MAIL_FROM": "", "SUPPORT_EMAIL": "", "APP_ORIGIN": "https://salonstation-app.affworld0.workers.dev" },
+  "vars": { "BRAND_NAME": "SalonKit", "ROOT_DOMAIN": "salonkit.online", "ADMIN_HOST": "admin", "MAIL_FROM": "", "SUPPORT_EMAIL": "", "APP_ORIGIN": "https://salonkit-app.affworld0.workers.dev" },
   // Secrets (wrangler secret put): SESSION_SECRET, SECRETS_KEY (base64 32 bytes), FCM_SERVICE_ACCOUNT, WA_APP_SECRET, WA_VERIFY_TOKEN.
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "salonstation-db",
-      // database_id filled when the D1 is created (Plan 2 deploy)
-      "database_id": "local-only",
+      "database_name": "salonkit-db",
+      "database_id": "ea41ae98-4ed9-4e15-ba57-6804d0771d80",
       "migrations_dir": "migrations"
     }
   ]

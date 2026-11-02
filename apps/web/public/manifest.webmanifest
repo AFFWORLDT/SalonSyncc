@@ -1,6 +1,6 @@
 {
-  "name": "SalonStation",
-  "short_name": "SalonStation",
+  "name": "SalonKit",
+  "short_name": "SalonKit",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

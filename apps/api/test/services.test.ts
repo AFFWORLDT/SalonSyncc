@@ -152,7 +152,7 @@ describe("GET /api/public/services", () => {
   });
   it("works from the tenant host", async () => {
     await setup("sv-pubhost");
-    const r = await app.fetch(new Request("https://sv-pubhost.salonstation.online/api/public/services"), { ...env, ROOT_DOMAIN: "salonstation.online" }, ctx);
+    const r = await app.fetch(new Request("https://sv-pubhost.salonkit.online/api/public/services"), { ...env, ROOT_DOMAIN: "salonkit.online" }, ctx);
     expect(r.status).toBe(200);
   });
   it("404 for a free org, an unknown org and no org", async () => {

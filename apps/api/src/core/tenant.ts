@@ -25,10 +25,10 @@ export function isValidSlug(s: string): boolean {
  * Extract tenant slug from host name
  *
  * Examples:
- * - "beardsalon.salonstation.online" → { kind: "tenant", slug: "beardsalon" }
- * - "admin.salonstation.online" → { kind: "admin" }
- * - "www.salonstation.online" → { kind: "none" }
- * - "salonstation.online" → { kind: "none" }
+ * - "beardsalon.salonkit.online" → { kind: "tenant", slug: "beardsalon" }
+ * - "admin.salonkit.online" → { kind: "admin" }
+ * - "www.salonkit.online" → { kind: "none" }
+ * - "salonkit.online" → { kind: "none" }
  * - "" (empty rootDomain) → { kind: "none" }
  */
 export function slugFromHost(

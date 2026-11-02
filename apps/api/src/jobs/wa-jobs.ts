@@ -77,7 +77,7 @@ const PICTURE_SETTING = {
   "fresh-cut": "wa_fresh_cut_image_url",
 } as const satisfies Record<Picture, keyof Settings>;
 
-/** The image header: the org's own picture, else the generic SalonStation one on APP_ORIGIN. */
+/** The image header: the org's own picture, else the generic SalonKit one on APP_ORIGIN. */
 function picture(env: Env, s: Settings, kind: Picture): WaValue {
   const own = s[PICTURE_SETTING[kind]];
   return { part: "header", key: "media", media: "image", text: own || `${env.APP_ORIGIN.replace(/\/+$/, "")}/wa/${kind}.jpg` };

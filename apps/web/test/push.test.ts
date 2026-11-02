@@ -8,7 +8,7 @@ const firebaseConfig = (e: Record<string, string>) => fc(e as unknown as NodeJS.
 const env = {
   NEXT_PUBLIC_FIREBASE_API_KEY: "k",
   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "ss.firebaseapp.com",
-  NEXT_PUBLIC_FIREBASE_PROJECT_ID: "salonstation-test",
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: "salonkit-test",
   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "b",
   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "1",
   NEXT_PUBLIC_FIREBASE_APP_ID: "a",
@@ -16,7 +16,7 @@ const env = {
 
 describe("push configuration", () => {
   it("needs every Firebase value", () => {
-    expect(firebaseWebConfig(env)?.projectId).toBe("salonstation-test");
+    expect(firebaseWebConfig(env)?.projectId).toBe("salonkit-test");
     expect(firebaseWebConfig({ ...env, NEXT_PUBLIC_FIREBASE_APP_ID: "" })).toBeNull();
   });
   it("without the build config push is off and starting it does nothing", async () => {
@@ -27,7 +27,7 @@ describe("push configuration", () => {
   });
   it("the generated service worker uses the env project and no FM values", () => {
     const sw = serviceWorker(firebaseConfig(env));
-    expect(sw).toContain("salonstation-test");
+    expect(sw).toContain("salonkit-test");
     expect(sw).not.toMatch(/fm-salon|FM Salon/);
     expect(serviceWorker(firebaseConfig({}))).toContain("not configured");
   });

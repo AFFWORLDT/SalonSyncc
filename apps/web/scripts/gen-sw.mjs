@@ -1,4 +1,4 @@
-// Writes public/firebase-messaging-sw.js from the NEXT_PUBLIC_FIREBASE_* build env (one SalonStation Firebase project).
+// Writes public/firebase-messaging-sw.js from the NEXT_PUBLIC_FIREBASE_* build env (one SalonKit Firebase project).
 // Without the full config the service worker is a no-op and the app never asks for push permission.
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

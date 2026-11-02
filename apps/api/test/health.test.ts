@@ -4,7 +4,7 @@ import { it, expect } from "vitest";
 it("health answers with brand", async () => {
   const r = await SELF.fetch("https://x.test/api/health");
   expect(r.status).toBe(200);
-  expect(await r.json()).toEqual({ ok: true, brand: "SalonStation" });
+  expect(await r.json()).toEqual({ ok: true, brand: "SalonKit" });
 });
 
 it("unknown api route is JSON 404", async () => {

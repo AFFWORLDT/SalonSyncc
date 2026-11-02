@@ -12,7 +12,7 @@ export interface Env {
   MAIL_FROM: string;
   SUPPORT_EMAIL: string;
   ENVIRONMENT?: string;
-  /** App origin for message links when ROOT_DOMAIN is empty (workers.dev), e.g. https://salonstation-app.affworld0.workers.dev. */
+  /** App origin for message links when ROOT_DOMAIN is empty (workers.dev), e.g. https://salonkit-app.affworld0.workers.dev. */
   APP_ORIGIN: string;
   /** Secret: base64 of 32 random bytes; AES-GCM key for org_whatsapp.token_enc (lib/secrets). */
   SECRETS_KEY: string;

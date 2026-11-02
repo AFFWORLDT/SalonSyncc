@@ -5,7 +5,7 @@ import { PUBLIC_LIMITS, minuteWindow } from "../src/lib/limits";
 import { makeOrg } from "./helpers";
 
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
-const ROOT = "salonstation.online";
+const ROOT = "salonkit.online";
 const get = (url: string, root = "", headers: Record<string, string> = {}) =>
   app.fetch(new Request(url, { headers }), { ...env, ROOT_DOMAIN: root }, ctx);
 const org = async (url: string, root = "") => ((await (await get(url, root)).json()) as any).org;

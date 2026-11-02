@@ -107,7 +107,7 @@ describe("/api/me", () => {
   it("brand comes from env", async () => {
     const { cookie } = await setup("me-brand");
     const b: any = await (await me(cookie)).json();
-    expect(b.brand.name).toBe("SalonStation");
+    expect(b.brand.name).toBe("SalonKit");
   });
 });
 

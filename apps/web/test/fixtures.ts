@@ -39,7 +39,7 @@ export function meFixture(o: {
     features: o.features ?? ["core_sales"],
     limits: { max_staff: o.maxStaff === undefined ? null : o.maxStaff },
     subscription: { status, planId: "pro", trialEndsAt: o.trialEndsAt ?? null, graceEndsAt: o.graceEndsAt ?? null },
-    brand: { name: "SalonStation" },
+    brand: { name: "SalonKit" },
     today: o.today ?? "2026-11-02",
   };
 }

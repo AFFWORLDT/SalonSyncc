@@ -1,5 +1,5 @@
 /**
- * The SalonStation Firebase web config (one project for every salon), from the NEXT_PUBLIC_FIREBASE_* build env.
+ * The SalonKit Firebase web config (one project for every salon), from the NEXT_PUBLIC_FIREBASE_* build env.
  * Next inlines each process.env.NEXT_PUBLIC_* reference at build time, so they are spelled out one by one.
  * Null when any value is missing: push is then off and the app never asks for permission.
  */

@@ -51,7 +51,7 @@ const receipt = (over: { sale?: Partial<Receipt["sale"]>; salon?: Partial<Receip
     ...over.salon,
   },
 });
-const LINK = "https://fm.salonstation.online/r/?t=abc123def456";
+const LINK = "https://fm.salonkit.online/r/?t=abc123def456";
 
 describe("pdfSafe / pdfMoney", () => {
   it("keeps only what Helvetica (WinAnsi) can draw", () => {

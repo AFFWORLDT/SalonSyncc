@@ -153,7 +153,7 @@ describe("settings", () => {
     expect(await r.json()).toMatchObject({ wa_language: "ar", wa_reminder_days: 90, wa_rating_image_url: edge.wa_rating_image_url, wa_fresh_cut_image_url: null });
   });
 
-  it("GET has the SalonStation WhatsApp defaults and wa_ready", async () => {
+  it("GET has the SalonKit WhatsApp defaults and wa_ready", async () => {
     const { owner } = await setup("st-wa-def");
     const b: any = await (await call("GET", "/settings", owner)).json();
     expect(b).toMatchObject({

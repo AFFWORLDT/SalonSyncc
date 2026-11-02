@@ -1,4 +1,4 @@
-# SalonStation
+# SalonKit
 
 Multi-salon SaaS on Cloudflare Workers + D1 (Hono). Monorepo: `apps/api`, `packages/*`.
 
@@ -115,10 +115,10 @@ npm run e2e -w @ss/web                   # Playwright smoke (build + migrate + s
 ```
 
 Build env (`NEXT_PUBLIC_*`, not secret):
-- `NEXT_PUBLIC_BRAND_NAME` (default SalonStation)
+- `NEXT_PUBLIC_BRAND_NAME` (default SalonKit)
 - `NEXT_PUBLIC_ROOT_DOMAIN`: `salonkit.online` in `.env.production`. On `<slug>.salonkit.online` login needs no salon ID.
 - `NEXT_PUBLIC_SUPPORT_EMAIL`: the Upgrade card's contact address.
-- `NEXT_PUBLIC_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_STORAGE_BUCKET`, `_MESSAGING_SENDER_ID`, `_APP_ID`, `_VAPID_KEY`: one SalonStation Firebase project. While these are unset, push is off and the service worker does nothing.
+- `NEXT_PUBLIC_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_STORAGE_BUCKET`, `_MESSAGING_SENDER_ID`, `_APP_ID`, `_VAPID_KEY`: one SalonKit Firebase project. While these are unset, push is off and the service worker does nothing.
 
 `test/brand-guard.test.ts` fails the build if FM, AED, Dubai or +971 values are hardcoded in `apps/web/src`.
 
