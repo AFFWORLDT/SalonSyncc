@@ -8,7 +8,7 @@ import { setServicesForTest } from "../src/core/services";
 import { invalidateFeatures } from "../src/core/features-cache";
 import { reportsRepo, waConfigRepo } from "../src/data/tenant";
 import type { OrgStatus } from "../src/data/platform";
-import { CRON_BUDGET, CRON_STMTS, hourly, tickIndex } from "../src/jobs/hourly";
+import { CRON_BUDGET, CRON_STMTS, hourly, rotationStart, tickIndex } from "../src/jobs/hourly";
 import { moneyText } from "../src/lib/money";
 import { meteredEnv } from "../src/lib/metered";
 
@@ -302,7 +302,7 @@ describe("hourly cron: WhatsApp jobs", () => {
     const ids = [bad.org.id, good.org.id].sort();
     const badFirst = ids[0] === bad.org.id ? 0 : 1;
     let at = at0;
-    while (tickIndex(at) % 2 !== badFirst) at += TICK;
+    while (rotationStart(tickIndex(at), 2) !== badFirst) at += TICK;
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const { r } = await tick(at);
     expect(err).toHaveBeenCalled();
@@ -383,11 +383,8 @@ describe("hourly cron: free-plan budget (R2)", () => {
       orgs.push(s);
     }
     // R2 ruling bound ceil(30k/40) counts sends only; every send also costs a D1 statement (its log row) and each newly
-    // served org costs 3 more (WA config, due list, claim), out of 44 statements a tick after the org load. The start
-    // moves by 1 a tick (fix round 1), so a tick may first re-check up to 29 already-served orgs (1 statement each, the
-    // empty due list) before reaching new ones: at least floor((44 - 29) / (k + 3)) new orgs a tick, guaranteed.
-    const perTick = Math.floor((CRON_STMTS - 1 - 29) / (k + 3));
-    const bound = Math.ceil(30 / perTick); // k = 2: 10 (measured: 6)
+    // served org costs 3 more (WA config, due list, claim), out of 44 statements a tick after the org load. So:
+    const bound = Math.ceil((30 * (k + 3)) / (CRON_STMTS - 1)) + 1;
     const servedAt = new Map<string, number>();
     for (let n = 0; n < 30 && servedAt.size < 30; n++) {
       const t = await tick(at0 + n * TICK);
@@ -398,7 +395,7 @@ describe("hourly cron: free-plan budget (R2)", () => {
     expect(servedAt.size).toBe(30);
     expect(Math.max(...servedAt.values())).toBeLessThanOrEqual(bound);
     // The start rotates: consecutive ticks begin at different orgs.
-    expect(tickIndex(at0) % 30).not.toBe(tickIndex(at0 + TICK) % 30);
+    expect(rotationStart(tickIndex(at0), 30)).not.toBe(rotationStart(tickIndex(at0 + TICK), 30));
   });
 });
 
@@ -475,7 +472,7 @@ describe("hourly cron: fix round 1 (rotation, failed sends, big pushes, fail-clo
     for (const s of rest) await dueReminders(s.org.id, 2, at0);
     // Start at the tick where the campaign org leads, the worst case for the others.
     let at = at0;
-    while (tickIndex(at) % 7 !== 0) at += TICK;
+    while (rotationStart(tickIndex(at), 7) !== 0) at += TICK;
     for (let k = 0; k < 7; k++) {
       const t = await tick(at + k * TICK);
       expect(t.statements).toBeLessThanOrEqual(CRON_STMTS);
@@ -541,5 +538,31 @@ describe("hourly cron: fix round 1 (rotation, failed sends, big pushes, fail-clo
     expect(await st.first()).toEqual({ x: 1 });
     await m.DB.batch([m.DB.prepare("SELECT 1"), m.DB.prepare("SELECT 2")]);
     expect(budget.stmts).toBe(7);
+  });
+});
+
+describe("rotationStart", () => {
+  const old = (tick: number, n: number) => (n <= 1 ? 0 : (tick * 7) % n);
+  const coversAll = (f: (t: number, n: number) => number, n: number, t0: number) =>
+    new Set(Array.from({ length: n }, (_, i) => f(t0 + i, n))).size === n;
+  const t0s = [0, 1, 6, 13, tickIndex(Date.UTC(2026, 10, 20, 8, 10)), 2_951_234];
+
+  it("for every n in 1..40, any n consecutive ticks start at all n distinct orgs", () => {
+    for (let n = 1; n <= 40; n++) for (const t0 of t0s) expect(coversAll(rotationStart, n, t0), `n=${n} t0=${t0}`).toBe(true);
+  });
+
+  it("the old (tick * 7) % n fails exactly where 7 divides n; the new one does not", () => {
+    for (const n of [7, 14, 21, 28, 35]) {
+      expect(coversAll(old, n, t0s[4]!), `old n=${n}`).toBe(false);
+      expect(coversAll(rotationStart, n, t0s[4]!), `new n=${n}`).toBe(true);
+    }
+  });
+
+  it("stride: 7 when coprime with n, else the next coprime prime (n = 7 -> 11); 0 for n <= 1", () => {
+    expect(rotationStart(1, 30)).toBe(7);
+    expect(rotationStart(1, 7)).toBe(11 % 7);
+    expect(rotationStart(1, 77)).toBe(13);
+    expect(rotationStart(5, 1)).toBe(0);
+    expect(rotationStart(5, 0)).toBe(0);
   });
 });

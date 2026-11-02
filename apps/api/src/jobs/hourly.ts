@@ -2,7 +2,9 @@
  * The cron (FM scheduled.ts hourly, per org). wrangler.jsonc triggers it every 10 minutes (R1); each invocation:
  *   1. prune (minute-0 tick only, before org work): jobs/prune.ts;
  *   2. loads every served org (trial/active/grace/past_due) with settings and feature inputs in ONE statement;
- *   3. visits them in id order from offset tickIndex(at) % n, wrapping round, so every org leads in turn (n ticks);
+ *   3. visits them in id order from offset rotationStart(tickIndex(at), n), wrapping round: the stride shares no factor
+ *      with n, so every org leads once in any n consecutive ticks, and the start jumps far enough per tick that the
+ *      orgs served last tick are not all re-checked first;
  *   4. per org, in its local hour (lib/clock), in two passes over that order: first the push jobs (the admins'
  *      summary and the barber reminder, due in their target hour and the next, once per business day:
  *      jobs/push-jobs.ts), then WhatsApp (one open campaign batch, visit reminders from wa_reminder_hour, rating
@@ -41,6 +43,24 @@ export const CRON_STMTS = 45;
 /** The cron interval (wrangler.jsonc "*\/10 * * * *"). */
 export const TICK_MS = 600_000;
 export const tickIndex = (at: number): number => Math.floor(at / TICK_MS);
+
+const gcd = (a: number, b: number): number => (b ? gcd(b, a % b) : a);
+const isPrime = (p: number): boolean => {
+  for (let d = 2; d * d <= p; d++) if (p % d === 0) return false;
+  return p >= 2;
+};
+
+/**
+ * The first org (by index into the id-ordered list) a tick visits. Stride = the smallest prime >= 7 sharing no factor
+ * with n (7 unless 7 divides n; n = 7 -> 11), so `tick * stride mod n` is a permutation over any n consecutive ticks
+ * (no gcd trap, unlike a fixed 7), while still moving ~7 orgs a tick. 0 for n <= 1.
+ */
+export function rotationStart(tick: number, n: number): number {
+  if (n <= 1) return 0;
+  let stride = 7;
+  while (!isPrime(stride) || gcd(stride, n) !== 1) stride++;
+  return (((tick % n) * stride) % n + n) % n;
+}
 
 /** Devices per cron push: one full push (tokens + OAuth) fits a fresh budget. */
 const TOKEN_CAP = Math.min(PUSH_MAX_TOKENS, CRON_BUDGET - 1);
@@ -90,7 +110,7 @@ export async function hourly(rawEnv: Env, at: number): Promise<HourlyResult> {
     }
   }
   const n = orgs.length;
-  const start = n ? tickIndex(at) % n : 0; // step 1: coprime with every n, so the lead org cycles through all of them
+  const start = rotationStart(tickIndex(at), n);
   const rotated = Array.from({ length: n }, (_, i) => orgs[(start + i) % n]!);
   const ctxs = new Map<string, OrgCtx>();
   const ctxOf = (o: CronOrg) => ctxs.get(o.org.id) ?? ctxs.set(o.org.id, orgCtx(env, o, at)).get(o.org.id)!;
