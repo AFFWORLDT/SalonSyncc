@@ -35,6 +35,7 @@ import { FREE_STMTS, FREE_SUBREQUESTS, meteredEnv } from "../lib/metered";
 import { CAMPAIGN_BATCH, JOB_FIXED_STMTS, drainCampaign, inFeedbackHours, ratingLimit, reminderLimit, runFeedback, runFeedbackReminders, runReminders, type Budget, type JobPre } from "./wa-jobs";
 import { BARBER_REMINDER_STMTS, SUMMARY_STMTS, pushDueDay, runBarberReminder, runSummary } from "./push-jobs";
 import { PRUNE_STMTS, prune } from "./prune";
+import { LIFECYCLE_EMAILS_PER_TICK, LIFECYCLE_MOVE_STMTS, lifecycleEmailStmts, runLifecycleEmails, runLifecycleMoves } from "./lifecycle";
 
 /** Outbound subrequests per invocation, across all orgs (D19; the free plan allows 50). */
 export const CRON_BUDGET = FREE_SUBREQUESTS;
@@ -99,6 +100,17 @@ export async function hourly(rawEnv: Env, at: number): Promise<HourlyResult> {
   const budget: CronBudget = { left: CRON_BUDGET, stmts: CRON_STMTS };
   const env = meteredEnv(rawEnv, budget);
   if (new Date(at).getUTCMinutes() === 0 && budget.stmts >= PRUNE_STMTS) await guarded("prune", null, () => prune(env, at));
+  // The subscription lifecycle, hourly, before the org loader so its jobs see today's states: state moves, then
+  // emails (a few per tick, each 1 subrequest; the rest stay due for the next hour).
+  if (new Date(at).getUTCMinutes() === 0) {
+    if (budget.stmts >= LIFECYCLE_MOVE_STMTS) await guarded("lifecycle moves", null, () => runLifecycleMoves(env, at));
+    const emails = Math.min(LIFECYCLE_EMAILS_PER_TICK, budget.left, Math.floor((budget.stmts - ORG_LOADER_STMTS - 1) / 2));
+    if (emails > 0 && budget.stmts >= lifecycleEmailStmts(emails)) {
+      await guarded("lifecycle emails", null, async () => {
+        budget.left -= await runLifecycleEmails(env, at, emails);
+      });
+    }
+  }
 
   let orgs: CronOrg[] = [];
   if (budget.stmts >= ORG_LOADER_STMTS) {
