@@ -184,15 +184,37 @@ describe("auth", () => {
     expect(await r.json()).toEqual({ ok: true, slug: "noorg" });
   });
 
-  it("fail-closed: every registered /api route except health and auth requires a session", async () => {
-    const guarded = app.routes.filter(
-      (r) => r.method !== "ALL" && r.path.startsWith("/api") && r.path !== "/api/health" && !r.path.startsWith("/api/auth"),
+  it("fail-closed: every registered /api route except health, auth and the guard requires a session", async () => {
+    const api = app.routes.filter((r) => r.path.startsWith("/api"));
+    // The only ALL-method route under /api is the guard itself.
+    const all = api.filter((r) => r.method === "ALL");
+    expect(all.map((r) => r.path)).toEqual(["/api/*"]);
+    const guard = all[0].handler;
+    const guarded = api.filter(
+      (r) => r.handler !== guard && r.path !== "/api/health" && !r.path.startsWith("/api/auth"),
     );
     expect(guarded.map((r) => r.path)).toContain("/api/_whoami");
     for (const r of guarded) {
-      const res = await call(`https://x.test${r.path.replace(/:\w+/g, "1")}`, { method: r.method });
+      const path = r.path.replace(/:\w+/g, "1").replace(/\*/g, "x");
+      const method = r.method === "ALL" ? "GET" : r.method;
+      const res = await call(`https://x.test${path}`, { method });
       expect(res.status, `${r.method} ${r.path}`).toBe(401);
     }
+  });
+
+  it("an ALL-method tenant route added without auth is still guarded", async () => {
+    const { Hono } = await import("hono");
+    const { tenantGuard } = await import("../src/index");
+    const t = new Hono<any>();
+    t.use("*", tenantGuard);
+    t.all("/open", (c) => c.json({ leaked: true }));
+    const a = new Hono<any>();
+    a.route("/api", t);
+    a.onError((err, c) => c.json({ error: err.message }, (err as any).status ?? 500));
+    a.notFound((c) => c.json({ error: "Not found" }, 404));
+    const res = await a.fetch(new Request("https://x.test/api/open", { method: "POST" }), env, ctx);
+    expect(res.status).toBe(401);
+    expect((await a.fetch(new Request("https://x.test/api/none"), env, ctx)).status).toBe(404);
   });
 
   it("unknown /api paths stay JSON 404 when unauthenticated, health stays public", async () => {

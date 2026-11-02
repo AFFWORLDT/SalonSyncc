@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { matchedRoutes } from "hono/route";
 import type { AppEnv } from "./env";
 import { HttpError } from "./core/errors";
@@ -15,10 +15,12 @@ app.route("/api/auth", auth);
 // matched this request, so a route added here without its own auth is still protected. Paths that match no
 // tenant handler fall through (next) to the JSON 404 instead of 401.
 const tenantApi = new Hono<AppEnv>();
-tenantApi.use("*", async (c, next) => {
-  if (!matchedRoutes(c).some((r) => r.method !== "ALL")) return next();
+export const tenantGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
+  // Any matched handler other than this guard (including method ALL) counts as a real tenant route.
+  if (!matchedRoutes(c).some((r) => r.handler !== tenantGuard)) return next();
   return tenantAuth(c, next);
-});
+};
+tenantApi.use("*", tenantGuard);
 
 // Test-only probe; checked per request because env is per-request in Workers.
 tenantApi.get("/_whoami", (c) =>
