@@ -132,32 +132,38 @@ type CustomerRow = Omit<Customer, "wa_opt_out"> & { wa_opt_out: number };
 
 /** This org's wa_messages and the customers' WhatsApp opt-out. Every statement is org_id scoped (opt-out is per org, RF3). */
 export function waMessagesRepo(db: D1Database, orgId: string) {
+  const logStatement = (m: WaLogInput, r: SendResult, returning: string): D1PreparedStatement => {
+    const at = Date.now();
+    return db
+      .prepare(
+        `INSERT INTO wa_messages (org_id, kind, customer_id, phone, template, params, status, wa_id, error, sale_id, created_by, created_at, sent_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)${returning}`,
+      )
+      .bind(
+        orgId,
+        m.kind,
+        m.customerId ?? null,
+        m.phone,
+        m.template,
+        JSON.stringify(m.params),
+        r.status,
+        r.status === "sent" ? r.wa_id : null,
+        r.status === "sent" ? null : r.error,
+        m.saleId ?? null,
+        m.actorId ?? null,
+        at,
+        r.status === "sent" ? at : null,
+      );
+  };
   return {
     /** Writes exactly one row for a send attempt and returns it as the API shows it. */
     async log(m: WaLogInput, r: SendResult): Promise<WaMessage> {
-      const at = Date.now();
-      const row = await db
-        .prepare(
-          `INSERT INTO wa_messages (org_id, kind, customer_id, phone, template, params, status, wa_id, error, sale_id, created_by, created_at, sent_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING ${WA_MESSAGE_COLS}`,
-        )
-        .bind(
-          orgId,
-          m.kind,
-          m.customerId ?? null,
-          m.phone,
-          m.template,
-          JSON.stringify(m.params),
-          r.status,
-          r.status === "sent" ? r.wa_id : null,
-          r.status === "sent" ? null : r.error,
-          m.saleId ?? null,
-          m.actorId ?? null,
-          at,
-          r.status === "sent" ? at : null,
-        )
-        .first<WaMessage>();
-      return row!;
+      return (await logStatement(m, r, ` RETURNING ${WA_MESSAGE_COLS}`).first<WaMessage>())!;
+    },
+
+    /** The same one-row write as a statement, for the jobs to batch with their "done" mark (one D1 round trip per item). */
+    logStatement(m: WaLogInput, r: SendResult): D1PreparedStatement {
+      return logStatement(m, r, "");
     },
 
     /** The latest bill message for a sale of this org, or null. */

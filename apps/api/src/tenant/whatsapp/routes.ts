@@ -8,7 +8,9 @@ import { forbidden, isAdmin, requireAdmin } from "../../core/roles";
 import { platformRepo } from "../../data/platform";
 import { salesRepo, settingsRepo, waConfigRepo, waMessagesRepo, type WaConfigInput } from "../../data/tenant";
 import { canonicalPhone } from "../../lib/phone";
-import { isBillError, sendBill } from "./bill";
+import { isBillError, NOT_READY, sendBill } from "./bill";
+import { waReady } from "./ready";
+import { runFeedback, runFeedbackReminders, runReminders, WA_BATCH } from "../../jobs/wa-jobs";
 
 /**
  * The salon's own WhatsApp credentials: GET/PUT/DELETE /whatsapp/config. Owner/admin, feature `whatsapp`, gated per
@@ -131,4 +133,26 @@ whatsapp.put("/customers/:id/whatsapp", ...gate, async (c) => {
   const row = await waMessagesRepo(c.env.DB, org.id).setOptOut(customerId, b.opt_out, { id: user.id, name: user.name });
   if (!row) throw new HttpError(404, "Not found");
   return c.json(row);
+});
+
+// ---------- manual job runs (FM routes.ts 1523-1535): admin, feature whatsapp, 40 sends per call, no hour window ----------
+
+const requireReady = async (c: Context<AppEnv>) => {
+  if (!(await waReady(c, c.var.tenant.org))) throw new HttpError(409, NOT_READY, "wa_not_ready");
+};
+
+/** Due visit reminders now (like FM, regardless of wa_reminder_enabled / wa_reminder_hour). */
+whatsapp.post("/wa/reminders/run", ...gate, async (c) => {
+  await requireReady(c);
+  return c.json(await runReminders(c.env, c.var.tenant.org.id, Date.now(), WA_BATCH, { left: WA_BATCH }));
+});
+
+/** Due rating requests, then due rating reminders, sharing one 40-send budget, as one tally (FM order). */
+whatsapp.post("/wa/feedback/run", ...gate, async (c) => {
+  await requireReady(c);
+  const orgId = c.var.tenant.org.id;
+  const budget = { left: WA_BATCH };
+  const a = await runFeedback(c.env, orgId, Date.now(), WA_BATCH, budget);
+  const b = await runFeedbackReminders(c.env, orgId, Date.now(), WA_BATCH, budget);
+  return c.json({ due: a.due + b.due, sent: a.sent + b.sent, failed: a.failed + b.failed, skipped: a.skipped + b.skipped });
 });

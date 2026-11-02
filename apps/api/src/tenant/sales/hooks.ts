@@ -6,6 +6,7 @@ import { notificationsRepo, settingsRepo } from "../../data/tenant";
 import { notifyUsers } from "../notifications/notify";
 import { moneyText } from "../../lib/money";
 import { sendBill } from "../whatsapp/bill";
+import { runFeedback } from "../../jobs/wa-jobs";
 
 export { moneyText };
 
@@ -25,12 +26,17 @@ async function salePush(c: Context<AppEnv>, sale: Sale, s: Settings): Promise<vo
   });
 }
 
-/** WhatsApp (FM routes.ts 760-770): the bill when the org is WA-ready and wa_bill_auto is on (sendBill checks readiness). */
+/**
+ * WhatsApp (FM routes.ts 760-770): the bill when wa_bill_auto is on, then the rating request inline when
+ * wa_feedback_enabled && wa_feedback_delay_min === 0 (one send at most; like FM, no hour window). Both check readiness.
+ * A failed rating request is logged and never stops the bill.
+ */
 async function saleWhatsapp(c: Context<AppEnv>, sale: Sale, s: Settings): Promise<void> {
   if (!hasFeature(c, "whatsapp") || !sale.customer_phone) return;
-  if (s.wa_bill_auto) await sendBill(c.env, c.var.tenant.org.id, sale.id, c.var.tenant.user.id);
-  // TODO(Plan 2b Task 9): FM sends the rating request inline when wa_feedback_enabled && wa_feedback_delay_min === 0:
-  //   await runFeedback(c.env, orgId, Date.now(), 1, sale.id). Nothing is called until Task 9 lands.
+  const orgId = c.var.tenant.org.id;
+  if (s.wa_bill_auto) await sendBill(c.env, orgId, sale.id, c.var.tenant.user.id);
+  if (s.wa_feedback_enabled && s.wa_feedback_delay_min === 0)
+    await runFeedback(c.env, orgId, Date.now(), 1, { left: 1 }, sale.id).catch((err) => console.error("whatsapp feedback failed", err));
 }
 
 /**
