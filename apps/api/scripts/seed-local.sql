@@ -3,6 +3,15 @@
 -- so demo ledger balances agree with demo reports. Seeded sales use days today-1 and today-2 so they never collide with
 -- today's bill counter.
 UPDATE orgs SET owner_user_id = NULL WHERE id IN ('org_demo_alpha','org_demo_bravo');
+-- Plan 2b tables first (children before parents; they reference sales, users and orgs).
+DELETE FROM wa_messages WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM wa_campaigns WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM ratings WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM notifications WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM announcements WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM push_tokens WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM org_assets WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
+DELETE FROM org_whatsapp WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM sale_items WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM sales WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM customers WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
@@ -35,6 +44,9 @@ INSERT INTO orgs(id,slug,name,status,plan_id,trial_ends_at,grace_ends_at,country
 INSERT INTO org_settings(org_id,display_name,bill_prefix) VALUES
   ('org_demo_alpha','Alpha Salon','ALP'),
   ('org_demo_bravo','Bravo Salon','BRA');
+
+-- bravo: every WhatsApp automation off, and no org_whatsapp row (a salon that has not connected WhatsApp yet).
+UPDATE org_settings SET wa_bill_auto = 0, wa_reminder_enabled = 0, wa_feedback_enabled = 0 WHERE org_id = 'org_demo_bravo';
 
 INSERT INTO subscriptions(org_id,provider,status) VALUES
   ('org_demo_alpha','none',NULL),
@@ -140,3 +152,19 @@ WHERE e.org_id IN ('org_demo_alpha','org_demo_bravo') ORDER BY e.org_id, e.id;
 INSERT INTO ledger_entries(org_id,at,day,book,account,barber_id,amount,kind,source,source_id,ref,memo,actor_id)
 SELECT org_id, created_at, day, 'shop', paid_from, NULL, -amount, 'company_expense', 'company_expense', id, note, 'Company · ' || note, created_by
 FROM company_expenses WHERE org_id IN ('org_demo_alpha','org_demo_bravo') ORDER BY org_id, id;
+
+-- Plan 2b demo engagement data for bravo (pro_max): ratings on two seeded bills and a few notifications for the owner.
+-- Rows are found by uid / username / bill_no subselects, never MAX(id).
+INSERT INTO ratings(org_id,sale_id,customer_id,barber_id,stars,comment,created_at,updated_at)
+SELECT sa.org_id, sa.id, NULL, sa.barber_id, r.stars, r.comment, CAST(strftime('%s','now') AS INTEGER) * 1000, CAST(strftime('%s','now') AS INTEGER) * 1000
+FROM (SELECT 'BRA-' || strftime('%Y%m%d', date('now','-1 day')) || '-001' AS bill_no, 5 AS stars, 'Great cut' AS comment
+      UNION ALL SELECT 'BRA-' || strftime('%Y%m%d', date('now','-1 day')) || '-002', 4, NULL
+      UNION ALL SELECT 'BRA-' || strftime('%Y%m%d', date('now','-2 day')) || '-001', 3, 'A bit of a wait') r
+JOIN sales sa ON sa.org_id = 'org_demo_bravo' AND sa.bill_no = r.bill_no;
+
+INSERT INTO notifications(org_id,user_id,title,body,path,created_at,read_at)
+SELECT u.org_id, u.id, n.title, n.body, n.path, CAST(strftime('%s','now') AS INTEGER) * 1000 - n.age, n.read_at
+FROM (SELECT 'New rating: 5 stars' AS title, 'Great cut' AS body, '/ratings' AS path, 60000 AS age, NULL AS read_at
+      UNION ALL SELECT 'New rating: 4 stars', NULL, '/ratings', 120000, NULL
+      UNION ALL SELECT 'Welcome to Bravo Salon', 'Your trial has started', NULL, 86400000, CAST(strftime('%s','now') AS INTEGER) * 1000) n
+JOIN users u ON u.org_id = 'org_demo_bravo' AND u.username = 'owner';

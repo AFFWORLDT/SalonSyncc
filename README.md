@@ -22,29 +22,65 @@ curl -c j -X POST localhost:8787/api/auth/login -H 'content-type: application/js
 curl -b j localhost:8787/api/me
 ```
 
-The seed is re-runnable. It inserts a few services, two barbers, four sales (with items), one barber expense and one company expense per org, directly in SQL, together with the ledger lines the API would post for them, so the demo ledger balances agree with the demo reports.
+The seed is re-runnable. It inserts a few services, two barbers, four sales (with items), one barber expense and one company expense per org, directly in SQL (bravo also gets WhatsApp automations off, no `org_whatsapp` row, three ratings and three notifications), together with the ledger lines the API would post for them, so the demo ledger balances agree with the demo reports.
 
 ## Modules and routes
 
 All tenant routes are under `/api`, need a session (`ss_session`), and keep FM's paths. Each router is gated by a feature key (`core_sales` is always on):
 
-| Feature key | Routes |
+| Feature key | Routes or jobs |
 |---|---|
 | `core_sales` | `/me`, `/settings`, staff (`/users`, avatars), `/services`, `/sales`, receipts, `/reports/me`, `/reports/overview`, `/customers` (barber autocomplete) |
 | `expenses` | `/expenses`, `/company-expenses` |
 | `daily_sheet` | `/reports/daily` |
 | `reports_advanced` | `/reports/monthly` |
+| `excel_export` | no routes yet (reserved) |
 | `ledger` | `/ledger/*`, `/payouts`, `/transfers` |
 | `customers_crm` | admin customer list and detail (`/customers`, `/customers/:id`) |
+| `audit_log` | `/sales/:id/history` and the audit viewer |
+| `ratings` | `/ratings`; public rating page `/api/public/feedback/:token`, `/api/public/review/:token` |
+| `push` | `/push/tokens`, `/notifications`, `/notifications/read`; cron jobs: end-of-day summary and barber reminder (push) |
+| `announcements` | `/announcements` (in-app plus push) |
+| `whatsapp` | `/whatsapp/config`, `/sales/:id/whatsapp`, `/customers/:id/whatsapp` (opt-out), `/wa/reminders/run`, `/wa/feedback/run`, webhook `/api/wa/webhook`; cron jobs: visit reminders, rating requests and their reminder |
+| `whatsapp_campaigns` | `/wa/templates`, `/wa/test`, `/wa/audience`, `/wa/campaigns`, `/wa/campaigns/:id/next`, `/wa/media`; cron job: campaign drain |
 | `public_services_api` | `/api/public/services` |
 
 Public routes (no session) live on `publicApi` at `/api/public` (avatars, services list, receipts), rate-limited per IP.
 
 **Stale edits (409):** edits and deletes that reverse and repost ledger lines (sales, company expenses, barber expenses, payouts, transfers, opening balances) are compare-and-set on `updated_at`. If another write won, the API answers `409 {"error": ..., "code": "stale"}` and changes nothing; the client should reload and retry. Paged lists clamp `?page` to 100000.
 
+## Secrets
+
+Set with `wrangler secret put <NAME>` (never commit values; local ones go in the gitignored `apps/api/.dev.vars`):
+
+| Name | Purpose |
+|---|---|
+| `SESSION_SECRET` | Signs session cookies |
+| `SECRETS_KEY` | Base64 of 32 random bytes; AES-GCM key that encrypts each org's WhatsApp access token (`org_whatsapp.token_enc`) |
+| `FCM_SERVICE_ACCOUNT` | Firebase service-account JSON, one FCM project for all salons. Unset: push sends are skipped |
+| `WA_APP_SECRET` | Meta app secret; verifies the `X-Hub-Signature-256` on webhook POSTs (503 without it) |
+| `WA_VERIFY_TOKEN` | Token for Meta's webhook GET handshake |
+
+## WhatsApp webhook
+
+Give Meta the callback URL `https://<app host>/api/wa/webhook` and set its verify token to the value of `WA_VERIFY_TOKEN`. The signature is required on every POST. The org is resolved from the payload's `phone_number_id` (unique in `org_whatsapp`).
+
+## Cron
+
+`wrangler.jsonc` runs the Worker on `*/10 * * * *`. Each invocation is held to the Workers free plan: a budget of **40 subrequests** (WhatsApp Graph calls; FCM costs 1 per token plus 1 OAuth) and **45 D1 statements** (every statement in a batch counts). Within that:
+
+- It loads every served org in one statement and works in each org's local hours (`org_settings.timezone` and `day_start_hour`), not UTC.
+- Once-a-day push jobs (end-of-day summary, barber reminder) claim `job_runs(org_id, job, day)` with `INSERT OR IGNORE`, so exactly one tick runs each per org per business day. `job_runs` rows older than 7 days are pruned (with `rate_hits` and `login_failures`) at the top of the hour.
+- Orgs are visited in a rotation: the start offset steps by a stride coprime to the org count, so every org is reached over consecutive ticks when the budget cannot cover all of them.
+- A campaign batch may use at most half a tick's statements, so a big campaign never starves the other jobs. Due work that does not fit stays due for the next tick.
+
+## Free-plan campaign limits
+
+A WhatsApp campaign goes to at most 1000 recipients (a bigger audience is refused with 400), and an org may have one unfinished campaign at a time (409 `campaign_running`).
+
 ## Migrations
 
-`0001_platform`, `0002_tenant_core`, `0003_seed_plans` (frozen), `0004_core` (services, audit_log, rate_hits), `0005_users_ci` (case-insensitive usernames), `0006_sales` (customers, sales, sale_items), `0007_expenses` (expenses, company_expenses), `0008_ledger` (ledger_entries, barber_payouts, money_transfers), `0009_engagement` (org_settings wa_*, org_whatsapp, org_assets, push_tokens, notifications, announcements, ratings, wa_campaigns, wa_messages).
+`0001_platform`, `0002_tenant_core`, `0003_seed_plans` (frozen), `0004_core` (services, audit_log, rate_hits), `0005_users_ci` (case-insensitive usernames), `0006_sales` (customers, sales, sale_items), `0007_expenses` (expenses, company_expenses), `0008_ledger` (ledger_entries, barber_payouts, money_transfers), `0009_engagement` (org_settings wa_*, org_whatsapp, org_assets, push_tokens, notifications, announcements, ratings, wa_campaigns, wa_messages), `0010_jobs` (job_runs).
 
 ## Test
 

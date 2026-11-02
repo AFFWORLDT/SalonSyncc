@@ -185,24 +185,29 @@ describe("auth", () => {
   });
 
   it("fail-closed: every registered /api route except health, auth, public and the guard requires a session", async () => {
-    const { publicApi } = await import("../src/core/public");
-    const { waWebhook } = await import("../src/integrations/wa-webhook");
     const api = app.routes.filter((r) => r.path.startsWith("/api"));
     const guard = api.find((r) => r.method === "ALL" && r.path === "/api/*")!.handler;
-    // Public routes are excluded only if they really are registered on publicApi (same handler, same path under /api/public),
-    // never by path prefix alone: a tenant route placed under /api/public/ would still be checked below.
-    const isPublic = (r: (typeof api)[number]) =>
-      r.path.startsWith("/api/public/") &&
-      publicApi.routes.some((p) => p.handler === r.handler && p.method === r.method && `/api/public${p.path === "/*" ? "/*" : p.path}` === r.path);
-    const publicRoutes = api.filter(isPublic);
-    expect(publicRoutes.map((r) => r.path)).toContain("/api/public/_probe");
-    // Meta's webhook (signature-checked, no session): excluded only by registration on waWebhook at /api/wa/webhook.
-    const isWebhook = (r: (typeof api)[number]) =>
-      waWebhook.routes.some((p) => p.handler === r.handler && p.method === r.method && `/api/wa/webhook${p.path === "/" ? "" : p.path}` === r.path);
-    expect(api.filter(isWebhook).map((r) => `${r.method} ${r.path}`).sort()).toEqual(["GET /api/wa/webhook", "POST /api/wa/webhook"]);
-    const guarded = api.filter(
-      (r) => r.handler !== guard && r.path !== "/api/health" && !r.path.startsWith("/api/auth/") && !isPublic(r) && !isWebhook(r),
-    );
+    // Session-free routes, listed by exact "METHOD path" (never by prefix): a tenant route placed under /api/public/ or
+    // /api/wa/ is not in this list, so it is checked below and must answer 401.
+    const OPEN = new Set([
+      "GET /api/public/_probe",
+      "GET /api/public/_probe/pdf",
+      "GET /api/public/receipt/:token",
+      "GET /api/public/bill/:token",
+      "GET /api/public/feedback/:token",
+      "POST /api/public/feedback/:token",
+      "GET /api/public/review/:token",
+      "GET /api/public/avatar/:id/:v",
+      "GET /api/public/services",
+      "OPTIONS /api/public/services",
+      "GET /api/public/logo/:v",
+      "GET /api/wa/webhook",
+      "POST /api/wa/webhook",
+    ]);
+    const key = (r: (typeof api)[number]) => `${r.method} ${r.path}`;
+    const registered = new Set(api.map(key));
+    for (const k of OPEN) expect(registered.has(k), `${k} is no longer registered; update the list`).toBe(true);
+    const guarded = api.filter((r) => r.handler !== guard && r.path !== "/api/health" && !r.path.startsWith("/api/auth/") && !OPEN.has(key(r)));
     expect(guarded.map((r) => r.path)).toContain("/api/_whoami");
     expect(guarded.some((r) => r.path.startsWith("/api/public"))).toBe(false);
     for (const r of guarded) {

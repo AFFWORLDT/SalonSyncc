@@ -44,10 +44,11 @@ These come from the Plan 1 per-task reviews and the final review. Each was triag
 - **`PUT /api/sales/:id`:** a foreign-key failure (a service deleted mid-request) currently returns 500. Map it to 400 with "One of the services no longer exists", as create already does.
 
 ## Carried into Plan 2b
-- **Edit and delete hooks** next to `hooks.afterSale`, for FM's "your sale was changed" barber push.
-- **Cron pruning** of `rate_hits` and `login_failures`.
-- **Org scoping in WhatsApp and push:**
-  - resolve the WhatsApp webhook's org from `phone_number_id`
-  - scope `adminIds()` by org
-  - remove the `MAX(id)` lookup from `wa_campaigns`
-- **Free plan:** no Queues. Send email via `waitUntil`, and have the hourly cron retry rows in `email_log` with status `failed` (spec D19).
+- [x] **Edit and delete hooks** next to `hooks.afterSale`, for FM's "your sale was changed" barber push.
+- [x] **Cron pruning** of `rate_hits` and `login_failures` (also `job_runs`).
+- [x] **Org scoping in WhatsApp and push:**
+  - [x] resolve the WhatsApp webhook's org from `phone_number_id`
+  - [x] scope `adminIds()` by org
+  - [x] remove the `MAX(id)` lookup from `wa_campaigns` (no `MAX(id)` anywhere in `src/`, enforced by a test)
+- [ ] **Free plan:** no Queues. Send email via `waitUntil`, and have the hourly cron retry rows in `email_log` with status `failed` (spec D19). Still open: `email_log` arrives in Plan 6, so this moves there.
+
