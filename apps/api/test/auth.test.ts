@@ -186,6 +186,7 @@ describe("auth", () => {
 
   it("fail-closed: every registered /api route except health, auth, public and the guard requires a session", async () => {
     const { publicApi } = await import("../src/core/public");
+    const { waWebhook } = await import("../src/integrations/wa-webhook");
     const api = app.routes.filter((r) => r.path.startsWith("/api"));
     const guard = api.find((r) => r.method === "ALL" && r.path === "/api/*")!.handler;
     // Public routes are excluded only if they really are registered on publicApi (same handler, same path under /api/public),
@@ -195,8 +196,12 @@ describe("auth", () => {
       publicApi.routes.some((p) => p.handler === r.handler && p.method === r.method && `/api/public${p.path === "/*" ? "/*" : p.path}` === r.path);
     const publicRoutes = api.filter(isPublic);
     expect(publicRoutes.map((r) => r.path)).toContain("/api/public/_probe");
+    // Meta's webhook (signature-checked, no session): excluded only by registration on waWebhook at /api/wa/webhook.
+    const isWebhook = (r: (typeof api)[number]) =>
+      waWebhook.routes.some((p) => p.handler === r.handler && p.method === r.method && `/api/wa/webhook${p.path === "/" ? "" : p.path}` === r.path);
+    expect(api.filter(isWebhook).map((r) => `${r.method} ${r.path}`).sort()).toEqual(["GET /api/wa/webhook", "POST /api/wa/webhook"]);
     const guarded = api.filter(
-      (r) => r.handler !== guard && r.path !== "/api/health" && !r.path.startsWith("/api/auth/") && !isPublic(r),
+      (r) => r.handler !== guard && r.path !== "/api/health" && !r.path.startsWith("/api/auth/") && !isPublic(r) && !isWebhook(r),
     );
     expect(guarded.map((r) => r.path)).toContain("/api/_whoami");
     expect(guarded.some((r) => r.path.startsWith("/api/public"))).toBe(false);

@@ -19,6 +19,7 @@ import { notifications } from "./tenant/notifications/routes";
 import { announcements } from "./tenant/announcements/routes";
 import { ratings } from "./tenant/ratings/routes";
 import { whatsapp } from "./tenant/whatsapp/routes";
+import { waWebhook } from "./integrations/wa-webhook";
 
 const app = new Hono<AppEnv>();
 
@@ -31,6 +32,10 @@ publicApi.route("/avatar", avatarPublic);
 publicApi.route("/services", servicesPublic);
 publicApi.route("/logo", logoPublic);
 app.route("/api/public", publicApi);
+
+// Meta's WhatsApp webhook: no session (signature-checked), not behind the public rate limiter; the org comes from each
+// change's phone_number_id. Registered before the tenant router so its guard never sees it.
+app.route("/api/wa/webhook", waWebhook);
 
 // Tenant routes. FAIL-CLOSED: the router-level guard runs tenantAuth whenever a real (non-middleware) handler
 // matched this request, so a route added here without its own auth is still protected. Paths that match no

@@ -33,12 +33,16 @@ export async function resolvePublicOrg(c: Context<AppEnv>): Promise<Org | null> 
   return org;
 }
 
-/** Per-IP fixed-window limiter backed by the global rate_hits table. */
-export function publicRateLimit(bucket: keyof typeof PUBLIC_LIMITS): MiddlewareHandler<AppEnv> {
+const clientIp = (c: Context<AppEnv>) => c.req.header("CF-Connecting-IP") ?? "unknown";
+
+/**
+ * Fixed-window limiter backed by the global rate_hits table: per IP by default, or per `keyOf(c)` (key `<bucket>:<key>`)
+ * for routes whose callers share IPs.
+ */
+export function publicRateLimit(bucket: keyof typeof PUBLIC_LIMITS, keyOf: (c: Context<AppEnv>) => string = clientIp): MiddlewareHandler<AppEnv> {
   return async (c, next) => {
-    const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
     const at = Date.now();
-    const n = await rateHit(c.env.DB, `${bucket}:${ip}`, minuteWindow(at));
+    const n = await rateHit(c.env.DB, `${bucket}:${keyOf(c)}`, minuteWindow(at));
     if (n > PUBLIC_LIMITS[bucket]) {
       c.header("Retry-After", String(60 - Math.floor((at % 60_000) / 1000)));
       throw new HttpError(429, "Too many requests");
@@ -103,14 +107,21 @@ publicApi.get("/receipt/:token", publicRateLimit("pub"), async (c) => {
   return c.json(receiptOf(sale, await settingsRepo(c.env.DB, org.id).get()));
 });
 
+const billToken = (c: Context<AppEnv>) => (c.req.param("token") ?? "").replace(/\.pdf$/, "");
+/** A malformed token is a 404 before it can create a rate_hits row. */
+const billTokenShape: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (!TOKEN_RE.test(billToken(c))) return c.json({ error: "Not found" }, 404);
+  await next();
+};
+
 /**
  * The bill as a PDF (feature `whatsapp`): WhatsApp fetches this link for the document of the PDF bill template. The org
  * comes from the token's live sale row; 404 for a lapsed org or one without `whatsapp`. ".pdf" may be appended.
+ * Rate limited per bill token (bucket "pdf", key pdf:<token>), not per IP: Meta fetches from one shared IP pool for all salons.
  */
-publicApi.get("/bill/:token", publicRateLimit("pdf"), async (c) => {
-  const token = c.req.param("token").replace(/\.pdf$/, "");
+publicApi.get("/bill/:token", billTokenShape, publicRateLimit("pdf", billToken), async (c) => {
+  const token = billToken(c);
   const notFound = () => c.json({ error: "Not found" }, 404);
-  if (!TOKEN_RE.test(token)) return notFound();
   const org = await platformRepo(c.env.DB).orgBySaleToken(token);
   if (!org || org.status === "deactivated" || org.status === "deleted") return notFound();
   if (!(await featuresFor(c.env.DB, org)).features.includes("whatsapp")) return notFound();

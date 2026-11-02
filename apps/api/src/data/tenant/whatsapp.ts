@@ -2,6 +2,7 @@ import { decryptSecret, encryptSecret } from "../../lib/secrets";
 import { auditRepo } from "./audit";
 import type { Customer, WaMessage } from "@ss/contract";
 import type { SendResult, WaConfig } from "../../core/services";
+import type { WaStatusEvent } from "../../lib/whatsapp";
 
 /**
  * One org's WhatsApp number (org_whatsapp). The token is stored AES-GCM encrypted (lib/secrets, SECRETS_KEY) and only
@@ -173,6 +174,32 @@ export function waMessagesRepo(db: D1Database, orgId: string) {
         ? await db.prepare("SELECT wa_opt_out FROM customers WHERE org_id = ? AND id = ?").bind(orgId, customerId).first<{ wa_opt_out: number }>()
         : await db.prepare("SELECT wa_opt_out FROM customers WHERE org_id = ? AND phone = ?").bind(orgId, phone).first<{ wa_opt_out: number }>();
       return !!r?.wa_opt_out;
+    },
+
+    /**
+     * The writes for one webhook change of this org (FM POST /wa/webhook, org-scoped): delivery receipts by wa_id (delivered_at
+     * and read_at are set only once; "read" implies delivered; "failed" stores the error, at most 300 chars) and STOP replies
+     * as opt-outs by this org's canonical phone. Statements only: the caller batches them.
+     */
+    webhookStatements(statuses: WaStatusEvent[], optOutPhones: string[]): D1PreparedStatement[] {
+      const out: D1PreparedStatement[] = [];
+      for (const s of statuses) {
+        if (s.status === "failed") {
+          out.push(
+            db.prepare("UPDATE wa_messages SET status = 'failed', error = ? WHERE org_id = ? AND wa_id = ?").bind((s.error ?? "Not delivered").slice(0, 300), orgId, s.wa_id),
+          );
+        } else if (s.status === "delivered") {
+          out.push(db.prepare("UPDATE wa_messages SET delivered_at = COALESCE(delivered_at, ?) WHERE org_id = ? AND wa_id = ?").bind(s.at, orgId, s.wa_id));
+        } else {
+          out.push(
+            db
+              .prepare("UPDATE wa_messages SET read_at = COALESCE(read_at, ?), delivered_at = COALESCE(delivered_at, ?) WHERE org_id = ? AND wa_id = ?")
+              .bind(s.at, s.at, orgId, s.wa_id),
+          );
+        }
+      }
+      for (const phone of new Set(optOutPhones)) out.push(db.prepare("UPDATE customers SET wa_opt_out = 1 WHERE org_id = ? AND phone = ?").bind(orgId, phone));
+      return out;
     },
 
     /** FM PUT /customers/:id/whatsapp: sets the flag and audits it in one batch; null when this org has no such customer. */

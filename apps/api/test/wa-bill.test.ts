@@ -319,13 +319,17 @@ describe("GET /api/public/bill/:token", () => {
     }
   });
 
-  it("is rate limited by the pdf bucket", async () => {
+  it("is rate limited per bill token (pdf bucket), not per IP: Meta fetches from a shared IP pool", async () => {
     install();
     const a = await setup("wb-pub-rl");
     const sale = await newSale(a.ck);
+    const other = await newSale(a.ck);
     const codes: number[] = [];
-    for (let i = 0; i < 11; i++) codes.push((await pub(`/bill/${sale.token}`, "4.4.4.4")).status);
+    for (let i = 0; i < 11; i++) codes.push((await pub(`/bill/${sale.token}`, `4.4.${i}.4`)).status);
     expect(codes.slice(0, 10).every((c) => c === 200)).toBe(true);
     expect(codes[10]).toBe(429);
+    // ".pdf" shares the token's bucket; a different token is unaffected, even from an IP that was used above
+    expect((await pub(`/bill/${sale.token}.pdf`, "4.4.99.4")).status).toBe(429);
+    expect((await pub(`/bill/${other.token}`, "4.4.0.4")).status).toBe(200);
   });
 });
