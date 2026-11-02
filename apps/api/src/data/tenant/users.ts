@@ -85,15 +85,16 @@ export function usersRepo(db: D1Database, orgId: string) {
     /**
      * Whether the user is referenced by business records, in which case they are deactivated rather than deleted.
      * audit_log actor references do not count.
-     * Counts sales (as barber or creator, soft-deleted ones too: they still reference the user) and ledger lines (barber book).
-     * TODO(Tasks 9/10): extend with expenses (barber_id) and payouts (barber_id) when those tables exist.
+     * Counts sales (as barber or creator, soft-deleted ones too: they still reference the user) ledger lines (barber book) and expenses.
+     * TODO(Task 10): extend with payouts (barber_id) when that table exists.
      */
     async userHasActivity(id: number): Promise<boolean> {
       const r = await db
         .prepare(
           `SELECT EXISTS (SELECT 1 FROM sales WHERE org_id = ?1 AND barber_id = ?2)
                 + EXISTS (SELECT 1 FROM sales WHERE org_id = ?1 AND created_by = ?2)
-                + EXISTS (SELECT 1 FROM ledger_entries WHERE org_id = ?1 AND barber_id = ?2) AS n`,
+                + EXISTS (SELECT 1 FROM ledger_entries WHERE org_id = ?1 AND barber_id = ?2)
+                + EXISTS (SELECT 1 FROM expenses WHERE org_id = ?1 AND barber_id = ?2) AS n`,
         )
         .bind(orgId, id)
         .first<{ n: number }>();

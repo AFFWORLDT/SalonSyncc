@@ -6,3 +6,4 @@ export * from "./tenant/services";
 export * from "./tenant/customers";
 export * from "./tenant/sales";
 export * from "./tenant/ledger";
+export * from "./tenant/reports";
