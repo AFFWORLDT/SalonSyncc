@@ -202,3 +202,14 @@ button,
 .glass [data-slot="input"]:focus-visible {
   border-color: var(--primary);
 }
+
+/* Browser autofill paints its own light-blue fill; keep the theme's field colours (light and dark). */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--foreground);
+  caret-color: var(--foreground);
+  -webkit-box-shadow: 0 0 0 1000px color-mix(in oklab, var(--background) 92%, var(--foreground)) inset !important;
+  box-shadow: 0 0 0 1000px color-mix(in oklab, var(--background) 92%, var(--foreground)) inset !important;
+  transition: background-color 9999s ease-out 0s;
+}

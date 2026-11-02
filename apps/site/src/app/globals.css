@@ -122,3 +122,18 @@ body {
 .glass [data-slot="input"][aria-invalid="true"] {
   border-color: #d92d20;
 }
+
+/* Browser autofill paints its own light-blue fill; keep the field's cream fill and ink text instead. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+select:-webkit-autofill {
+  -webkit-text-fill-color: #1c1b18;
+  caret-color: #1c1b18;
+  -webkit-box-shadow: 0 0 0 1000px #fbf8f1 inset !important;
+  box-shadow: 0 0 0 1000px #fbf8f1 inset !important;
+  transition: background-color 9999s ease-out 0s;
+}
+.glass input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #fbf8f1 inset, 0 0 0 3px rgb(31 122 106 / 0.18) !important;
+}
