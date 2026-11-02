@@ -10,8 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-const POLL_MS = 45_000;
-
 /** Short relative time: "now", "5m", "3h", "2d", else a date. */
 function ago(ms: number): string {
   const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
@@ -27,20 +25,11 @@ function ago(ms: number): string {
 
 /** Top-bar bell: unread count, a list of recent notifications, and mark-all-read on open. */
 export function NotificationBell() {
-  const { data: feed, reload, setData } = useApi<NotificationFeed>("/api/notifications");
+  const { data: feed, setData } = useApi<NotificationFeed>("/api/notifications");
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
-  // Keep the count fresh: poll, and refetch whenever the window regains focus.
-  useEffect(() => {
-    const t = setInterval(reload, POLL_MS);
-    const onFocus = () => reload();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      clearInterval(t);
-      window.removeEventListener("focus", onFocus);
-    };
-  }, [reload]);
+  // No polling (Workers free plan): the feed loads with the page and again on ss:data-changed (useApi).
 
   async function onOpenChange(next: boolean) {
     setOpen(next);

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, PUBLIC_PATHS as AUTH_FREE } from "@/lib/auth-context";
 import { AppSidebar } from "@/components/admin/app-sidebar";
 import { BottomBar } from "@/components/admin/bottom-bar";
 import { TopBar } from "@/components/admin/top-bar";
@@ -39,7 +39,7 @@ function readCollapsed() {
 }
 
 /** Pages that render without sign-in or the app frame. */
-const PUBLIC_PATHS = ["/login", "/r", "/rate"];
+const PUBLIC_PATHS = ["/login", ...AUTH_FREE];
 /** Pages only the admin may open (barbers are sent home). */
 const ADMIN_PATHS = ["/services", "/sales", "/expenses", "/sheet", "/monthly", "/audit", "/ledger", "/barbers", "/customers", "/settings", "/ratings", "/plan"];
 
@@ -80,7 +80,8 @@ function Frame({ children }: { children: React.ReactNode }) {
   const mainRef = useRef<HTMLElement>(null);
   // Devices that allowed notifications re-register after sign-in; pushes that land while the app is open show as toasts.
   const userId = user?.id;
-  const push = has("push");
+  // A lapsed salon would get 402 on the token POST (and an /api/me refresh each load), so push waits for an upgrade.
+  const push = has("push") && !readOnly;
   useEffect(() => {
     if (!userId || !push) return;
     let stop = () => {};

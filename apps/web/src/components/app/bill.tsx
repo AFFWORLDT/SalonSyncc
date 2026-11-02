@@ -203,9 +203,9 @@ export function printBill() {
 
 /** Print, share link and WhatsApp for a saved bill. */
 export function BillActions({ sale, settings, disabled }: { sale: Sale; settings: SettingsResponse | null; disabled?: boolean }) {
-  const { has } = useAuth();
+  const { has, readOnly } = useAuth();
   // Sending from the salon's own number needs the plan feature and a connected number; otherwise a wa.me link.
-  const cloud = has("whatsapp") && !!settings?.wa_ready && !!sale.customer_phone && sale.id > 0;
+  const cloud = has("whatsapp") && !readOnly && !!settings?.wa_ready && !!sale.customer_phone && sale.id > 0;
   return (
     <div className="flex flex-col gap-2">
     <div className="grid grid-cols-3 gap-2">

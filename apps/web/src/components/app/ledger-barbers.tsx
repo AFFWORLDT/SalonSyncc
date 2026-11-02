@@ -1,5 +1,7 @@
 "use client";
 
+import { useAuth } from "@/lib/auth-context";
+
 import { useState } from "react";
 import { ArrowLeft, HandCoins } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +26,7 @@ import { ACCOUNT_OPTIONS } from "./ledger-dialogs";
 
 /** What the shop owes each barber: commission earned minus payouts. Tap one for their statement. */
 export function LedgerBarbers() {
+  const { readOnly } = useAuth();
   const { data, error, reload } = useApi<BarberBalance[]>("/api/ledger/barbers");
   const [open, setOpen] = useState<BarberBalance | null>(null);
   const [paying, setPaying] = useState<{ barberId: number | null; current: Payout | null } | null>(null);
@@ -36,7 +39,7 @@ export function LedgerBarbers() {
       <div className="grid grid-cols-2 gap-3">
         <MoneyTile label="Owed to barbers" value={data ? owed : null} hint="Commission earned minus payouts" className="bg-primary/5" />
         <Card className="justify-center p-4">
-          <Button onClick={() => setPaying({ barberId: null, current: null })} disabled={!data?.length}>
+          <Button onClick={() => setPaying({ barberId: null, current: null })} disabled={!data?.length || readOnly}>
             <HandCoins />
             Pay barber
           </Button>
@@ -106,6 +109,7 @@ function Statement({
   setPaying: (p: null) => void;
   barbers: BarberBalance[];
 }) {
+  const { readOnly } = useAuth();
   const today = businessToday();
   const [from, setFrom] = useState(`${today.slice(0, 7)}-01`);
   const [to, setTo] = useState(today);
@@ -130,7 +134,7 @@ function Statement({
           <ArrowLeft />
         </Button>
         <h2 className="text-lg font-semibold">{b.name}</h2>
-        <Button className="ml-auto" onClick={() => onPay(null)}>
+        <Button className="ml-auto" onClick={() => onPay(null)} disabled={readOnly}>
           <HandCoins />
           Pay {b.name}
         </Button>

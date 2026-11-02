@@ -5,7 +5,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --var ROOT_DOMAIN:",
     "db:migrate:local": "wrangler d1 migrations apply salonkit-db --local",
     "db:seed:local": "wrangler d1 execute salonkit-db --local --file scripts/seed-local.sql",
     "db:gen-seed": "node --experimental-strip-types scripts/gen-plan-seed.ts > migrations/0003_seed_plans.sql"

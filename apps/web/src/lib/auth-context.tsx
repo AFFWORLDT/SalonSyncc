@@ -11,6 +11,8 @@ import { forgetPushToken } from "@/lib/push";
 /** Org statuses in which the salon can still change data (the API's write guard, WRITE_OK). */
 const WRITABLE = new Set(["trial", "active", "grace", "past_due"]);
 const LAST_ORG = "ss_last_org";
+/** Pages that work without signing in. */
+export const PUBLIC_PATHS = ["/r", "/rate"];
 
 interface AuthValue {
   me: MeResponse | null;
@@ -85,6 +87,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [apply]);
 
   useEffect(() => {
+    // Public pages (receipt, rating) have no session: never call /api/me there (Workers free plan, no sign-in).
+    if (PUBLIC_PATHS.some((p) => window.location.pathname === p || window.location.pathname.startsWith(`${p}/`))) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
     const cached = readCache();
     if (cached) {
       setFormat(cached.settings);

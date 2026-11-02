@@ -28,7 +28,7 @@ const VIEW = [
 
 /** The shop book: balances now, then every line in a range with a running balance. */
 export function LedgerShop() {
-  const { has, settings } = useAuth();
+  const { has, settings, readOnly } = useAuth();
   const today = businessToday();
   const [from, setFrom] = useState(`${today.slice(0, 7)}-01`);
   const [to, setTo] = useState(today);
@@ -59,11 +59,11 @@ export function LedgerShop() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button onClick={() => setMoving({ current: null })}>
+        <Button onClick={() => setMoving({ current: null })} disabled={readOnly}>
           <ArrowLeftRight />
           Move money
         </Button>
-        <Button variant="outline" onClick={() => setSetting(true)} disabled={!b}>
+        <Button variant="outline" onClick={() => setSetting(true)} disabled={!b || readOnly}>
           <Scale />
           Set balances
         </Button>

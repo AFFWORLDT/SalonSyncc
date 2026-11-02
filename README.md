@@ -14,7 +14,7 @@ npm run db:seed:local -w @ss/api      # demo orgs alpha (free) and bravo (trial)
 npm run dev -w @ss/api                # http://localhost:8787
 ```
 
-Try it (local mode has `ROOT_DOMAIN=""`, so the org comes from the request body):
+Try it (`npm run dev -w @ss/api` clears `ROOT_DOMAIN` locally, so the org comes from the request body; in production `ROOT_DOMAIN=salonkit.online` and the org comes from the `<slug>.salonkit.online` host. Images on the workers.dev fallback host 404 because only tenant hosts resolve a salon):
 
 ```sh
 curl -c j -X POST localhost:8787/api/auth/login -H 'content-type: application/json' \

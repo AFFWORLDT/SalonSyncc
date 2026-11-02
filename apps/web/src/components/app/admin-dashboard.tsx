@@ -76,7 +76,7 @@ export function AdminDashboard() {
 
   return (
     <div className="flex flex-col gap-5">
-      <HomePushPrompt />
+      {has("push") && !readOnly && <HomePushPrompt />}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl">Dashboard</h1>
