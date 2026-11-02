@@ -11,9 +11,10 @@
     "db:gen-seed": "node --experimental-strip-types scripts/gen-plan-seed.ts > migrations/0003_seed_plans.sql"
   },
   "dependencies": {
-    "hono": "^4.13.13",
     "@ss/contract": "*",
-    "@ss/features": "*"
+    "@ss/features": "*",
+    "hono": "^4.13.13",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.4.12",

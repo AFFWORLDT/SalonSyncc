@@ -27,6 +27,15 @@ export function assetsRepo(db: D1Database, orgId: string) {
     async clearLogo(): Promise<void> {
       await db.prepare("DELETE FROM org_assets WHERE org_id = ? AND kind = 'logo'").bind(orgId).run();
     },
+    /** The current logo, whatever its version (the PDF bill); null when the org has none. */
+    async currentLogo(): Promise<{ bytes: Uint8Array; type: string } | null> {
+      const r = await db
+        .prepare("SELECT bytes, type FROM org_assets WHERE org_id = ? AND kind = 'logo'")
+        .bind(orgId)
+        .first<{ bytes: ArrayBuffer | number[]; type: string }>();
+      if (!r) return null;
+      return { bytes: r.bytes instanceof ArrayBuffer ? new Uint8Array(r.bytes) : new Uint8Array(r.bytes), type: r.type };
+    },
     /** The logo at version `v` (its current version); null otherwise. */
     async logo(v: number): Promise<{ bytes: Uint8Array; type: string } | null> {
       const r = await db

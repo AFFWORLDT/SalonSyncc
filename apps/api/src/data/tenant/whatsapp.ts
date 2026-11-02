@@ -1,6 +1,7 @@
 import { decryptSecret, encryptSecret } from "../../lib/secrets";
 import { auditRepo } from "./audit";
-import type { WaConfig } from "../../core/services";
+import type { Customer, WaMessage } from "@ss/contract";
+import type { SendResult, WaConfig } from "../../core/services";
 
 /**
  * One org's WhatsApp number (org_whatsapp). The token is stored AES-GCM encrypted (lib/secrets, SECRETS_KEY) and only
@@ -108,6 +109,96 @@ export function waConfigRepo(db: D1Database, orgId: string, secretsKey: string) 
         auditRepo(db, orgId).stmt({ actor, entity: "whatsapp", entityId: 1, ref: "WhatsApp", action: "delete", before: snapshot(before), after: null }),
       ]);
       return true;
+    },
+  };
+}
+
+// ---------- sent messages (wa_messages) and customer opt-out ----------
+
+/** What one send attempt is logged as (FM logSend). `params` are the template values as sent (never the token). */
+export interface WaLogInput {
+  kind: WaMessage["kind"];
+  phone: string;
+  template: string;
+  params: unknown[];
+  customerId?: number | null;
+  saleId?: number | null;
+  actorId?: number | null;
+}
+
+const WA_MESSAGE_COLS = "id, kind, phone, template, status, error, created_at, delivered_at, read_at";
+type CustomerRow = Omit<Customer, "wa_opt_out"> & { wa_opt_out: number };
+
+/** This org's wa_messages and the customers' WhatsApp opt-out. Every statement is org_id scoped (opt-out is per org, RF3). */
+export function waMessagesRepo(db: D1Database, orgId: string) {
+  return {
+    /** Writes exactly one row for a send attempt and returns it as the API shows it. */
+    async log(m: WaLogInput, r: SendResult): Promise<WaMessage> {
+      const at = Date.now();
+      const row = await db
+        .prepare(
+          `INSERT INTO wa_messages (org_id, kind, customer_id, phone, template, params, status, wa_id, error, sale_id, created_by, created_at, sent_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING ${WA_MESSAGE_COLS}`,
+        )
+        .bind(
+          orgId,
+          m.kind,
+          m.customerId ?? null,
+          m.phone,
+          m.template,
+          JSON.stringify(m.params),
+          r.status,
+          r.status === "sent" ? r.wa_id : null,
+          r.status === "sent" ? null : r.error,
+          m.saleId ?? null,
+          m.actorId ?? null,
+          at,
+          r.status === "sent" ? at : null,
+        )
+        .first<WaMessage>();
+      return row!;
+    },
+
+    /** The latest bill message for a sale of this org, or null. */
+    latestBill(saleId: number): Promise<WaMessage | null> {
+      return db
+        .prepare(`SELECT ${WA_MESSAGE_COLS} FROM wa_messages WHERE org_id = ? AND sale_id = ? AND kind = 'bill' ORDER BY id DESC LIMIT 1`)
+        .bind(orgId, saleId)
+        .first<WaMessage>();
+    },
+
+    /** True when this org's customer (by id, else by canonical phone) opted out of WhatsApp. */
+    async optedOut(customerId: number | null, phone: string): Promise<boolean> {
+      const r = customerId
+        ? await db.prepare("SELECT wa_opt_out FROM customers WHERE org_id = ? AND id = ?").bind(orgId, customerId).first<{ wa_opt_out: number }>()
+        : await db.prepare("SELECT wa_opt_out FROM customers WHERE org_id = ? AND phone = ?").bind(orgId, phone).first<{ wa_opt_out: number }>();
+      return !!r?.wa_opt_out;
+    },
+
+    /** FM PUT /customers/:id/whatsapp: sets the flag and audits it in one batch; null when this org has no such customer. */
+    async setOptOut(customerId: number, optOut: boolean, actor: { id: number; name: string }): Promise<Customer | null> {
+      const old = await db
+        .prepare("SELECT name, phone, wa_opt_out FROM customers WHERE org_id = ? AND id = ?")
+        .bind(orgId, customerId)
+        .first<{ name: string | null; phone: string | null; wa_opt_out: number }>();
+      if (!old) return null;
+      await db.batch([
+        db.prepare("UPDATE customers SET wa_opt_out = ? WHERE org_id = ? AND id = ?").bind(optOut ? 1 : 0, orgId, customerId),
+        auditRepo(db, orgId).stmt({
+          actor,
+          entity: "settings", // FM parity
+          entityId: customerId,
+          ref: `Customer ${old.name ?? old.phone ?? customerId}`,
+          action: "update",
+          before: { wa_opt_out: !!old.wa_opt_out },
+          after: { wa_opt_out: optOut },
+        }),
+      ]);
+      const row = await db
+        .prepare("SELECT id, name, phone, visits, spent, last_visit_at, wa_opt_out FROM customers WHERE org_id = ? AND id = ?")
+        .bind(orgId, customerId)
+        .first<CustomerRow>();
+      return row ? { ...row, wa_opt_out: !!row.wa_opt_out } : null;
     },
   };
 }

@@ -11,6 +11,7 @@ import { orgAppUrl } from "./links";
 import { notifyUsers } from "../tenant/notifications/notify";
 import { notificationsRepo } from "../data/tenant";
 import { firstName } from "../lib/names";
+import { billPdfFor } from "../tenant/whatsapp/bill";
 import type { FeedbackInput, FeedbackPage, Receipt, Sale, Settings } from "@ss/contract";
 
 /** Public (no session) routes. Mounted at /api/public BEFORE the tenant router; every route here is public by design. */
@@ -100,6 +101,29 @@ publicApi.get("/receipt/:token", publicRateLimit("pub"), async (c) => {
   const sale = await salesRepo(c.env.DB, org.id).byToken(token);
   if (!sale) return notFound();
   return c.json(receiptOf(sale, await settingsRepo(c.env.DB, org.id).get()));
+});
+
+/**
+ * The bill as a PDF (feature `whatsapp`): WhatsApp fetches this link for the document of the PDF bill template. The org
+ * comes from the token's live sale row; 404 for a lapsed org or one without `whatsapp`. ".pdf" may be appended.
+ */
+publicApi.get("/bill/:token", publicRateLimit("pdf"), async (c) => {
+  const token = c.req.param("token").replace(/\.pdf$/, "");
+  const notFound = () => c.json({ error: "Not found" }, 404);
+  if (!TOKEN_RE.test(token)) return notFound();
+  const org = await platformRepo(c.env.DB).orgBySaleToken(token);
+  if (!org || org.status === "deactivated" || org.status === "deleted") return notFound();
+  if (!(await featuresFor(c.env.DB, org)).features.includes("whatsapp")) return notFound();
+  const sale = await salesRepo(c.env.DB, org.id).byToken(token);
+  if (!sale) return notFound();
+  const bytes = await billPdfFor(c.env, org, sale);
+  return new Response(bytes, {
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="Bill_${sale.bill_no.replace(/[^\w.-]/g, "_")}.pdf"`,
+      "Cache-Control": "private, max-age=300",
+    },
+  });
 });
 
 // ---- Ratings (feature `ratings`): the org comes from the token's sale row, like the receipt ----

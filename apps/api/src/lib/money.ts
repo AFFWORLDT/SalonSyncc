@@ -52,3 +52,12 @@ export function shopProfit(t: DayTotals): number {
 export function clampPage(raw: unknown): number {
   return Math.min(100_000, Math.max(1, Math.floor(Number(raw)) || 1));
 }
+
+/** Money as the org shows it: Intl currency format in the org's locale (FM's aedText, per org). */
+export function moneyText(minor: number, s: { currency: string; currency_minor: number; locale: string }): string {
+  try {
+    return new Intl.NumberFormat(s.locale, { style: "currency", currency: s.currency }).format(minor / s.currency_minor);
+  } catch {
+    return `${s.currency} ${minor / s.currency_minor}`;
+  }
+}

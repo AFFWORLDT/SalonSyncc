@@ -1,12 +1,14 @@
 import { Hono } from "hono";
 import type { WaConfigView } from "@ss/contract";
 import type { AppEnv } from "../../env";
+import type { Context } from "hono";
 import { HttpError } from "../../core/errors";
 import { requireFeature } from "../../core/pipeline";
-import { requireAdmin } from "../../core/roles";
+import { forbidden, isAdmin, requireAdmin } from "../../core/roles";
 import { platformRepo } from "../../data/platform";
-import { settingsRepo, waConfigRepo, type WaConfigInput } from "../../data/tenant";
+import { salesRepo, settingsRepo, waConfigRepo, waMessagesRepo, type WaConfigInput } from "../../data/tenant";
 import { canonicalPhone } from "../../lib/phone";
+import { isBillError, sendBill } from "./bill";
 
 /**
  * The salon's own WhatsApp credentials: GET/PUT/DELETE /whatsapp/config. Owner/admin, feature `whatsapp`, gated per
@@ -83,4 +85,50 @@ whatsapp.delete("/whatsapp/config", ...gate, async (c) => {
   const { org, user } = c.var.tenant;
   await waConfigRepo(c.env.DB, org.id, c.env.SECRETS_KEY).clear({ id: user.id, name: user.name });
   return c.json({ wa_ready: false });
+});
+
+// ---------- bills (feature whatsapp) and customer opt-out (admin) ----------
+
+const idParam = (raw: string | undefined): number => {
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n <= 0) throw new HttpError(404, "Not found");
+  return n;
+};
+
+/** FM billForWhatsapp: a live sale of this org (404 otherwise); barbers only their own (403). */
+async function billSale(c: Context<AppEnv>) {
+  const { org, user } = c.var.tenant;
+  const sale = await salesRepo(c.env.DB, org.id).byId(idParam(c.req.param("id")));
+  if (!sale) throw new HttpError(404, "Not found");
+  if (!isAdmin(user) && sale.barber_id !== user.id) throw forbidden();
+  return sale;
+}
+
+/** The latest WhatsApp send of this bill, or null. */
+whatsapp.get("/sales/:id/whatsapp", requireFeature("whatsapp"), async (c) => {
+  const sale = await billSale(c);
+  return c.json(await waMessagesRepo(c.env.DB, c.var.tenant.org.id).latestBill(sale.id));
+});
+
+/** Sends the bill now. 409 wa_not_ready without a connected number (checked after the sale, so another org's id is 404). */
+whatsapp.post("/sales/:id/whatsapp", requireFeature("whatsapp"), async (c) => {
+  const sale = await billSale(c);
+  const r = await sendBill(c.env, c.var.tenant.org.id, sale.id, c.var.tenant.user.id);
+  if (isBillError(r)) {
+    if (r.code === "wa_not_ready") throw new HttpError(409, r.error, "wa_not_ready");
+    if (r.code === "not_found") throw new HttpError(404, "Not found");
+    throw bad(r.error);
+  }
+  return c.json(r);
+});
+
+/** FM PUT /customers/:id/whatsapp: opt a customer of THIS org out of (or back into) WhatsApp (RF3). Audited. */
+whatsapp.put("/customers/:id/whatsapp", ...gate, async (c) => {
+  const customerId = idParam(c.req.param("id"));
+  const b = (await c.req.json().catch(() => null)) as { opt_out?: unknown } | null;
+  if (!b || typeof b !== "object" || typeof b.opt_out !== "boolean") throw bad("opt_out must be true or false");
+  const { org, user } = c.var.tenant;
+  const row = await waMessagesRepo(c.env.DB, org.id).setOptOut(customerId, b.opt_out, { id: user.id, name: user.name });
+  if (!row) throw new HttpError(404, "Not found");
+  return c.json(row);
 });

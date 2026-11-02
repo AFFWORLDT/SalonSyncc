@@ -4,27 +4,18 @@ import type { AppEnv } from "../../env";
 import { isAdmin } from "../../core/roles";
 import { notificationsRepo, settingsRepo } from "../../data/tenant";
 import { notifyUsers } from "../notifications/notify";
+import { moneyText } from "../../lib/money";
+import { sendBill } from "../whatsapp/bill";
 
-/** Money as the org shows it: Intl currency format in the org's locale (FM's aedText, per org). */
-export function moneyText(minor: number, s: Pick<Settings, "currency" | "currency_minor" | "locale">): string {
-  try {
-    return new Intl.NumberFormat(s.locale, { style: "currency", currency: s.currency }).format(minor / s.currency_minor);
-  } catch {
-    return `${s.currency} ${minor / s.currency_minor}`;
-  }
-}
+export { moneyText };
 
-const hasPush = (c: Context<AppEnv>) => c.var.tenant.features.includes("push");
+const hasFeature = (c: Context<AppEnv>, key: string) => (c.var.tenant.features as readonly string[]).includes(key);
 
-/**
- * Runs in waitUntil after a sale is created. Push (FM routes.ts 772-780): tell this org's admins about the bill when
- * notify_sales is on and the amount reaches notify_sale_min; never the person who rang it up.
- */
-export async function afterSale(c: Context<AppEnv>, sale: Sale): Promise<void> {
-  if (!hasPush(c)) return;
-  const orgId = c.var.tenant.org.id;
-  const s = await settingsRepo(c.env.DB, orgId).get();
+/** Push (FM routes.ts 772-780): tell this org's admins about the bill when notify_sales is on and the amount reaches notify_sale_min; never the person who rang it up. */
+async function salePush(c: Context<AppEnv>, sale: Sale, s: Settings): Promise<void> {
+  if (!hasFeature(c, "push")) return;
   if (!s.notify_sales || sale.amount < s.notify_sale_min) return;
+  const orgId = c.var.tenant.org.id;
   const what = sale.items.map((i) => (i.qty > 1 ? `${i.name} ×${i.qty}` : i.name)).join(", ");
   const admins = await notificationsRepo(c.env.DB, orgId).adminIds(c.var.tenant.user.id);
   await notifyUsers(c, orgId, admins, {
@@ -34,10 +25,30 @@ export async function afterSale(c: Context<AppEnv>, sale: Sale): Promise<void> {
   });
 }
 
+/** WhatsApp (FM routes.ts 760-770): the bill when the org is WA-ready and wa_bill_auto is on (sendBill checks readiness). */
+async function saleWhatsapp(c: Context<AppEnv>, sale: Sale, s: Settings): Promise<void> {
+  if (!hasFeature(c, "whatsapp") || !sale.customer_phone) return;
+  if (s.wa_bill_auto) await sendBill(c.env, c.var.tenant.org.id, sale.id, c.var.tenant.user.id);
+  // TODO(Plan 2b Task 9): FM sends the rating request inline when wa_feedback_enabled && wa_feedback_delay_min === 0:
+  //   await runFeedback(c.env, orgId, Date.now(), 1, sale.id). Nothing is called until Task 9 lands.
+}
+
+/**
+ * Runs in waitUntil after a sale is created: the push part and the WhatsApp part, independently (one failing never
+ * stops the other; the first error is rethrown afterwards so runHook logs it).
+ */
+export async function afterSale(c: Context<AppEnv>, sale: Sale): Promise<void> {
+  if (!hasFeature(c, "push") && !hasFeature(c, "whatsapp")) return;
+  const s = await settingsRepo(c.env.DB, c.var.tenant.org.id).get();
+  const results = await Promise.allSettled([salePush(c, sale, s), saleWhatsapp(c, sale, s)]);
+  const failed = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
+  if (failed) throw failed.reason;
+}
+
 /** An admin changed or deleted another barber's sale and the org wants barbers told (FM notify_barber_changes). */
 async function barberChangeSettings(c: Context<AppEnv>, sale: Sale): Promise<Settings | null> {
   const me = c.var.tenant.user;
-  if (!hasPush(c) || !isAdmin(me) || sale.barber_id === me.id) return null;
+  if (!hasFeature(c, "push") || !isAdmin(me) || sale.barber_id === me.id) return null;
   const s = await settingsRepo(c.env.DB, c.var.tenant.org.id).get();
   return s.notify_barber_changes ? s : null;
 }

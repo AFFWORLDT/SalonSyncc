@@ -200,3 +200,24 @@ CASES.push({
   },
   read: async (orgId, id) => (await env.DB.prepare("SELECT * FROM audit_log WHERE org_id = ? AND entity = 'sale' AND entity_id = ?").bind(orgId, id).all()).results,
 });
+
+// ---- Plan 2b Task 7: WhatsApp bills and opt-out ----
+const readSaleMessages = async (orgId: string, id: number) => ({
+  sale: await readSale(orgId, id),
+  messages: (await env.DB.prepare("SELECT * FROM wa_messages WHERE sale_id = ?").bind(id).all()).results,
+});
+CASES.push(
+  { name: "GET /api/sales/:id/whatsapp", method: "GET", path: (id) => `/api/sales/${id}/whatsapp`, seed: seedSale, read: readSaleMessages },
+  { name: "POST /api/sales/:id/whatsapp", method: "POST", path: (id) => `/api/sales/${id}/whatsapp`, seed: seedSale, read: readSaleMessages },
+  {
+    name: "PUT /api/customers/:id/whatsapp",
+    method: "PUT",
+    path: (id) => `/api/customers/${id}/whatsapp`,
+    body: { opt_out: true },
+    seed: seedCustomer,
+    read: async (orgId, id) => ({
+      row: await env.DB.prepare("SELECT * FROM customers WHERE org_id = ? AND id = ?").bind(orgId, id).first(),
+      audit: (await env.DB.prepare("SELECT * FROM audit_log WHERE entity_id = ? AND ref LIKE 'Customer %'").bind(id).all()).results,
+    }),
+  },
+);
