@@ -28,6 +28,34 @@ describe("tenant resolver", () => {
     it("empty ROOT_DOMAIN means workers.dev mode", () => {
       expect(slugFromHost("a.b.c", "", "admin")).toEqual({ kind: "none" });
     });
+
+    it("empty label with empty adminHost returns none (I1 fix)", () => {
+      expect(slugFromHost(".salonstation.online", R, "")).toEqual({
+        kind: "none",
+      });
+    });
+
+    it("empty label with non-empty adminHost returns none (I1 fix)", () => {
+      expect(slugFromHost(".salonstation.online", R, "admin")).toEqual({
+        kind: "none",
+      });
+    });
+
+    it("config normalization: uppercase rootDomain and adminHost (M1)", () => {
+      expect(
+        slugFromHost(
+          "admin.salonstation.online",
+          "SalonStation.Online.",
+          "Admin"
+        )
+      ).toEqual({ kind: "admin" });
+    });
+
+    it("config normalization: uppercase rootDomain (M1)", () => {
+      expect(
+        slugFromHost("beardsalon.salonstation.online", "SalonStation.Online", "admin")
+      ).toEqual({ kind: "tenant", slug: "beardsalon" });
+    });
   });
 
   describe("normalizeSlug", () => {

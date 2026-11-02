@@ -36,12 +36,19 @@ export function slugFromHost(
   rootDomain: string,
   adminHost: string
 ): { kind: "tenant"; slug: string } | { kind: "admin" } | { kind: "none" } {
+  // Normalize config inputs: lowercase and strip trailing dot from rootDomain
+  let normalizedRootDomain = rootDomain.toLowerCase();
+  if (normalizedRootDomain.endsWith(".")) {
+    normalizedRootDomain = normalizedRootDomain.slice(0, -1);
+  }
+  const normalizedAdminHost = adminHost.toLowerCase();
+
   // Return none if rootDomain is empty (workers.dev mode)
-  if (!rootDomain) {
+  if (!normalizedRootDomain) {
     return { kind: "none" };
   }
 
-  // Normalize: strip port and trailing dot, then lowercase
+  // Normalize host: strip port and trailing dot, then lowercase
   let normalized = host;
 
   // Strip port (everything after :)
@@ -63,18 +70,23 @@ export function slugFromHost(
   normalized = normalized.toLowerCase();
 
   // If normalized host is exactly the root domain, return none (bare root)
-  if (normalized === rootDomain) {
+  if (normalized === normalizedRootDomain) {
     return { kind: "none" };
   }
 
   // Check if host ends with "." + rootDomain
-  const suffix = "." + rootDomain;
+  const suffix = "." + normalizedRootDomain;
   if (!normalized.endsWith(suffix)) {
     return { kind: "none" };
   }
 
   // Extract the label(s) before the root domain
   const label = normalized.substring(0, normalized.length - suffix.length);
+
+  // Return none if label is empty
+  if (!label) {
+    return { kind: "none" };
+  }
 
   // Check if more than one label deep (contains a dot)
   if (label.includes(".")) {
@@ -86,8 +98,8 @@ export function slugFromHost(
     return { kind: "none" };
   }
 
-  // Check if label equals adminHost
-  if (label === adminHost) {
+  // Check if label equals adminHost (only if adminHost is non-empty)
+  if (normalizedAdminHost && label === normalizedAdminHost) {
     return { kind: "admin" };
   }
 
