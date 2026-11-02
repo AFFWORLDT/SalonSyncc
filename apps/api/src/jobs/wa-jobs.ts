@@ -192,22 +192,32 @@ export async function runFeedbackReminders(env: Env, orgId: string, at: number, 
   return out;
 }
 
+/** Campaign sends per drain call (/next, and the cron's per-campaign batch): below FM's 40 to keep /next well under the free plan's ~50 D1 queries per request. Free-plan limit: raise on upgrade. */
+export const CAMPAIGN_BATCH = 30;
+
 /**
  * Sends the next batch of one campaign of org `orgId` (FM wa-jobs drainCampaign): POST /api/wa/campaigns/:id/next
- * (limit and budget 40) and the cron (Task 11, shared budget). Null when this org has no such campaign; the campaign
- * as the API shows it otherwise (unchanged when finished, out of budget or the org is not WA-ready).
+ * (limit and budget CAMPAIGN_BATCH) and the cron (Task 11, shared budget). Null when this org has no such campaign; the
+ * campaign as the API shows it otherwise (unchanged when finished, out of budget or the org is not WA-ready).
  *
- * The claim (data/tenant waCampaignsRepo.claim) stamps sent_at on up to `limit` queued rows in ONE UPDATE ... RETURNING,
- * so overlapping drains get disjoint rows and never send a message twice; a claim older than 5 minutes (a crashed drain)
- * is taken over. Each result write only applies while this drain's claim is in place. A customer who opted out after the
- * campaign was queued is logged "skipped" (RF3), as is a phone outside the org's test list; neither calls Graph nor
- * spends budget. On a budget stop the unsent claims are released (queued, unclaimed) for the next drain. The campaign is
- * finished (finished_at) once no queued row remains.
+ * Claim: data/tenant waCampaignsRepo.claim stamps sent_at on up to `limit` queued rows in ONE UPDATE ... RETURNING, so
+ * overlapping drains get disjoint rows. AT-MOST-ONCE (as the Task 9 jobs): right before each Graph call the row is
+ * marked SENDING (error column, batched with the previous row's result), and the send only happens when that mark
+ * applied (this drain still holds the claim). If the drain dies after that (request killed mid-loop, D1 cap hit), the
+ * next drain to come along after 5 minutes marks the row failed "interrupted, may have been sent" instead of sending it
+ * again; claimed rows that were never attempted are simply claimed again. Each result write only applies while this
+ * drain's claim is in place.
+ *
+ * Opt-out (RF3): the customer's wa_opt_out is read at CLAIM time (in the claim's RETURNING), so a customer who opted out
+ * after the campaign was queued is logged "skipped / opted out". Tolerance: a STOP that lands between the claim and
+ * the send (seconds; at most one batch) is not seen by this batch. A phone outside the org's test list is skipped too;
+ * neither calls Graph nor spends budget. On a budget stop the unsent claims are released (queued, unclaimed). The
+ * campaign is finished (finished_at) once no queued row remains.
  *
  * D1 cost (round trips; for Task 11's per-invocation query budget): campaign row 1 (0 when `pre.row` is given) + WA
- * setup when `pre.cfg` is not given (org 1 + features 0-3, cached + org_whatsapp 1; skipped without whatsapp_campaigns) + claim 1 + exactly 1 per Graph send (its
- * result, batched with any skipped rows' results before it) + 1 final batch (remaining skipped results, the release,
- * the finish check and the campaign view: up to 4 statements). Finished, unknown or budget-0: row 1 + view 1.
+ * setup when `pre.cfg` is not given (org 1 + features 0-3, cached + org_whatsapp 1; skipped without whatsapp_campaigns)
+ * + claim 1 (2 statements) + exactly 1 per Graph send (its SENDING mark, batched with the previous results) + 1 final
+ * batch (the last results, the release, the finish check and the view). Finished, unknown or budget-0: row 1 + view 1.
  */
 export async function drainCampaign(
   env: Env,
@@ -230,20 +240,24 @@ export async function drainCampaign(
   for (let i = 0; i < claimed.length; i++) {
     const m = claimed[i]!;
     const params = bodyParams(spec, m.name);
-    let r: SendResult;
-    if (m.opted_out) r = { status: "skipped", error: "opted out" };
-    else if (!allowedRecipient(cfg.testNumbers, m.phone, cfg.callingCode)) r = { status: "skipped", error: "not in test numbers" };
-    else {
-      if (budget.left <= 0) {
-        pending.push(repo.releaseStatement(claimed.slice(i).map((x) => x.id), claim));
-        break;
-      }
-      budget.left--;
-      r = await services(env).wa.sendTemplate(cfg, m.phone, k.template, k.language, params);
-      await repo.run([...pending, repo.resultStatement(m.id, claim, r, params)]);
-      pending = [];
+    if (m.opted_out) {
+      pending.push(repo.resultStatement(m.id, claim, { status: "skipped", error: "opted out" }, params));
       continue;
     }
+    if (!allowedRecipient(cfg.testNumbers, m.phone, cfg.callingCode)) {
+      pending.push(repo.resultStatement(m.id, claim, { status: "skipped", error: "not in test numbers" }, params));
+      continue;
+    }
+    if (budget.left <= 0) {
+      pending.push(repo.releaseStatement(claimed.slice(i).map((x) => x.id), claim));
+      break;
+    }
+    // Earlier results + this row's SENDING mark in one round trip; no mark (claim lost) = no send.
+    const res = await repo.run([...pending, repo.sendingStatement(m.id, claim)]);
+    pending = [];
+    if (res[res.length - 1]!.meta.changes !== 1) continue;
+    budget.left--;
+    const r = await services(env).wa.sendTemplate(cfg, m.phone, k.template, k.language, params);
     pending.push(repo.resultStatement(m.id, claim, r, params));
   }
   const res = await repo.run([...pending, repo.finishStatement(k.id), repo.viewStatement(k.id)]);

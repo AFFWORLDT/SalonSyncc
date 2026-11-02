@@ -129,6 +129,9 @@ describe("templates, audience, test send, media", () => {
     expect((await call("POST", "/wa/templates", a.ck, { name: "Eid Offer", body: "Hi {{1}}", examples: [] })).status).toBe(400);
     expect((await call("POST", "/wa/templates", a.ck, { name: "ei", body: "Hi {{1}} there", examples: ["Ali"] })).status).toBe(400); // name too short
     expect((await call("POST", "/wa/templates", a.ck, { name: "eid_2", body: "{{1}} hi", examples: ["Ali"] })).status).toBe(400); // blank at start
+    const long = await call("POST", "/wa/templates", a.ck, { name: "eid_3", body: `Hi ${"x".repeat(1024)}`, examples: [] });
+    expect(long.status).toBe(400);
+    expect((await json(long)).error).toBe("Message too long (max 1024)");
     const r = await call("POST", "/wa/templates", a.ck, { name: "Eid Offer", category: "MARKETING", body: "Hi {{1}}, offer inside", examples: ["Ali"] });
     expect(r.status).toBe(201);
     expect(await json(r)).toMatchObject({ name: "eid_offer", status: "PENDING", language: "en_GB", vars: 1, slots: [{ part: "body", key: "1" }] });
@@ -222,33 +225,42 @@ describe("campaigns", () => {
     const au = await env.DB.prepare("SELECT entity_id, ref FROM audit_log WHERE org_id = ? AND ref LIKE 'WhatsApp announcement%'").bind(a.org.id).all();
     expect(au.results).toEqual([{ entity_id: k.id, ref: "WhatsApp announcement eid_offer" }]);
     expect(f.wa).toHaveLength(0);
+    // One unfinished campaign per org at a time.
+    const again = await call("POST", "/wa/campaigns", a.ck, { template: "eid_offer", params: PARAMS });
+    expect(again.status).toBe(409);
+    expect(await json(again)).toEqual({ error: "Finish the current campaign first", code: "campaign_running" });
+    expect(await messages(a.org.id)).toHaveLength(12);
     // Listed newest first, this org only.
-    await call("POST", "/wa/campaigns", a.ck, { template: "eid_offer", params: PARAMS });
+    await env.DB.prepare("UPDATE wa_campaigns SET finished_at = 1 WHERE org_id = ?").bind(a.org.id).run();
+    expect((await call("POST", "/wa/campaigns", a.ck, { template: "eid_offer", params: PARAMS })).status).toBe(201);
     const list = await json(await call("GET", "/wa/campaigns", a.ck));
     expect(list.map((x: any) => x.total)).toEqual([12, 12]);
     expect(list[1].id).toBe(k.id);
     expect(await json(await call("GET", "/wa/campaigns", b.ck))).toEqual([]);
   });
 
-  it("refuses an audience over 5000 (free plan cap)", async () => {
+  it("refuses an empty audience and one over 1000 (free-plan cap); nothing is written", async () => {
     install();
     const a = await setup("wc-cap");
-    await customers(a.org.id, 5001);
+    const none = await call("POST", "/wa/campaigns", a.ck, { template: "eid_offer", params: PARAMS });
+    expect(none.status).toBe(400);
+    expect((await json(none)).error).toBe("No customers to send to");
+    await customers(a.org.id, 1001);
     const r = await call("POST", "/wa/campaigns", a.ck, { template: "eid_offer", params: PARAMS });
     expect(r.status).toBe(400);
-    expect((await json(r)).error).toMatch(/5000/);
+    expect((await json(r)).error).toBe("Campaigns are limited to 1000 customers on the current plan");
     expect(await messages(a.org.id)).toHaveLength(0);
     expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM wa_campaigns WHERE org_id = ?").bind(a.org.id).first<{ n: number }>())!.n).toBe(0);
   });
 
-  it("/next sends 40, then the remainder, then finishes; values personalised", async () => {
+  it("/next sends 30, then the remainder, then finishes; values personalised", async () => {
     install();
     const a = await setup("wc-next");
     await customers(a.org.id, 45);
     const k = await json(await call("POST", "/wa/campaigns", a.ck, { template: "eid_offer", params: PARAMS }));
     const r1 = await json(await call("POST", `/wa/campaigns/${k.id}/next`, a.ck));
-    expect(r1).toMatchObject({ id: k.id, total: 45, sent: 40, queued: 5, finished_at: null });
-    expect(f.wa).toHaveLength(40);
+    expect(r1).toMatchObject({ id: k.id, total: 45, sent: 30, queued: 15, finished_at: null });
+    expect(f.wa).toHaveLength(30);
     expect(f.wa[0]!.params).toEqual([{ part: "body", key: "1", text: "Cust" }, { part: "body", key: "2", text: "20%" }]);
     expect(f.wa[0]).toMatchObject({ template: "eid_offer", lang: "en" });
     const r2 = await json(await call("POST", `/wa/campaigns/${k.id}/next`, a.ck));
@@ -291,10 +303,10 @@ describe("campaigns", () => {
     const k = await json(await call("POST", "/wa/campaigns", a.ck, { template: "eid_offer", params: PARAMS }));
     const first = call("POST", `/wa/campaigns/${k.id}/next`, a.ck);
     const until = async (ok: () => boolean) => { for (let i = 0; i < 500 && !ok(); i++) await new Promise((r) => setTimeout(r, 5)); };
-    await until(() => f.wa.length >= 1); // the first call has claimed its 40 and is held in its first send
+    await until(() => f.wa.length >= 1); // the first call has claimed its 30 and is held in its first send
     const second = call("POST", `/wa/campaigns/${k.id}/next`, a.ck);
-    await until(() => f.wa.length >= 2); // the second has claimed the other 10
-    expect(f.wa.map((s) => s.phone)).toEqual(["+919800000001", "+919800000041"]); // disjoint claims, both held in a send
+    await until(() => f.wa.length >= 2); // the second has claimed the other 20
+    expect(f.wa.map((s) => s.phone)).toEqual(["+919800000001", "+919800000031"]); // disjoint claims, both held in a send
     open();
     const [r1, r2] = await Promise.all([first, second]);
     expect(r1.status).toBe(200);
@@ -350,4 +362,100 @@ describe("campaigns", () => {
       expect(own!.org_id).toBe(orgs[i]!.org.id);
     }
   });
+
+  it("two concurrent creates in one org: one campaign, the other 409 with nothing written", async () => {
+    install();
+    const a = await setup("wc-twice");
+    await customers(a.org.id, 5);
+    const rs = await Promise.all([1, 2].map(() => call("POST", "/wa/campaigns", a.ck, { template: "eid_offer", params: PARAMS })));
+    expect(rs.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM wa_campaigns WHERE org_id = ?").bind(a.org.id).first<{ n: number }>())!.n).toBe(1);
+    const rows = await messages(a.org.id);
+    expect(rows).toHaveLength(5);
+    expect(rows.every((m) => m.campaign_id !== null)).toBe(true);
+    const au = await env.DB.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE org_id = ? AND ref LIKE 'WhatsApp announcement%'").bind(a.org.id).first<{ n: number }>();
+    expect(au!.n).toBe(1);
+  });
+
+  it("at-most-once: a drain that dies after a send never re-sends it; its unattempted claims are sent later", async () => {
+    let crash = true;
+    install({
+      send: (s) => {
+        if (crash) throw new Error("worker killed"); // the Graph call went out, then the request died before logging
+        return { status: "sent", wa_id: `w${s.phone}` };
+      },
+    });
+    const a = await setup("wc-crash");
+    await customers(a.org.id, 3);
+    const k = await json(await call("POST", "/wa/campaigns", a.ck, { template: "eid_offer", params: PARAMS }));
+    await expect(drainCampaign(E, a.org.id, k.id, 30, { left: 30 })).rejects.toThrow("worker killed");
+    expect(f.wa.map((s) => s.phone)).toEqual(["+919800000001"]);
+    expect((await messages(a.org.id)).map((m) => [m.status, m.error])).toEqual([["queued", "sending"], ["queued", null], ["queued", null]]);
+    crash = false;
+    // Within 5 minutes the claim still holds: nothing to do.
+    expect(await drainCampaign(E, a.org.id, k.id, 30, { left: 30 })).toMatchObject({ queued: 3, sent: 0 });
+    expect(f.wa).toHaveLength(1);
+    // Later: the SENDING row fails as interrupted (not re-sent); the never-attempted ones go out.
+    await env.DB.prepare("UPDATE wa_messages SET sent_at = sent_at - 600000 WHERE org_id = ?").bind(a.org.id).run();
+    const r = await drainCampaign(E, a.org.id, k.id, 30, { left: 30 });
+    expect(r).toMatchObject({ sent: 2, failed: 1, queued: 0, finished_at: expect.any(Number) });
+    expect(f.wa.map((s) => s.phone)).toEqual(["+919800000001", "+919800000002", "+919800000003"]);
+    expect((await messages(a.org.id)).map((m) => [m.phone, m.status, m.error])).toEqual([
+      ["+919800000001", "failed", "interrupted, may have been sent"],
+      ["+919800000002", "sent", null],
+      ["+919800000003", "sent", null],
+    ]);
+  });
+
+  it("/next with a full batch on a cold features cache stays within 45 D1 queries", async () => {
+    install();
+    const a = await setup("wc-d1");
+    await customers(a.org.id, 40);
+    const k = await json(await call("POST", "/wa/campaigns", a.ck, { template: "eid_offer", params: PARAMS }));
+    invalidateFeatures(a.org.id);
+    const { db, count } = countingDb(env.DB);
+    const res = await app.fetch(
+      new Request(`https://x.test/api/wa/campaigns/${k.id}/next`, { method: "POST", headers: { cookie: a.ck } }),
+      { ...E, DB: db },
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    expect(await json(res)).toMatchObject({ sent: 30, queued: 10 });
+    expect(count.calls, `D1 round trips (statements: ${count.statements})`).toBeLessThanOrEqual(45);
+  });
 });
+
+/** env.DB with every round trip counted (a batch = 1 call; `statements` counts each statement too). */
+function countingDb(real: D1Database) {
+  const count = { calls: 0, statements: 0 };
+  const REAL = Symbol("real");
+  const wrap = (st: D1PreparedStatement): D1PreparedStatement =>
+    new Proxy(st, {
+      get(t, p) {
+        if (p === REAL) return t;
+        if (p === "bind") return (...a: unknown[]) => wrap(t.bind(...a));
+        if (p === "first" || p === "all" || p === "run" || p === "raw")
+          return (...a: unknown[]) => {
+            count.calls++;
+            count.statements++;
+            return (t as any)[p](...a);
+          };
+        const v = (t as any)[p];
+        return typeof v === "function" ? v.bind(t) : v;
+      },
+    });
+  const db = new Proxy(real, {
+    get(t, p) {
+      if (p === "prepare") return (sql: string) => wrap(t.prepare(sql));
+      if (p === "batch")
+        return (stmts: D1PreparedStatement[]) => {
+          count.calls++;
+          count.statements += stmts.length;
+          return t.batch(stmts.map((s) => (s as any)[REAL] ?? s));
+        };
+      const v = (t as any)[p];
+      return typeof v === "function" ? v.bind(t) : v;
+    },
+  });
+  return { db, count };
+}

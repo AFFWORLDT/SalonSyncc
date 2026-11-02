@@ -9,7 +9,7 @@ import { services, type SendResult, type WaConfig } from "../../core/services";
 import { settingsRepo, waCampaignsRepo, waMessagesRepo } from "../../data/tenant";
 import { canonicalPhone } from "../../lib/phone";
 import { allowedRecipient, bodyParams, templateSlots, templateVars } from "../../lib/whatsapp";
-import { drainCampaign, WA_BATCH } from "../../jobs/wa-jobs";
+import { CAMPAIGN_BATCH, drainCampaign } from "../../jobs/wa-jobs";
 import { NOT_READY } from "../whatsapp/bill";
 import { waSetup } from "../whatsapp/ready";
 
@@ -19,14 +19,16 @@ import { waSetup } from "../whatsapp/ready";
  * `whatsapp` + its own number), else 409 wa_not_ready. Id routes look the row up in this org first (another org's id
  * is 404, not 409).
  *
- * Free plan (D19): a campaign queues at most CAMPAIGN_MAX recipients (one INSERT ... SELECT; a bigger audience is
- * refused with 400), and each /next sends at most 40 (FM), so a 5000-customer campaign takes 125 clicks or the
- * hourly cron (Task 11, 40 sends per invocation across all orgs) hours to drain.
+ * Free-plan limits (D19; raise on upgrade). D1's free daily write budget (~100k rows) is shared by every salon and a
+ * campaign message costs about 11 row writes over its life (queue + indexes, claim, SENDING mark, result, receipts):
+ *  - CAMPAIGN_MAX_AUDIENCE: a campaign goes to at most 1000 customers (a bigger audience is refused with 400);
+ *  - one unfinished campaign per org at a time (409 campaign_running);
+ *  - each /next sends at most CAMPAIGN_BATCH (30), keeping the request well under ~50 D1 queries.
  */
 export const campaigns = new Hono<AppEnv>();
 
-/** Free plan: the most recipients one campaign queues. */
-export const CAMPAIGN_MAX = 5000;
+/** Free-plan limit (raise on upgrade): the most recipients one campaign queues. */
+export const CAMPAIGN_MAX_AUDIENCE = 1000;
 /** WhatsApp's media limits (MB): images up to 5 MB, videos (mp4, H.264 + AAC) up to 16 MB. */
 const MEDIA_TYPES: Record<string, number> = { "image/jpeg": 5, "image/png": 5, "video/mp4": 16 };
 const MB = 1024 * 1024;
@@ -79,6 +81,7 @@ async function approvedTemplate(c: Context<AppEnv>, cfg: WaConfig, name: string)
   return t;
 }
 
+const running409 = () => new HttpError(409, "Finish the current campaign first", "campaign_running");
 const actor = (c: Context<AppEnv>) => ({ id: c.var.tenant.user.id, name: c.var.tenant.user.name });
 
 campaigns.get("/wa/templates", ...gate, async (c) => {
@@ -92,8 +95,9 @@ campaigns.post("/wa/templates", ...gate, async (c) => {
   const name = String(b.name ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
   if (!/^[a-z0-9_]{3,60}$/.test(name)) throw bad("Name: 3–60 lower-case letters, digits or _ (e.g. eid_offer)");
   const category = b.category === "UTILITY" ? "UTILITY" : "MARKETING";
-  const text = clean(b.body, 1024);
+  const text = clean(b.body, Infinity);
   if (!text) throw bad("Write the message");
+  if (text.length > 1024) throw bad("Message too long (max 1024)");
   const vars = templateVars(text);
   const examples = (Array.isArray(b.examples) ? b.examples : []).map((e) => clean(e, 100) ?? "");
   if (examples.length !== vars || examples.some((e) => !e)) throw bad(`Give an example for each of the ${vars} blank${vars === 1 ? "" : "s"}`);
@@ -131,20 +135,23 @@ campaigns.get("/wa/campaigns", ...gate, async (c) => {
   return c.json(await waCampaignsRepo(c.env.DB, c.var.tenant.org.id).list());
 });
 
-/** Queues the template for every audience customer (at most CAMPAIGN_MAX); sending is /next (or the cron). */
+/** Queues the template for every audience customer (at most CAMPAIGN_MAX_AUDIENCE, one unfinished campaign per org); sending is /next (or the cron). */
 campaigns.post("/wa/campaigns", ...gate, async (c) => {
   const cfg = await ready(c);
   const b = await body<{ template: string; params: unknown }>(c);
   const t = await approvedTemplate(c, cfg, String(b.template ?? ""));
   const params = readParams(b.params, t.slots);
   const repo = waCampaignsRepo(c.env.DB, c.var.tenant.org.id);
-  const size = await repo.audienceSize();
-  if (size > CAMPAIGN_MAX) throw bad(`A campaign can go to at most ${CAMPAIGN_MAX} customers (this salon has ${size})`);
-  const k = await repo.create({ uid: randomToken(12), template: t.name, language: t.language, params, actor: actor(c), cap: CAMPAIGN_MAX });
+  const { audience, running } = await repo.createCheck();
+  if (running) throw running409();
+  if (!audience) throw bad("No customers to send to");
+  if (audience > CAMPAIGN_MAX_AUDIENCE) throw bad(`Campaigns are limited to ${CAMPAIGN_MAX_AUDIENCE} customers on the current plan`);
+  const k = await repo.create({ uid: randomToken(12), template: t.name, language: t.language, params, actor: actor(c), cap: CAMPAIGN_MAX_AUDIENCE });
+  if (!k) throw running409(); // another create won the race: nothing was written
   return c.json(k, 201);
 });
 
-/** Sends the next batch of up to 40. */
+/** Sends the next batch of up to CAMPAIGN_BATCH (30). */
 campaigns.post("/wa/campaigns/:id/next", ...gate, async (c) => {
   const id = Number(c.req.param("id"));
   if (!Number.isInteger(id) || id <= 0) throw new HttpError(404, "Not found");
@@ -152,7 +159,7 @@ campaigns.post("/wa/campaigns/:id/next", ...gate, async (c) => {
   const row = await waCampaignsRepo(c.env.DB, orgId).row(id);
   if (!row) throw new HttpError(404, "Not found");
   const cfg = await ready(c);
-  const k = await drainCampaign(c.env, orgId, id, WA_BATCH, { left: WA_BATCH }, { cfg, row });
+  const k = await drainCampaign(c.env, orgId, id, CAMPAIGN_BATCH, { left: CAMPAIGN_BATCH }, { cfg, row });
   if (!k) throw new HttpError(404, "Not found");
   return c.json(k);
 });

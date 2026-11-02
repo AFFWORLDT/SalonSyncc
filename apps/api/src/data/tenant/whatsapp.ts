@@ -281,20 +281,38 @@ export interface CampaignCreate {
   cap: number;
 }
 
-/** A drain claim older than this is taken over (a crashed drain); far longer than one batch of 40 sends takes. */
+/** A drain claim older than this is taken over (a crashed drain); far longer than one batch of sends takes. */
 export const CLAIM_STALE_MS = 300_000;
+/** wa_messages.error on a claimed row whose Graph send is about to start (status stays 'queued'; the CHECK is unchanged). */
+export const SENDING = "sending";
+/** What a takeover writes on a row whose drain died during (or right after) its send: never re-sent (at-most-once). */
+export const INTERRUPTED = "interrupted, may have been sent";
 
 /**
  * This org's WhatsApp campaigns (FM routes.ts 1474-1521, wa-jobs drainCampaign). Every statement binds org_id as ?1.
- * The create batch finds the new campaign by (org_id, uid), never by the highest id (INV §8.2). The drain claim keeps FM's
- * sent_at claim marker: one UPDATE ... RETURNING stamps up to `limit` queued, unclaimed (or stale) rows, so two
- * overlapping drains (two /next clicks, /next vs the cron) get disjoint rows and never send a message twice.
+ * The create batch finds the new campaign by (org_id, uid), never by the highest id (INV §8.2), and only creates it
+ * while the org has no unfinished campaign (one at a time). The drain claim keeps FM's sent_at claim marker: one
+ * UPDATE ... RETURNING stamps up to `limit` queued, unclaimed (or stale) rows, so two overlapping drains (two /next
+ * clicks, /next vs the cron) get disjoint rows. Sends are at-most-once: a row is marked SENDING (error column) before
+ * its Graph call, and a takeover turns a stale SENDING row into "failed: interrupted" instead of re-queueing it.
  */
 export function waCampaignsRepo(db: D1Database, orgId: string) {
   const view = (where: string, ...binds: unknown[]) => db.prepare(`${CAMPAIGN_SELECT}${where}`).bind(orgId, ...binds);
   return {
     async audienceSize(): Promise<number> {
       return (await db.prepare(`SELECT COUNT(*) AS n ${AUDIENCE_SQL}`).bind(orgId).first<{ n: number }>())?.n ?? 0;
+    },
+
+    /** One read for the create checks: the audience size and whether an unfinished campaign exists. */
+    async createCheck(): Promise<{ audience: number; running: boolean }> {
+      const r = await db
+        .prepare(
+          `SELECT (SELECT COUNT(*) ${AUDIENCE_SQL}) AS n,
+             EXISTS (SELECT 1 FROM wa_campaigns k WHERE k.org_id = ?1 AND k.finished_at IS NULL) AS running`,
+        )
+        .bind(orgId)
+        .first<{ n: number; running: number }>();
+      return { audience: r?.n ?? 0, running: !!r?.running };
     },
 
     /** The newest 20 (FM). */
@@ -314,21 +332,26 @@ export function waCampaignsRepo(db: D1Database, orgId: string) {
     },
 
     /**
-     * One batch (one D1 round trip, atomic): the campaign row, a queued 'announcement' message per audience customer
-     * (INSERT ... SELECT, at most `cap`), total = the rows queued, the audit row, and the campaign as the API shows it.
+     * One batch (one D1 round trip, atomic): the campaign row (only when no unfinished campaign exists), a queued
+     * 'announcement' message per audience customer (INSERT ... SELECT, at most `cap`, only when that row was created),
+     * total = the rows queued, the audit row (same condition), and the campaign as the API shows it. Null when another
+     * unfinished campaign won the race (nothing written).
      */
-    async create(k: CampaignCreate): Promise<WaCampaign> {
+    async create(k: CampaignCreate): Promise<WaCampaign | null> {
       const at = Date.now();
-      const idExpr = { sql: "(SELECT id FROM wa_campaigns WHERE org_id = ? AND uid = ?)", binds: [orgId, k.uid] };
+      const mine = { sql: "EXISTS (SELECT 1 FROM wa_campaigns WHERE org_id = ? AND uid = ?)", binds: [orgId, k.uid] };
       const res = await db.batch([
         db
-          .prepare("INSERT INTO wa_campaigns (org_id, uid, template, language, params, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+          .prepare(
+            `INSERT INTO wa_campaigns (org_id, uid, template, language, params, created_by, created_at)
+             SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7 WHERE NOT EXISTS (SELECT 1 FROM wa_campaigns k WHERE k.org_id = ?1 AND k.finished_at IS NULL)`,
+          )
           .bind(orgId, k.uid, k.template, k.language, JSON.stringify(k.params), k.actor.id, at),
         db
           .prepare(
             `INSERT INTO wa_messages (org_id, kind, customer_id, phone, template, status, campaign_id, created_by, created_at)
              SELECT ?1, 'announcement', id, phone, ?2, 'queued', (SELECT id FROM wa_campaigns WHERE org_id = ?1 AND uid = ?3), ?4, ?5
-             ${AUDIENCE_SQL} ORDER BY id LIMIT ?6`,
+             ${AUDIENCE_SQL} AND EXISTS (SELECT 1 FROM wa_campaigns WHERE org_id = ?1 AND uid = ?3) ORDER BY id LIMIT ?6`,
           )
           .bind(orgId, k.template, k.uid, k.actor.id, at, k.cap),
         db
@@ -340,7 +363,8 @@ export function waCampaignsRepo(db: D1Database, orgId: string) {
         auditRepo(db, orgId).stmt({
           actor: k.actor,
           entity: "settings", // FM parity
-          entityId: idExpr,
+          entityId: { sql: "(SELECT id FROM wa_campaigns WHERE org_id = ? AND uid = ?)", binds: [orgId, k.uid] },
+          when: mine,
           ref: `WhatsApp announcement ${k.template}`,
           action: "create",
           before: null,
@@ -348,7 +372,7 @@ export function waCampaignsRepo(db: D1Database, orgId: string) {
         }),
         view(" AND k.uid = ?2", k.uid),
       ]);
-      return (res[4]!.results as WaCampaign[])[0]!;
+      return (res[4]!.results as WaCampaign[])[0] ?? null;
     },
 
     /** Audits a template submitted to Meta (FM parity: entity settings, id 1). */
@@ -359,26 +383,42 @@ export function waCampaignsRepo(db: D1Database, orgId: string) {
     },
 
     /**
-     * Claims up to `limit` of the campaign's queued messages for this drain (sent_at = `claim`): unclaimed ones, or
-     * ones whose claim is older than CLAIM_STALE_MS. Returns exactly the rows this statement stamped, each with the
-     * customer's CURRENT name and opt-out flag (so an opt-out after queueing is honoured at send time, RF3).
+     * One round trip: first, rows of this campaign still marked SENDING under a stale claim (their drain died during
+     * or right after the Graph call) become failed "interrupted, may have been sent", never re-sent; then up to
+     * `limit` queued rows that are unclaimed or stale-claimed (claimed but never attempted) are claimed (sent_at =
+     * `claim`). Returns exactly the rows the claim stamped, each with the customer's CURRENT name and opt-out flag.
      */
     async claim(campaignId: number, claim: number, limit: number): Promise<ClaimedMessage[]> {
-      const r = await db
-        .prepare(
-          `UPDATE wa_messages SET sent_at = ?3
-           WHERE org_id = ?1 AND id IN (
-             SELECT id FROM wa_messages WHERE org_id = ?1 AND campaign_id = ?2 AND status = 'queued' AND COALESCE(sent_at, 0) < ?4 ORDER BY id LIMIT ?5)
-           RETURNING id, phone, customer_id,
-             (SELECT c.name FROM customers c WHERE c.org_id = ?1 AND c.id = wa_messages.customer_id) AS name,
-             COALESCE((SELECT c.wa_opt_out FROM customers c WHERE c.org_id = ?1 AND c.id = wa_messages.customer_id), 0) AS opted_out`,
-        )
-        .bind(orgId, campaignId, claim, claim - CLAIM_STALE_MS, limit)
-        .all<ClaimedMessage>();
-      return r.results.sort((a, b) => a.id - b.id);
+      const stale = claim - CLAIM_STALE_MS;
+      const [, r] = await db.batch([
+        db
+          .prepare(
+            `UPDATE wa_messages SET status = 'failed', error = ?4 WHERE org_id = ?1 AND campaign_id = ?2 AND status = 'queued'
+               AND error = ?5 AND sent_at < ?3`,
+          )
+          .bind(orgId, campaignId, stale, INTERRUPTED, SENDING),
+        db
+          .prepare(
+            `UPDATE wa_messages SET sent_at = ?3, error = NULL
+             WHERE org_id = ?1 AND id IN (
+               SELECT id FROM wa_messages WHERE org_id = ?1 AND campaign_id = ?2 AND status = 'queued' AND COALESCE(sent_at, 0) < ?4 ORDER BY id LIMIT ?5)
+             RETURNING id, phone, customer_id,
+               (SELECT c.name FROM customers c WHERE c.org_id = ?1 AND c.id = wa_messages.customer_id) AS name,
+               COALESCE((SELECT c.wa_opt_out FROM customers c WHERE c.org_id = ?1 AND c.id = wa_messages.customer_id), 0) AS opted_out`,
+          )
+          .bind(orgId, campaignId, claim, stale, limit),
+      ]);
+      return (r!.results as ClaimedMessage[]).sort((a, b) => a.id - b.id);
     },
 
-    /** The result of one claimed message; only applies while this drain's claim is in place. */
+    /** Marks a claimed row SENDING right before its Graph call; applies (changes = 1) only while this drain's claim holds. */
+    sendingStatement(messageId: number, claim: number): D1PreparedStatement {
+      return db
+        .prepare("UPDATE wa_messages SET error = ?3 WHERE org_id = ?1 AND id = ?2 AND status = 'queued' AND sent_at = ?4")
+        .bind(orgId, messageId, SENDING, claim);
+    },
+
+    /** The result of one claimed message (clears SENDING); only applies while this drain's claim is in place. */
     resultStatement(messageId: number, claim: number, r: SendResult, params: unknown[]): D1PreparedStatement {
       return db
         .prepare(
