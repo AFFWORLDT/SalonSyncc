@@ -4,10 +4,12 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:gen-seed": "node --experimental-strip-types scripts/gen-plan-seed.ts > migrations/0003_seed_plans.sql"
   },
   "dependencies": {
-    "hono": "^4.13.13"
+    "hono": "^4.13.13",
+    "@ss/features": "*"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "^1.4.12",
