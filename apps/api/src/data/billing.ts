@@ -46,48 +46,62 @@ export function billingRepo(db: D1Database) {
       const r = await db.prepare("SELECT id FROM plans WHERE stripe_price_id = ?").bind(priceId).first<{ id: string }>();
       return r?.id ?? null;
     },
-    /** Records an event id; false when it was already processed (Stripe retries and replays). */
-    async claimEvent(eventId: string, at: number): Promise<boolean> {
-      const r = await db.prepare("INSERT OR IGNORE INTO stripe_events(event_id, received_at) VALUES(?, ?)").bind(eventId, at).run();
-      return (r.meta.changes ?? 0) > 0;
-    },
-    async releaseEvent(eventId: string): Promise<void> {
-      await db.prepare("DELETE FROM stripe_events WHERE event_id = ?").bind(eventId).run();
-    },
     /**
-     * Applies a Stripe subscription state to the org, with an audit row, in one batch:
-     * paid -> active (and the plan); failing -> past_due with 7 days' grace (kept if already past_due); ended -> expired.
+     * Applies a Stripe subscription's LIVE state (read from Stripe, so event order and retries don't matter) with an
+     * audit row and the event id, in one batch. The batch starts with a plain INSERT into stripe_events: a duplicate
+     * event fails the whole batch (nothing applied twice), and an event that never got here is not marked done.
+     *   paid    -> active on its plan (also takes over from a manual payment: they now pay by card)
+     *   failing -> past_due with 7 days' grace (kept if already past_due)
+     *   ended   -> expired
+     * failing/ended only count for the subscription on file, and never while the salon is paid by hand.
+     * Returns false when the event was already processed.
      */
     async applyStripe(
       orgId: string,
-      s: { state: "paid" | "failing" | "ended"; planId: string | null; customerId: string | null; subscriptionId: string | null; status: string; periodEnd: number | null; cancelAt: number | null },
+      eventId: string,
+      s: { state: "paid" | "failing" | "ended"; planId: string | null; customerId: string | null; subscriptionId: string; status: string; periodEnd: number | null; cancelAt: number | null },
       eventType: string,
       at: number,
-    ): Promise<void> {
+    ): Promise<boolean> {
+      // Rows the non-paid moves apply to: this subscription is the one on file, and the salon isn't paid by hand.
+      const mine = "EXISTS (SELECT 1 FROM subscriptions WHERE org_id = ?1 AND provider = 'stripe' AND stripe_subscription_id = ?3)";
       const orgUpdate =
         s.state === "paid"
           ? db.prepare(`UPDATE orgs SET status = 'active', plan_id = COALESCE(?2, plan_id) WHERE id = ?1 AND status IN ${MOVABLE}`).bind(orgId, s.planId)
           : s.state === "failing"
             ? db
-                .prepare(`UPDATE orgs SET status = 'past_due', grace_ends_at = CASE WHEN status = 'past_due' THEN grace_ends_at ELSE ?2 END WHERE id = ?1 AND status IN ('active','past_due')`)
-                .bind(orgId, at + 7 * DAY)
-            : db.prepare(`UPDATE orgs SET status = 'expired' WHERE id = ?1 AND plan_id != 'free' AND status IN ${MOVABLE}`).bind(orgId);
-      await db.batch([
-        db
-          .prepare(
-            `INSERT INTO platform_audit(who,action,org_id,before_json,after_json,at)
-             SELECT 'stripe', ?2, id, json_object('status', status, 'plan_id', plan_id), json_object('state', ?3, 'plan_id', ?4, 'stripe_status', ?5), ?6 FROM orgs WHERE id = ?1`,
-          )
-          .bind(orgId, eventType, s.state, s.planId, s.status, at),
-        orgUpdate,
-        db
-          .prepare(
-            `INSERT INTO subscriptions(org_id, provider, stripe_customer_id, stripe_subscription_id, status, current_period_end, cancel_at) VALUES(?1, 'stripe', ?2, ?3, ?4, ?5, ?6)
-             ON CONFLICT(org_id) DO UPDATE SET provider = 'stripe', stripe_customer_id = COALESCE(?2, stripe_customer_id), stripe_subscription_id = COALESCE(?3, stripe_subscription_id),
-               status = ?4, current_period_end = COALESCE(?5, current_period_end), cancel_at = ?6`,
-          )
-          .bind(orgId, s.customerId, s.subscriptionId, s.status, s.periodEnd, s.cancelAt),
-      ]);
+                .prepare(`UPDATE orgs SET status = 'past_due', grace_ends_at = CASE WHEN status = 'past_due' THEN grace_ends_at ELSE ?2 END WHERE id = ?1 AND status IN ('active','past_due') AND ${mine}`)
+                .bind(orgId, at + 7 * DAY, s.subscriptionId)
+            : db.prepare(`UPDATE orgs SET status = 'expired' WHERE id = ?1 AND plan_id != 'free' AND status IN ${MOVABLE} AND ?2 = ?2 AND ${mine}`).bind(orgId, 0, s.subscriptionId);
+      const subUpdate =
+        s.state === "paid"
+          ? db
+              .prepare(
+                `INSERT INTO subscriptions(org_id, provider, stripe_customer_id, stripe_subscription_id, status, current_period_end, cancel_at) VALUES(?1, 'stripe', ?2, ?3, ?4, ?5, ?6)
+                 ON CONFLICT(org_id) DO UPDATE SET provider = 'stripe', stripe_customer_id = COALESCE(?2, stripe_customer_id), stripe_subscription_id = ?3,
+                   status = ?4, current_period_end = ?5, cancel_at = ?6`,
+              )
+              .bind(orgId, s.customerId, s.subscriptionId, s.status, s.periodEnd, s.cancelAt)
+          : db
+              .prepare(`UPDATE subscriptions SET status = ?4, current_period_end = COALESCE(?5, current_period_end), cancel_at = ?6 WHERE org_id = ?1 AND provider = 'stripe' AND stripe_subscription_id = ?3 AND ?2 = ?2`)
+              .bind(orgId, 0, s.subscriptionId, s.status, s.periodEnd, s.cancelAt);
+      try {
+        await db.batch([
+          db.prepare("INSERT INTO stripe_events(event_id, received_at) VALUES(?, ?)").bind(eventId, at),
+          db
+            .prepare(
+              `INSERT INTO platform_audit(who,action,org_id,before_json,after_json,at)
+               SELECT 'stripe', ?2, id, json_object('status', status, 'plan_id', plan_id), json_object('state', ?3, 'plan_id', ?4, 'stripe_status', ?5, 'subscription', ?7), ?6 FROM orgs WHERE id = ?1`,
+            )
+            .bind(orgId, eventType, s.state, s.planId, s.status, at, s.subscriptionId),
+          orgUpdate,
+          subUpdate,
+        ]);
+        return true;
+      } catch (e) {
+        if (/UNIQUE constraint failed: stripe_events/i.test(String((e as Error)?.message ?? e))) return false;
+        throw e;
+      }
     },
     /** The owner picks Free: permanent, core features only, any lapsed state becomes active. */
     async chooseFree(orgId: string, who: string, at: number): Promise<void> {

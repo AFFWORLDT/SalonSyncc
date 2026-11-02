@@ -65,7 +65,7 @@ billing.post("/checkout", async (c) => {
         ...(owner?.owner_email ? { email: owner.owner_email } : {}),
         "metadata[org_id]": org.id,
         "metadata[slug]": org.slug,
-      });
+      }, { idempotencyKey: `customer-${org.id}` });
       customer = created.id;
       await repo.setCustomer(org.id, customer);
     }

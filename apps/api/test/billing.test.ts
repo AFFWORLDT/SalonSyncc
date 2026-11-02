@@ -67,6 +67,7 @@ describe("billing API", () => {
     const s = f.stripeCalls[1]!.params;
     expect(s).toMatchObject({ mode: "subscription", "line_items[0][price]": "price_pro", "metadata[org_id]": org.id, success_url: "https://bill-co.salonkit.online/plan/?paid=1" });
     expect(f.stripeCalls[0]!.params.email).toBe("bill-co@example.com");
+    expect(f.stripeCalls[0]!.idempotencyKey).toBe(`customer-${org.id}`);
     await B("POST", "/checkout", { plan_id: "pro_max" });
     expect(f.stripeCalls.map((x) => x.path)).toEqual(["/customers", "/checkout/sessions", "/checkout/sessions"]);
     expect((await B("POST", "/checkout", { plan_id: "free" })).status).toBe(400);
@@ -99,6 +100,9 @@ describe("billing API", () => {
 });
 
 describe("Stripe webhook", () => {
+  const live = (f: ReturnType<typeof fakeServices>, id: string, status: string, over: Record<string, unknown> = {}) =>
+    (f.stripeSubs[id] = { id, status, customer: "cus_x", items: { data: [{ price: { id: "price_pro" }, current_period_end: 1_900_000_000 }] }, cancel_at: null, ...over });
+
   it("checks the signature", async () => {
     const body = JSON.stringify({ id: "evt_sig", type: "invoice.paid", data: { object: {} } });
     expect((await req("POST", "https://salonkit.online/api/stripe/webhook", body, { "stripe-signature": "t=1,v1=00" })).status).toBe(400);
@@ -108,29 +112,38 @@ describe("Stripe webhook", () => {
     expect(await validStripeSignature(await sign("x", 100, "other"), "x", WH, 100)).toBe(false);
   });
 
-  it("payment -> active on the plan; failing -> payment due; cancelled -> expired; each event once", async () => {
-    const { org } = await salon("hook-life");
-    await env.DB.prepare("UPDATE subscriptions SET stripe_customer_id = 'cus_life' WHERE org_id = ?").bind(org.id).run();
+  async function payingSalon(slug: string, customer: string) {
+    const { org } = await salon(slug);
+    await env.DB.prepare("UPDATE subscriptions SET stripe_customer_id = ? WHERE org_id = ?").bind(customer, org.id).run();
+    return org;
+  }
 
-    const done = await hook("checkout.session.completed", { mode: "subscription", status: "complete", payment_status: "paid", customer: "cus_life", subscription: "sub_1", metadata: { org_id: org.id, plan_id: "pro" } }, "evt_once");
+  it("applies Stripe's live state: paid, failing, cancelled; each event once", async () => {
+    const f = fakeServices();
+    f.install();
+    const org = await payingSalon("hook-life", "cus_life");
+    live(f, "sub_1", "active", { customer: "cus_life" });
+    const done = await hook("checkout.session.completed", { mode: "subscription", customer: "cus_life", subscription: "sub_1", metadata: { org_id: org.id, plan_id: "pro" } }, "evt_once");
     expect(done.status).toBe(200);
-    expect(await orgRow(org.id)).toMatchObject({ status: "active", plan_id: "pro", provider: "stripe", stripe_subscription_id: "sub_1" });
+    expect(await orgRow(org.id)).toMatchObject({ status: "active", plan_id: "pro", provider: "stripe", stripe_subscription_id: "sub_1", sub_status: "active" });
 
-    // The same event again changes nothing (even after someone changed the org in between).
+    // The same event again changes nothing.
     await env.DB.prepare("UPDATE orgs SET plan_id = 'pro_max' WHERE id = ?").bind(org.id).run();
-    await hook("checkout.session.completed", { mode: "subscription", status: "complete", payment_status: "paid", customer: "cus_life", subscription: "sub_1", metadata: { org_id: org.id, plan_id: "pro" } }, "evt_once");
+    await hook("checkout.session.completed", { mode: "subscription", customer: "cus_life", subscription: "sub_1" }, "evt_once");
     expect((await orgRow(org.id)).plan_id).toBe("pro_max");
 
-    await hook("customer.subscription.updated", { id: "sub_1", customer: "cus_life", status: "active", items: { data: [{ price: { id: "price_pro" } }] }, current_period_end: 1_900_000_000 });
-    expect(await orgRow(org.id)).toMatchObject({ status: "active", plan_id: "pro" });
-
-    await hook("invoice.payment_failed", { customer: "cus_life", subscription: "sub_1" });
+    live(f, "sub_1", "past_due", { customer: "cus_life" });
+    // Newer API payloads put the subscription under parent.subscription_details.
+    await hook("invoice.payment_failed", { customer: "cus_life", parent: { subscription_details: { subscription: "sub_1" } } });
     const due = await orgRow(org.id);
     expect(due.status).toBe("past_due");
     expect(due.grace_ends_at).toBeGreaterThan(Date.now() + 6 * 86_400_000);
+
+    live(f, "sub_1", "active", { customer: "cus_life" });
     await hook("invoice.paid", { customer: "cus_life", subscription: "sub_1" });
     expect((await orgRow(org.id)).status).toBe("active");
 
+    live(f, "sub_1", "canceled", { customer: "cus_life" });
     await hook("customer.subscription.deleted", { id: "sub_1", customer: "cus_life", status: "canceled" });
     expect(await orgRow(org.id)).toMatchObject({ status: "expired", sub_status: "canceled" });
 
@@ -138,16 +151,73 @@ describe("Stripe webhook", () => {
     expect(trail.results.every((t: any) => t.who === "stripe")).toBe(true);
   });
 
+  it("a late, retried failure can't undo a payment (live state wins)", async () => {
+    const f = fakeServices();
+    f.install();
+    const org = await payingSalon("hook-order", "cus_order");
+    live(f, "sub_o", "active", { customer: "cus_order" });
+    await hook("invoice.paid", { customer: "cus_order", subscription: "sub_o" });
+    await hook("invoice.payment_failed", { customer: "cus_order", subscription: "sub_o" }); // arrives late
+    expect((await orgRow(org.id)).status).toBe("active");
+  });
+
+  it("cancelling a second, stray subscription doesn't expire the salon", async () => {
+    const f = fakeServices();
+    f.install();
+    const org = await payingSalon("hook-two", "cus_two");
+    live(f, "sub_a", "active", { customer: "cus_two" });
+    await hook("customer.subscription.created", { id: "sub_a", customer: "cus_two" });
+    live(f, "sub_b", "canceled", { customer: "cus_two" });
+    await hook("customer.subscription.deleted", { id: "sub_b", customer: "cus_two" });
+    expect(await orgRow(org.id)).toMatchObject({ status: "active", stripe_subscription_id: "sub_a" });
+  });
+
+  it("a salon paid by hand isn't expired by its old card subscription ending", async () => {
+    const f = fakeServices();
+    f.install();
+    const org = await payingSalon("hook-manual", "cus_man");
+    live(f, "sub_m", "active", { customer: "cus_man" });
+    await hook("customer.subscription.created", { id: "sub_m", customer: "cus_man" });
+    await env.DB.prepare("UPDATE subscriptions SET provider = 'manual' WHERE org_id = ?").bind(org.id).run();
+    live(f, "sub_m", "canceled", { customer: "cus_man" });
+    await hook("customer.subscription.deleted", { id: "sub_m", customer: "cus_man" });
+    expect(await orgRow(org.id)).toMatchObject({ status: "active", provider: "manual" });
+  });
+
+  it("a paused subscription (trial ended without a card) expires the salon", async () => {
+    const f = fakeServices();
+    f.install();
+    const org = await payingSalon("hook-pause", "cus_p");
+    live(f, "sub_p", "active", { customer: "cus_p" });
+    await hook("customer.subscription.created", { id: "sub_p", customer: "cus_p" });
+    live(f, "sub_p", "paused", { customer: "cus_p" });
+    await hook("customer.subscription.updated", { id: "sub_p", customer: "cus_p" });
+    expect((await orgRow(org.id)).status).toBe("expired");
+  });
+
   it("never reactivates a salon the super admin deactivated", async () => {
-    const { org } = await salon("hook-deact");
+    const f = fakeServices();
+    f.install();
+    const org = await payingSalon("hook-deact", "cus_deact");
     await env.DB.prepare("UPDATE orgs SET status = 'deactivated' WHERE id = ?").bind(org.id).run();
-    await env.DB.prepare("UPDATE subscriptions SET stripe_customer_id = 'cus_deact' WHERE org_id = ?").bind(org.id).run();
-    await hook("invoice.paid", { customer: "cus_deact" });
+    live(f, "sub_d", "active", { customer: "cus_deact" });
+    await hook("invoice.paid", { customer: "cus_deact", subscription: "sub_d" });
     expect((await orgRow(org.id)).status).toBe("deactivated");
   });
 
-  it("unknown customers and events are acknowledged", async () => {
-    expect((await hook("invoice.paid", { customer: "cus_nobody" })).status).toBe(200);
+  it("metadata alone can't pick the org (only our own checkout sessions)", async () => {
+    const f = fakeServices();
+    f.install();
+    const { org } = await salon("hook-meta", "expired");
+    live(f, "sub_evil", "active", { customer: "cus_stranger" });
+    await hook("invoice.paid", { customer: "cus_stranger", subscription: "sub_evil", metadata: { org_id: org.id } });
+    await hook("checkout.session.completed", { mode: "subscription", customer: "cus_stranger", subscription: "sub_evil", client_reference_id: org.id, metadata: { org_id: org.id } });
+    expect((await orgRow(org.id)).status).toBe("expired");
+  });
+
+  it("unknown customers, subscriptions and events are acknowledged", async () => {
+    fakeServices().install();
+    expect((await hook("invoice.paid", { customer: "cus_nobody", subscription: "sub_x" })).status).toBe(200);
     expect((await hook("charge.refunded", { customer: "cus_nobody" })).status).toBe(200);
   });
 
@@ -155,6 +225,7 @@ describe("Stripe webhook", () => {
     expect(stateOf("trialing")).toBe("paid");
     expect(stateOf("unpaid")).toBe("failing");
     expect(stateOf("incomplete_expired")).toBe("ended");
+    expect(stateOf("paused")).toBe("ended");
     expect(stateOf("incomplete")).toBeNull();
   });
 });
