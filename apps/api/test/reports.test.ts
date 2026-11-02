@@ -6,7 +6,7 @@ import { makeOrg, makeUser, loginAs } from "./helpers";
 
 const E = { ...env, ROOT_DOMAIN: "" };
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
-const get = (path: string, cookie: string): Promise<Response> => app.fetch(new Request(`https://x.test/api${path}`, { headers: { cookie } }), E, ctx);
+const get = async (path: string, cookie: string): Promise<Response> => app.fetch(new Request(`https://x.test/api${path}`, { headers: { cookie } }), E, ctx);
 const json = async (r: Response): Promise<any> => r.json();
 
 let seq = 0;

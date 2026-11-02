@@ -8,3 +8,4 @@ export * from "./tenant/sales";
 export * from "./tenant/ledger";
 export * from "./tenant/reports";
 export * from "./tenant/expenses";
+export * from "./tenant/payouts";

@@ -7,7 +7,7 @@ import { invalidateFeatures } from "../src/core/features-cache";
 
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 const E = { ...env, ROOT_DOMAIN: "" };
-const callIn = (e: any, method: string, path: string, cookie: string, body?: unknown): Promise<Response> =>
+const callIn = async (e: any, method: string, path: string, cookie: string, body?: unknown): Promise<Response> =>
   app.fetch(
     new Request(`https://x.test/api${path}`, {
       method,

@@ -8,6 +8,8 @@ export interface CrossOrgCase {
   method: string;
   path: (id: number) => string;
   body?: unknown;
+  /** Optional: a body built from org A's seeded row (e.g. it must name A's own barber); overrides `body`. */
+  bodyFor?: (orgId: string, id: number) => Promise<unknown>;
   /** Seeds a row in the given org and returns its id. */
   seed: (orgId: string) => Promise<number>;
   /** REQUIRED: a comparable snapshot of the row through org A's scoped repo (compared before/after org B's attempt). */
@@ -121,3 +123,66 @@ CASES.push({
   seed: seedCustomer,
   read: (orgId, id) => env.DB.prepare("SELECT * FROM customers WHERE org_id = ? AND id = ?").bind(orgId, id).first(),
 });
+
+// ---- Task 10: ledger (payouts, transfers, barber book) ----
+const seedPayout = async (orgId: string): Promise<number> => {
+  const barber = await seedStaff(orgId);
+  const r = await env.DB.prepare(
+    "INSERT INTO barber_payouts(org_id,uid,barber_id,day,amount,paid_from,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
+  )
+    .bind(orgId, randomToken(9), barber, "2026-11-01", 1000, "cash", 1, 1)
+    .first<{ id: number }>();
+  return r!.id;
+};
+const readPayout = async (orgId: string, id: number) => ({
+  row: await env.DB.prepare("SELECT * FROM barber_payouts WHERE org_id = ? AND id = ?").bind(orgId, id).first(),
+  ledger: (await env.DB.prepare("SELECT * FROM ledger_entries WHERE source = 'payout' AND source_id = ?").bind(id).all()).results,
+  audit: (await env.DB.prepare("SELECT * FROM audit_log WHERE entity = 'payout' AND entity_id = ?").bind(id).all()).results,
+});
+CASES.push(
+  {
+    name: "PUT /api/payouts/:id",
+    method: "PUT",
+    path: (id) => `/api/payouts/${id}`,
+    // Valid for A's owner: A's own (seeded) barber.
+    bodyFor: async (orgId, id) => {
+      const r = await env.DB.prepare("SELECT barber_id FROM barber_payouts WHERE org_id = ? AND id = ?").bind(orgId, id).first<{ barber_id: number }>();
+      return { barber_id: r!.barber_id, amount: 5, paid_from: "bank", note: "Pwned" };
+    },
+    seed: seedPayout,
+    read: readPayout,
+  },
+  { name: "DELETE /api/payouts/:id", method: "DELETE", path: (id) => `/api/payouts/${id}`, seed: seedPayout, read: readPayout },
+);
+
+const seedTransfer = async (orgId: string): Promise<number> => {
+  const r = await env.DB.prepare(
+    "INSERT INTO money_transfers(org_id,uid,day,amount,from_account,to_account,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
+  )
+    .bind(orgId, randomToken(9), "2026-11-01", 1000, "cash", "bank", 1, 1)
+    .first<{ id: number }>();
+  return r!.id;
+};
+const readTransfer = async (orgId: string, id: number) => ({
+  row: await env.DB.prepare("SELECT * FROM money_transfers WHERE org_id = ? AND id = ?").bind(orgId, id).first(),
+  ledger: (await env.DB.prepare("SELECT * FROM ledger_entries WHERE source = 'transfer' AND source_id = ?").bind(id).all()).results,
+  audit: (await env.DB.prepare("SELECT * FROM audit_log WHERE entity = 'transfer' AND entity_id = ?").bind(id).all()).results,
+});
+CASES.push(
+  {
+    name: "PUT /api/transfers/:id",
+    method: "PUT",
+    path: (id) => `/api/transfers/${id}`,
+    body: { amount: 5, from_account: "bank", to_account: "cash", note: "Pwned" },
+    seed: seedTransfer,
+    read: readTransfer,
+  },
+  { name: "DELETE /api/transfers/:id", method: "DELETE", path: (id) => `/api/transfers/${id}`, seed: seedTransfer, read: readTransfer },
+  {
+    name: "GET /api/ledger/barbers/:id",
+    method: "GET",
+    path: (id) => `/api/ledger/barbers/${id}`,
+    seed: seedStaff,
+    read: readStaff,
+  },
+);

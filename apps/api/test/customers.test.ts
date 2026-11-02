@@ -8,7 +8,7 @@ const pending: Promise<unknown>[] = [];
 const ctx = { waitUntil(p: Promise<unknown>) { pending.push(p); }, passThroughOnException() {} } as unknown as ExecutionContext;
 const flush = async () => { while (pending.length) await pending.shift(); };
 const E = { ...env, ROOT_DOMAIN: "" };
-const call = (method: string, path: string, cookie: string, body?: unknown): Promise<Response> =>
+const call = async (method: string, path: string, cookie: string, body?: unknown): Promise<Response> =>
   app.fetch(
     new Request(`https://x.test/api${path}`, {
       method,

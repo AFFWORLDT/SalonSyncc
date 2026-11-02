@@ -20,12 +20,13 @@ async function runCase(fetcher: Fetcher, c: CrossOrgCase): Promise<string[]> {
   const id = await c.seed(a.id);
   const before = JSON.stringify(await c.read(a.id, id));
   const cookie = await loginAs(b.slug, "own");
+  const body = c.bodyFor ? await c.bodyFor(a.id, id) : c.body;
   const call = (ck: string) =>
     fetcher(
       new Request(`https://x.test${c.path(id)}`, {
         method: c.method,
-        headers: { cookie: ck, ...(c.body !== undefined ? { "content-type": "application/json" } : {}) },
-        body: c.body !== undefined ? JSON.stringify(c.body) : undefined,
+        headers: { cookie: ck, ...(body !== undefined ? { "content-type": "application/json" } : {}) },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
       }),
     );
   const res = await call(cookie);

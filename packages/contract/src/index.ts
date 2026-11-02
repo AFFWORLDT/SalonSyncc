@@ -309,6 +309,8 @@ export type MoneyAccount = "cash" | "bank";
  *   GET  /api/ledger/balances             -> Balances        (right now)
  *   PUT  /api/ledger/balances BalanceInput -> Balances       (posts the difference as a "Balance set" line)
  *   GET  /api/ledger/shop?from=&to=&account= -> ShopLedger
+ *   Transfer/payout edits and deletes, and PUT balances, are compare-and-set: 409 { error, code: "stale" } when someone
+ *   else changed them first (reload). Feature `ledger`; 403 { code: "feature_disabled" } without it.
  */
 export interface Transfer {
   id: number;
