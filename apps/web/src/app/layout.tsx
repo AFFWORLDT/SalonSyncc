@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   title: { default: BRAND_NAME, template: `%s · ${BRAND_NAME}` },
   description: "Daily sales, bills, expenses and reports for your salon.",
   manifest: "/manifest.webmanifest",
+  icons: { icon: [{ url: "/favicon.ico", sizes: "any" }, { url: "/icon-192.png", type: "image/png", sizes: "192x192" }] },
   appleWebApp: { capable: true, title: BRAND_NAME, statusBarStyle: "default" },
   robots: { index: false, follow: false },
 };

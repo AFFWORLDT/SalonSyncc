@@ -140,8 +140,8 @@ export async function startPush(onForeground: (title: string, body: string) => v
       const data = p.data as { link?: string } | undefined;
       reg?.showNotification(title, {
         body,
-        icon: "/icon.svg",
-        badge: "/icon.svg",
+        icon: "/icon-192.png",
+        badge: "/icon-192.png",
         tag: p.messageId,
         data: { url: p.fcmOptions?.link ?? data?.link ?? "/" },
       });

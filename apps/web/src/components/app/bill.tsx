@@ -91,7 +91,7 @@ export function Bill({ sale, settings }: { sale: BillSale; settings: BillSetting
     <div data-print className="font-mono rounded-xl bg-white p-5 text-[13px] leading-snug text-black ring-1 ring-black/10">
       <div className="flex flex-col items-center gap-1 pb-3 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={settings?.logo_url || "/icon.svg"} alt="" width={64} height={64} className="mb-1 size-16 rounded-full object-contain" />
+        <img src={settings?.logo_url || "/brand/mark.png"} alt="" width={64} height={64} className="mb-1 size-16 rounded-full object-contain" />
         <p className="font-sans text-base font-semibold">{name}</p>
         {settings?.salon_name_ar && (
           <p dir="rtl" lang="ar" className="font-sans text-sm">

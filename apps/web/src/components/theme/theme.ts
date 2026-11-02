@@ -5,10 +5,11 @@
 
 export type Appearance = "system" | "light" | "dark";
 
-/** Default accent (blue); a salon can pick another per device. */
-export const DEFAULT_ACCENT = "#3B4CCA";
+/** Default accent: the rose gold of the SalonKit logo; a user can pick another per device. */
+export const DEFAULT_ACCENT = "#C08A5B";
 
 export const ACCENTS: { name: string; hex: string }[] = [
+  { name: "SalonKit gold", hex: "#C08A5B" },
   { name: "Salon blue", hex: "#3B4CCA" },
   { name: "Red", hex: "#D71921" },
   { name: "Gold", hex: "#D4AF37" },

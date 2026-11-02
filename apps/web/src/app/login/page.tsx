@@ -6,7 +6,7 @@ import { lastOrg, useAuth } from "@/lib/auth-context";
 import { salonFromHost } from "@/lib/host";
 import { BRAND_NAME } from "@/lib/brand";
 import { errorMessage } from "@/lib/api";
-import { LogoBadge } from "@/components/logo";
+import { BrandLogo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,7 +58,7 @@ export default function LoginPage() {
     >
       <div className="mx-auto grid w-full max-w-[350px] gap-8">
         <div className="flex flex-col items-center gap-3 text-center">
-          <LogoBadge size={72} />
+          <BrandLogo />
           <h1 className="text-2xl font-bold">Sign in to your salon</h1>
           <p className="text-balance text-sm text-muted-foreground">
             {needOrg ? "Enter your salon ID and the username your salon gave you." : "Sign in with the username your salon gave you."}
