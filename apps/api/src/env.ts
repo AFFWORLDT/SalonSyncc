@@ -1,4 +1,6 @@
 import type { Hono } from "hono";
+import type { Org } from "./data/platform";
+import type { UserRow, tenantRepo } from "./data/tenant";
 
 export interface Env {
   DB: D1Database;
@@ -8,7 +10,14 @@ export interface Env {
   ADMIN_HOST: string;
   MAIL_FROM: string;
   SUPPORT_EMAIL: string;
+  ENVIRONMENT?: string;
 }
 
-export type AppEnv = { Bindings: Env; Variables: Record<string, unknown> };
+export interface TenantContext {
+  org: Org;
+  user: UserRow;
+  repo: ReturnType<typeof tenantRepo>;
+}
+
+export type AppEnv = { Bindings: Env; Variables: { tenant: TenantContext } };
 export type App = Hono<AppEnv>;

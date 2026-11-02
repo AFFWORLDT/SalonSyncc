@@ -30,3 +30,23 @@ export async function makeUser(
   ).bind(orgId, opts.username, opts.username, role, hash, Date.now()).first<UserRow>();
   return row!;
 }
+
+import app from "../src/index";
+
+/** Logs in through the real route and returns the cookie string ("ss_session=..."). Use a https URL (Secure cookie). */
+export async function loginAs(slug: string, username: string, password = "pass1234", host?: string): Promise<string> {
+  const url = `https://${host ?? "x.test"}/api/auth/login`;
+  const res = await app.fetch(
+    new Request(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ org: slug, username, password }),
+    }),
+    { ...env, ROOT_DOMAIN: host ? "salonstation.online" : env.ROOT_DOMAIN },
+    { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext,
+  );
+  if (res.status !== 200) throw new Error(`loginAs failed: ${res.status} ${await res.text()}`);
+  const cookie = res.headers.get("set-cookie")?.split(";")[0];
+  if (!cookie) throw new Error("no session cookie");
+  return cookie;
+}
