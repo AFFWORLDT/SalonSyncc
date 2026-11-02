@@ -199,3 +199,81 @@ export function platformRepo(db: D1Database) {
     },
   };
 }
+
+// ---------- signup (Plan 4) ----------
+
+export interface SignupInput {
+  orgId: string;
+  slug: string;
+  salonName: string;
+  ownerName: string;
+  ownerUsername: string;
+  ownerEmail: string;
+  ownerPhone: string | null;
+  passwordHash: string;
+  country: string;
+  defaults: { currency: string; currency_minor: number; timezone: string; locale: string; phone_country: string };
+  billPrefix: string;
+  handoffHash: string;
+  now: number;
+  trialEndsAt: number;
+  graceEndsAt: number;
+  handoffExpiresAt: number;
+}
+
+/** Why a salon ID can't be used, or null when it is free. */
+export type SlugProblem = "reserved" | "taken" | null;
+
+export function signupRepo(db: D1Database) {
+  return {
+    async slugProblem(slug: string): Promise<SlugProblem> {
+      const r = await db
+        .prepare("SELECT (SELECT 1 FROM reserved_slugs WHERE slug = ?1) AS reserved, (SELECT 1 FROM orgs WHERE slug = ?1) AS taken")
+        .bind(slug)
+        .first<{ reserved: number | null; taken: number | null }>();
+      return r?.reserved ? "reserved" : r?.taken ? "taken" : null;
+    },
+    async emailTaken(email: string): Promise<boolean> {
+      return !!(await db.prepare("SELECT 1 FROM orgs WHERE lower(owner_email) = lower(?) AND deleted_at IS NULL").bind(email).first());
+    },
+    /**
+     * Creates the salon in ONE batch (all or nothing): org (trial), settings (country defaults), subscription row, owner,
+     * owner link, and the handoff token. 6 statements. Throws on a duplicate slug/email (UNIQUE) with nothing written.
+     */
+    async create(i: SignupInput): Promise<void> {
+      const d = i.defaults;
+      await db.batch([
+        db
+          .prepare(
+            "INSERT INTO orgs(id,slug,name,status,plan_id,trial_ends_at,grace_ends_at,country,created_at,owner_email,owner_phone) VALUES(?,?,?,'trial','pro_max',?,?,?,?,?,?)",
+          )
+          .bind(i.orgId, i.slug, i.salonName, i.trialEndsAt, i.graceEndsAt, i.country, i.now, i.ownerEmail, i.ownerPhone),
+        db
+          .prepare(
+            "INSERT INTO org_settings(org_id,display_name,currency,currency_minor,locale,timezone,phone_country,bill_prefix) VALUES(?,?,?,?,?,?,?,?)",
+          )
+          .bind(i.orgId, i.salonName, d.currency, d.currency_minor, d.locale, d.timezone, d.phone_country, i.billPrefix),
+        db.prepare("INSERT INTO subscriptions(org_id) VALUES(?)").bind(i.orgId),
+        db
+          .prepare("INSERT INTO users(org_id,username,name,role,password_hash,created_at) VALUES(?,?,?,'owner',?,?)")
+          .bind(i.orgId, i.ownerUsername, i.ownerName, i.passwordHash, i.now),
+        db
+          .prepare("UPDATE orgs SET owner_user_id = (SELECT id FROM users WHERE org_id = ?1 AND username = ?2) WHERE id = ?1")
+          .bind(i.orgId, i.ownerUsername),
+        db
+          .prepare(
+            "INSERT INTO login_handoffs(token_hash,org_id,user_id,expires_at) VALUES(?1,?2,(SELECT id FROM users WHERE org_id = ?2 AND username = ?3),?4)",
+          )
+          .bind(i.handoffHash, i.orgId, i.ownerUsername, i.handoffExpiresAt),
+      ]);
+    },
+    /** Uses a handoff token once: returns its org and user, or null if unknown, used or expired. 1 statement. */
+    async consumeHandoff(tokenHash: string, now: number): Promise<{ orgId: string; userId: number } | null> {
+      const r = await db
+        .prepare("UPDATE login_handoffs SET used_at = ?2 WHERE token_hash = ?1 AND used_at IS NULL AND expires_at > ?2 RETURNING org_id, user_id")
+        .bind(tokenHash, now)
+        .first<{ org_id: string; user_id: number }>();
+      return r ? { orgId: r.org_id, userId: r.user_id } : null;
+    },
+  };
+}

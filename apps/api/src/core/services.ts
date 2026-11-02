@@ -76,15 +76,39 @@ export interface PushClient {
   send(env: Env, tokens: string[], push: Push): Promise<{ dead: string[] }>;
 }
 
+/** Cloudflare Turnstile (signup bot check). */
+export interface TurnstileClient {
+  verify(secret: string, token: string, ip: string | null): Promise<boolean>;
+}
+
+/** siteverify (1 subrequest). Network errors count as a failed check. */
+const cfTurnstile: TurnstileClient = {
+  async verify(secret, token, ip) {
+    const body = new FormData();
+    body.set("secret", secret);
+    body.set("response", token);
+    if (ip) body.set("remoteip", ip);
+    try {
+      const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body });
+      const d = (await r.json()) as { success?: boolean };
+      return d.success === true;
+    } catch {
+      return false;
+    }
+  },
+};
+
 export interface Services {
   wa: WaClient;
   push: PushClient;
+  turnstile: TurnstileClient;
 }
 
 /** Real clients: Meta Graph (v21.0) and FCM v1. */
 const REAL: Services = {
   wa: graphWaClient(),
   push: fcmPush,
+  turnstile: cfTurnstile,
 };
 
 let override: ((env: Env) => Services) | null = null;

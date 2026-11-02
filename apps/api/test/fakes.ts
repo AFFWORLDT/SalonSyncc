@@ -24,6 +24,8 @@ export function fakeServices(
     templates?: WaTemplateInfo[];
     /** checkNumber's answer (default: every token can use its number). */
     numberOk?: (cfg: WaConfig) => boolean;
+    /** Turnstile's answer (default: every token passes). */
+    turnstileOk?: (token: string) => boolean;
   } = {},
 ) {
   const wa: WaSend[] = [];
@@ -53,6 +55,11 @@ export function fakeServices(
       async createTemplate(cfg, input) {
         created.push({ cfg, name: input.name, language: input.language, body: input.body, examples: input.examples });
         return { id: `tpl_fake${++n}`, status: "PENDING", name: input.name };
+      },
+    },
+    turnstile: {
+      async verify(_secret: string, token: string) {
+        return opts.turnstileOk ? opts.turnstileOk(token) : true;
       },
     },
     push: {

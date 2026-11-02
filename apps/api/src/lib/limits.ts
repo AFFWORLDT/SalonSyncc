@@ -26,7 +26,11 @@ export const loginWindow = (at: number) => Math.floor(at / LOGIN_WINDOW_MS);
  * Requests per minute per IP on the public links; the PDF costs CPU to draw, so it gets fewer. Staff photos have their
  * own, higher bucket: one staff screen loads many of them, and they must not eat the receipts/services budget.
  */
-export const PUBLIC_LIMITS = { pub: 60, pdf: 10, avatar: 300 } as const;
+export const PUBLIC_LIMITS = { pub: 60, pdf: 10, avatar: 300, slug: 30 } as const;
+
+/** Signups per IP per hour (key `signup:<ip>` in rate_hits, hourly windows). */
+export const SIGNUP_PER_HOUR = 5;
+export const hourWindow = (at: number) => Math.floor(at / 3_600_000);
 
 /** The minute a request counts in (fixed windows). */
 export const minuteWindow = (at: number) => Math.floor(at / 60_000);

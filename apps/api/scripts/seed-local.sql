@@ -4,6 +4,7 @@
 -- today's bill counter.
 UPDATE orgs SET owner_user_id = NULL WHERE id IN ('org_demo_alpha','org_demo_bravo');
 -- Plan 2b tables first (children before parents; they reference sales, users and orgs).
+DELETE FROM login_handoffs WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM wa_messages WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM wa_campaigns WHERE org_id IN ('org_demo_alpha','org_demo_bravo');
 DELETE FROM ratings WHERE org_id IN ('org_demo_alpha','org_demo_bravo');

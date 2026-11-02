@@ -201,6 +201,8 @@ describe("auth", () => {
       "GET /api/public/services",
       "OPTIONS /api/public/services",
       "GET /api/public/logo/:v",
+      "GET /api/public/slug",
+      "POST /api/public/signup",
       "GET /api/wa/webhook",
       "POST /api/wa/webhook",
     ]);

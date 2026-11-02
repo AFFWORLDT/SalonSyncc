@@ -6,6 +6,8 @@ import { tenantAuth, writeGuard, requireFeature, originGuard, WRITE_METHODS } fr
 import { registerMe } from "./platform/me";
 import { auth } from "./platform/auth";
 import { publicApi } from "./core/public";
+// Registers /api/public/slug, /api/public/signup and /api/auth/handoff (before the routers are mounted below).
+import "./platform/signup";
 import { settings, logoPublic } from "./tenant/settings/routes";
 import { staff, avatarPublic } from "./tenant/staff/routes";
 import { services, servicesPublic } from "./tenant/services/routes";
