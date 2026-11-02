@@ -4,6 +4,7 @@ import { useState } from "react";
 import { KeyRound, MoreVertical, Pencil, Plus, Trash2, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
+import { staffError } from "@/lib/staff";
 import { useAuth } from "@/lib/auth-context";
 import { notifyDataChanged, useApi } from "@/hooks/use-api";
 import { pctLabel, phoneLabel } from "@/lib/format";
@@ -26,12 +27,16 @@ import { AvatarPicker } from "@/components/app/avatar-picker";
 import { cn } from "@/lib/utils";
 
 export default function BarbersPage() {
-  const { settings, user: me } = useAuth();
+  const { settings, user: me, me: session, readOnly } = useAuth();
+  const maxStaff = session?.limits.max_staff ?? null;
   const { data, error, reload } = useApi<User[]>("/api/users");
   const [form, setForm] = useState<{ user: User | null } | null>(null);
   const [reset, setReset] = useState<User | null>(null);
   const [remove, setRemove] = useState<User | null>(null);
   const def = settings?.default_commission_pct ?? 0;
+  // The plan's staff limit counts active staff, not the owner (same as the API).
+  const activeStaff = (data ?? []).filter((u) => u.active && u.role !== "owner").length;
+  const atLimit = maxStaff !== null && activeStaff >= maxStaff;
 
   async function setActive(u: User, active: boolean) {
     try {
@@ -39,7 +44,7 @@ export default function BarbersPage() {
       notifyDataChanged();
       toast.success(active ? `${u.name} can sign in again` : `${u.name} is now inactive`);
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(staffError(err, maxStaff));
     }
   }
 
@@ -60,12 +65,17 @@ export default function BarbersPage() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl">Barbers</h1>
+          <h1 className="text-2xl">Staff</h1>
           <p className="text-sm text-muted-foreground">Shop default commission: {pctLabel(def)} (change in Settings)</p>
+          {maxStaff !== null && (
+            <p data-testid="staff-limit" className="text-xs text-muted-foreground">
+              {activeStaff} of {maxStaff} staff on your plan{atLimit ? " · upgrade your plan to add more" : ""}
+            </p>
+          )}
         </div>
-        <Button onClick={() => setForm({ user: null })}>
+        <Button onClick={() => setForm({ user: null })} disabled={atLimit || readOnly}>
           <Plus />
-          Add barber
+          Add staff
         </Button>
       </div>
 
@@ -85,6 +95,7 @@ export default function BarbersPage() {
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-2 truncate font-medium">
                   {u.name}
+                  {u.role === "owner" && <Badge>Owner</Badge>}
                   {u.role === "admin" && <Badge variant="secondary">Admin</Badge>}
                   {!u.active && <Badge variant="outline">Inactive</Badge>}
                 </p>
@@ -107,7 +118,7 @@ export default function BarbersPage() {
                     <KeyRound />
                     Reset password
                   </DropdownMenuItem>
-                  {u.id !== me?.id && (
+                  {u.id !== me?.id && u.role !== "owner" && (
                     <>
                       <DropdownMenuItem onClick={() => setActive(u, !u.active)}>
                         <UserCheck />
@@ -126,7 +137,7 @@ export default function BarbersPage() {
         </div>
       )}
 
-      <UserDialog state={form} onClose={() => setForm(null)} defaultPct={def} />
+      <UserDialog state={form} onClose={() => setForm(null)} defaultPct={def} maxStaff={maxStaff} />
       <ResetDialog user={reset} onClose={() => setReset(null)} />
       <ConfirmDialog
         open={!!remove}
@@ -141,15 +152,17 @@ export default function BarbersPage() {
   );
 }
 
-function UserDialog({ state, onClose, defaultPct }: { state: { user: User | null } | null; onClose: () => void; defaultPct: number }) {
+function UserDialog({ state, onClose, defaultPct, maxStaff }: { state: { user: User | null } | null; onClose: () => void; defaultPct: number; maxStaff: number | null }) {
   return (
     <Dialog open={!!state} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">{state && <UserForm user={state.user} onDone={onClose} defaultPct={defaultPct} />}</DialogContent>
+      <DialogContent className="sm:max-w-md">{state && <UserForm user={state.user} onDone={onClose} defaultPct={defaultPct} maxStaff={maxStaff} />}</DialogContent>
     </Dialog>
   );
 }
 
-function UserForm({ user, onDone, defaultPct }: { user: User | null; onDone: () => void; defaultPct: number }) {
+function UserForm({ user, onDone, defaultPct, maxStaff }: { user: User | null; onDone: () => void; defaultPct: number; maxStaff: number | null }) {
+  // The owner's role, username and active flag can't change here (the API answers 400).
+  const isOwner = user?.role === "owner";
   const [name, setName] = useState(user?.name ?? "");
   const [username, setUsername] = useState(user?.username ?? "");
   const [touched, setTouched] = useState(!!user);
@@ -182,7 +195,7 @@ function UserForm({ user, onDone, defaultPct }: { user: User | null; onDone: () 
       toast.success(user ? "Saved" : `${name} added. Share the username and password with them.`);
       onDone();
     } catch (err) {
-      toast.error(errorMessage(err));
+      toast.error(staffError(err, maxStaff));
     } finally {
       setSaving(false);
     }
@@ -224,6 +237,7 @@ function UserForm({ user, onDone, defaultPct }: { user: User | null; onDone: () 
           required
           autoCapitalize="none"
           value={username}
+          disabled={isOwner}
           onChange={(e) => {
             setTouched(true);
             setUsername(e.target.value.toLowerCase().replace(/\s/g, ""));
@@ -253,11 +267,16 @@ function UserForm({ user, onDone, defaultPct }: { user: User | null; onDone: () 
             id="u-role"
             label="Role"
             value={role}
+            disabled={isOwner}
             onChange={(v) => setRole(v as User["role"])}
-            options={[
-              { value: "barber", label: "Barber" },
-              { value: "admin", label: "Admin" },
-            ]}
+            options={
+              isOwner
+                ? [{ value: "owner", label: "Owner" }]
+                : [
+                    { value: "barber", label: "Barber" },
+                    { value: "admin", label: "Admin" },
+                  ]
+            }
             className="h-11 w-full min-w-0"
           />
         </Field>
@@ -321,3 +340,4 @@ function ResetDialog({ user, onClose }: { user: User | null; onClose: () => void
     </Dialog>
   );
 }
+

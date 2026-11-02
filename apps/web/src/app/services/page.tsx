@@ -24,6 +24,7 @@ export default function ServicesPage() {
   const { data, error, reload, setData } = useApi<Service[]>("/api/services?all=1");
   const [form, setForm] = useState<{ service: Service | null; category?: string } | null>(null);
   const [remove, setRemove] = useState<Service | null>(null);
+  const [starting, setStarting] = useState(false);
 
   const groups = useMemo(() => {
     const m = new Map<string, Service[]>();
@@ -76,6 +77,28 @@ export default function ServicesPage() {
             <Skeleton key={i} className="h-64 rounded-xl" />
           ))}
         </div>
+      ) : data.length === 0 ? (
+        <Card data-testid="services-empty" className="items-center gap-3 p-8 text-center">
+          <p className="text-base font-semibold">No services yet</p>
+          <p className="max-w-sm text-sm text-muted-foreground">Start from a ready-made price list (haircuts, beard, colour…) and change the prices, or add your own.</p>
+          <Button
+            disabled={starting}
+            onClick={async () => {
+              setStarting(true);
+              try {
+                await api("/api/services/starter", { method: "POST" });
+                notifyDataChanged();
+                toast.success("Starter price list added. Edit the prices to match your salon.");
+              } catch (err) {
+                toast.error(errorMessage(err));
+              } finally {
+                setStarting(false);
+              }
+            }}
+          >
+            {starting ? "Adding…" : "Add starter price list"}
+          </Button>
+        </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {groups.map(([cat, list]) => (
