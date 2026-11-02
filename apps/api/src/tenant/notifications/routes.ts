@@ -32,7 +32,9 @@ notifications.post("/push/tokens", gate, async (c) => {
   return c.json({ ok: true });
 });
 
-notifications.delete("/push/tokens", gate, async (c) => {
+// Not feature-gated (nor blocked for a lapsed subscription, see pipeline isWriteAllowed): a downgraded org can still drop
+// its device token. Still session- and org-scoped.
+notifications.delete("/push/tokens", async (c) => {
   const { token } = await bodyOf(c);
   if (typeof token === "string") await repoOf(c).removeToken(c.var.tenant.user.id, token);
   return c.json({ ok: true });

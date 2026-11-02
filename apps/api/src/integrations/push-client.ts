@@ -16,16 +16,22 @@ export interface ServiceAccount {
 }
 
 let cached: { token: string; exp: number; email: string } | null = null;
+/** The parsed secret, memoised per isolate alongside the OAuth token (re-parsed only if the secret text changes). */
+let parsed: { raw: string; sa: ServiceAccount | null } | null = null;
 
 function account(env: Env): ServiceAccount | null {
-  if (!env.FCM_SERVICE_ACCOUNT) return null;
+  const raw = env.FCM_SERVICE_ACCOUNT;
+  if (!raw) return null;
+  if (parsed?.raw === raw) return parsed.sa;
+  let sa: ServiceAccount | null = null;
   try {
-    const a = JSON.parse(env.FCM_SERVICE_ACCOUNT) as ServiceAccount;
-    return a.project_id && a.client_email && a.private_key ? a : null;
+    const a = JSON.parse(raw) as ServiceAccount;
+    sa = a.project_id && a.client_email && a.private_key ? a : null;
   } catch {
     console.error("FCM_SERVICE_ACCOUNT is not valid JSON");
-    return null;
   }
+  parsed = { raw, sa };
+  return sa;
 }
 
 const b64url = (data: ArrayBuffer | Uint8Array | string): string => {
@@ -79,25 +85,30 @@ export const fcmPush: PushClient = {
     const auth = await accessToken(sa);
     const link = push.link ?? new URL(push.path ?? "/", env.APP_ORIGIN).toString();
     const dead: string[] = [];
+    // Per-token try/catch: one failed fetch (network error, subrequest cap) never loses the other tokens' dead reports.
     await Promise.all(
       tokens.map(async (token) => {
-        const res = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
-          method: "POST",
-          headers: { authorization: `Bearer ${auth}`, "content-type": "application/json" },
-          body: JSON.stringify({
-            message: {
-              token,
-              webpush: {
-                notification: { title: push.title, body: push.body, icon: "/icon-192.png", badge: "/icon-192.png", tag: push.tag },
-                fcm_options: { link },
+        try {
+          const res = await fetch(`https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`, {
+            method: "POST",
+            headers: { authorization: `Bearer ${auth}`, "content-type": "application/json" },
+            body: JSON.stringify({
+              message: {
+                token,
+                webpush: {
+                  notification: { title: push.title, body: push.body, icon: "/icon-192.png", badge: "/icon-192.png", tag: push.tag },
+                  fcm_options: { link },
+                },
               },
-            },
-          }),
-        });
-        if (res.ok) return;
-        const text = await res.text();
-        if (isDead(res.status, text)) dead.push(token);
-        else console.error("FCM send failed", res.status, text);
+            }),
+          });
+          if (res.ok) return;
+          const text = await res.text();
+          if (isDead(res.status, text)) dead.push(token);
+          else console.error("FCM send failed", res.status, text);
+        } catch (err) {
+          console.error("FCM send failed", err);
+        }
       }),
     );
     return { dead };

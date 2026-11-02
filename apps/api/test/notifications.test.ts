@@ -1,12 +1,12 @@
 import { env } from "cloudflare:test";
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import app from "../src/index";
 import { makeOrg, makeUser, loginAs } from "./helpers";
 import { fakeServices } from "./fakes";
 import { setServicesForTest } from "../src/core/services";
-import { notificationsRepo } from "../src/data/tenant";
+import { notificationsRepo, PUSH_MAX_TOKENS } from "../src/data/tenant";
 import { notifyUsers } from "../src/tenant/notifications/notify";
-import { buildAssertion } from "../src/integrations/push-client";
+import { buildAssertion, fcmPush } from "../src/integrations/push-client";
 
 // waitUntil work (hooks) is collected so tests can await it deterministically.
 const pending: Promise<unknown>[] = [];
@@ -271,7 +271,7 @@ describe("push token routes", () => {
   it("free org: every push/notification route is 403; unknown paths 404", async () => {
     const a = await setup("pt-free", "free");
     expect((await call("POST", "/push/tokens", a.ck, { token: tok("free") })).status).toBe(403);
-    expect((await call("DELETE", "/push/tokens", a.ck, { token: tok("free") })).status).toBe(403);
+    expect((await call("DELETE", "/push/tokens", a.ck, { token: tok("free") })).status).toBe(200); // sign-out is never gated
     expect((await call("GET", "/notifications", a.ck)).status).toBe(403);
     expect((await call("POST", "/notifications/read", a.ck, {})).status).toBe(403);
     expect((await call("GET", "/notifications/nope", a.ck)).status).toBe(404);
@@ -350,6 +350,87 @@ describe("user delete", () => {
     expect(await r.json()).toMatchObject({ deleted: true });
     expect((await tokens()).some((t) => t.token === tok("ud-b3"))).toBe(false);
     expect((await notes(a.org.id)).map((n) => n.title)).toEqual(["keep"]);
+  });
+});
+
+async function testKey() {
+  const pair = (await crypto.subtle.generateKey(
+    { name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" },
+    true,
+    ["sign", "verify"],
+  )) as CryptoKeyPair;
+  const der = new Uint8Array((await crypto.subtle.exportKey("pkcs8", pair.privateKey)) as ArrayBuffer);
+  let bin = "";
+  for (const x of der) bin += String.fromCharCode(x);
+  return { pair, pem: `-----BEGIN PRIVATE KEY-----\n${btoa(bin).replace(/(.{64})/g, "$1\n")}\n-----END PRIVATE KEY-----\n` };
+}
+
+describe("fix round 1", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("lapsed (expired) org: DELETE token and POST read still work; free org can drop its token", async () => {
+    const a = await setup("fx-exp");
+    await call("POST", "/push/tokens", a.ck, { token: tok("fx-exp") });
+    await env.DB.prepare("INSERT INTO notifications(org_id,user_id,title,created_at) VALUES(?,?,?,?)").bind(a.org.id, a.own.id, "x", 1).run();
+    await env.DB.prepare("UPDATE orgs SET status = 'expired' WHERE id = ?").bind(a.org.id).run();
+    // Other writes are still blocked.
+    expect((await call("POST", "/push/tokens", a.ck, { token: tok("fx-exp2") })).status).toBe(402);
+    expect((await call("POST", "/notifications/read", a.ck, {})).status).toBe(200);
+    expect((await json(await call("GET", "/notifications", a.ck))).unread).toBe(0);
+    expect((await call("DELETE", "/push/tokens", a.ck, { token: tok("fx-exp") })).status).toBe(200);
+    expect((await tokens()).some((t) => t.token === tok("fx-exp"))).toBe(false);
+
+    const f2 = await setup("fx-free", "free");
+    await env.DB.prepare("INSERT INTO push_tokens(token,org_id,user_id,created_at,updated_at) VALUES(?,?,?,?,?)").bind(tok("fx-free"), f2.org.id, f2.own.id, 1, 1).run();
+    expect((await call("DELETE", "/push/tokens", f2.ck, { token: tok("fx-free") })).status).toBe(200);
+    expect((await tokens()).some((t) => t.token === tok("fx-free"))).toBe(false);
+  });
+
+  it("caps a send at PUSH_MAX_TOKENS, most recently updated first", async () => {
+    install();
+    expect(PUSH_MAX_TOKENS).toBe(40);
+    const a = await setup("fx-cap");
+    const stmts = Array.from({ length: 45 }, (_, i) =>
+      env.DB.prepare("INSERT INTO push_tokens(token,org_id,user_id,created_at,updated_at) VALUES(?,?,?,?,?)").bind(tok(`cap${String(i).padStart(2, "0")}`), a.org.id, a.own.id, 1, 1000 + i),
+    );
+    await env.DB.batch(stmts);
+    await notifyUsers(E, a.org.id, [a.own.id], { title: "T", body: "B" });
+    expect(f.pushes).toHaveLength(1);
+    const sent = f.pushes[0]!.tokens;
+    expect(sent).toHaveLength(40);
+    expect(sent[0]).toBe(tok("cap44"));
+    expect([...sent].sort()).toEqual(Array.from({ length: 40 }, (_, i) => tok(`cap${String(i + 5).padStart(2, "0")}`)));
+  });
+
+  it("a token moved to org B gets no org-A push", async () => {
+    install();
+    const a = await setup("fx-mv-a");
+    const b = await setup("fx-mv-b");
+    await call("POST", "/push/tokens", a.ck, { token: tok("mv") });
+    await call("POST", "/push/tokens", b.ck, { token: tok("mv") });
+    await call("POST", "/sales", a.k1, { amount: 25, payment_mode: "cash" });
+    await flush();
+    expect(await notes(a.org.id)).toHaveLength(1); // the bell still has it
+    expect(f.pushes.flatMap((p) => p.tokens)).not.toContain(tok("mv"));
+  });
+
+  it("FCM client: one failed fetch never loses the other tokens' dead reports (no network: fetch is stubbed)", async () => {
+    const { pem } = await testKey();
+    const sa = JSON.stringify({ project_id: "p", client_email: "fx@p.iam.gserviceaccount.com", private_key: pem });
+    const seen: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.startsWith("https://oauth2.googleapis.com/")) return Response.json({ access_token: "at", expires_in: 3600 });
+      const token = JSON.parse(String(init?.body)).message.token as string;
+      seen.push(token);
+      if (token === "boom") throw new Error("Too many subrequests");
+      if (token === "gone404") return new Response("not found", { status: 404 });
+      if (token === "unreg") return new Response('{"error":{"details":[{"errorCode":"UNREGISTERED"}]}}', { status: 400 });
+      return new Response("{}", { status: 200 });
+    });
+    const r = await fcmPush.send({ ...env, FCM_SERVICE_ACCOUNT: sa }, ["gone404", "boom", "ok", "unreg"], { title: "T", body: "B", link: "https://x.test/sales/" });
+    expect(r.dead.sort()).toEqual(["gone404", "unreg"]);
+    expect(seen.sort()).toEqual(["boom", "gone404", "ok", "unreg"]);
   });
 });
 

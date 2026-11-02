@@ -12,6 +12,12 @@ const chunks = <T>(xs: T[]): T[][] => {
   for (let i = 0; i < xs.length; i += CHUNK) out.push(xs.slice(i, i + CHUNK));
   return out;
 };
+/**
+ * At most this many devices per notifyUsers send: tokensFor returns the most recently updated ones. Keeps one send
+ * under the Workers free plan's 50-subrequest cap (one per token + the OAuth call); Task 11 budgets cron sends by it.
+ */
+export const PUSH_MAX_TOKENS = 40;
+
 const marks = (n: number) => Array.from({ length: n }, () => "?").join(",");
 
 export interface PushContent {
@@ -48,18 +54,19 @@ export function notificationsRepo(db: D1Database, orgId: string) {
       );
     },
 
-    /** This org's device tokens for these users. */
-    async tokensFor(userIds: number[]): Promise<string[]> {
+    /** This org's device tokens for these users: the `limit` most recently updated (PUSH_MAX_TOKENS by default). */
+    async tokensFor(userIds: number[], limit = PUSH_MAX_TOKENS): Promise<string[]> {
       const ids = [...new Set(userIds)];
-      const out: string[] = [];
+      const out: { token: string; updated_at: number }[] = [];
       for (const part of chunks(ids)) {
         const { results } = await db
-          .prepare(`SELECT token FROM push_tokens WHERE org_id = ? AND user_id IN (${marks(part.length)})`)
-          .bind(orgId, ...part)
-          .all<{ token: string }>();
-        out.push(...results.map((r) => r.token));
+          .prepare(`SELECT token, updated_at FROM push_tokens WHERE org_id = ? AND user_id IN (${marks(part.length)}) ORDER BY updated_at DESC, token LIMIT ?`)
+          .bind(orgId, ...part, limit)
+          .all<{ token: string; updated_at: number }>();
+        out.push(...results);
       }
-      return out;
+      // Each chunk is already newest-first; merging keeps the newest `limit` overall.
+      return out.sort((a, b) => b.updated_at - a.updated_at || (a.token < b.token ? -1 : 1)).slice(0, limit).map((r) => r.token);
     },
 
     /** Removes tokens FCM reported gone; only this org's rows (a token that moved salons in the meantime is kept). */

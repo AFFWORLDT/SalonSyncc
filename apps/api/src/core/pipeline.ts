@@ -75,12 +75,17 @@ export const WRITE_OK: OrgStatus[] = ["trial", "active", "grace", "past_due"];
 
 export const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const WRITE_ALLOW_PREFIXES = ["/api/auth/", "/api/billing/"];
-const isWriteAllowed = (path: string) =>
-  WRITE_ALLOW_PREFIXES.some((p) => path.startsWith(p)) || path === "/api/me" || path.startsWith("/api/me/");
+/**
+ * Exact method + path writes a lapsed org may still make: a device signing out of pushes, and marking the bell read.
+ * Both are session- and org-scoped and touch no business data.
+ */
+const WRITE_ALLOW_EXACT = new Set(["DELETE /api/push/tokens", "POST /api/notifications/read"]);
+const isWriteAllowed = (method: string, path: string) =>
+  WRITE_ALLOW_PREFIXES.some((p) => path.startsWith(p)) || path === "/api/me" || path.startsWith("/api/me/") || WRITE_ALLOW_EXACT.has(`${method} ${path}`);
 
 /** Blocks writes for orgs whose subscription is inactive. Reads/exports always pass. Runs after tenantAuth. */
 export const writeGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
-  if (WRITE_METHODS.has(c.req.method.toUpperCase()) && !WRITE_OK.includes(c.var.tenant.org.status) && !isWriteAllowed(new URL(c.req.url).pathname)) {
+  if (WRITE_METHODS.has(c.req.method.toUpperCase()) && !WRITE_OK.includes(c.var.tenant.org.status) && !isWriteAllowed(c.req.method.toUpperCase(), new URL(c.req.url).pathname)) {
     throw new HttpError(402, "Your subscription is inactive. Upgrade to continue.", "subscription_inactive");
   }
   await next();
