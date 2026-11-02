@@ -26,6 +26,8 @@ export function fakeServices(
     numberOk?: (cfg: WaConfig) => boolean;
     /** Turnstile's answer (default: every token passes). */
     turnstileOk?: (token: string) => boolean;
+    /** Whether the fake mail provider accepts mail (default true). */
+    mailOk?: boolean;
   } = {},
 ) {
   const wa: WaSend[] = [];
@@ -33,6 +35,7 @@ export function fakeServices(
   const created: { cfg: WaConfig; name: string; language: string; body: string; examples: string[] }[] = [];
   const pushes: PushSend[] = [];
   const numberChecks: WaConfig[] = [];
+  const mails: { to: string; subject: string; html: string; text: string }[] = [];
   let n = 0;
   const svc: Services = {
     wa: {
@@ -57,6 +60,12 @@ export function fakeServices(
         return { id: `tpl_fake${++n}`, status: "PENDING", name: input.name };
       },
     },
+    mail: {
+      async send(_env: Env, m) {
+        mails.push(m);
+        return opts.mailOk ?? true;
+      },
+    },
     turnstile: {
       async verify(_secret: string, token: string) {
         return opts.turnstileOk ? opts.turnstileOk(token) : true;
@@ -75,6 +84,7 @@ export function fakeServices(
     created,
     pushes,
     numberChecks,
+    mails,
     services: svc,
     install() {
       setServicesForTest(() => svc);

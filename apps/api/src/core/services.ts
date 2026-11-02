@@ -98,10 +98,43 @@ const cfTurnstile: TurnstileClient = {
   },
 };
 
+/** Outgoing platform email (Resend). */
+export interface MailMessage {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  replyTo?: string;
+}
+export interface MailClient {
+  /** Sends one email; true when the provider accepted it. Never throws. */
+  send(env: Env, m: MailMessage): Promise<boolean>;
+}
+
+/** Resend's HTTP API (1 subrequest). Off without RESEND_API_KEY or MAIL_FROM. */
+const resendMail: MailClient = {
+  async send(env, m) {
+    if (!env.RESEND_API_KEY || !env.MAIL_FROM) return false;
+    try {
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: env.MAIL_FROM, to: [m.to], subject: m.subject, html: m.html, text: m.text, ...(m.replyTo ? { reply_to: m.replyTo } : {}) }),
+      });
+      if (!r.ok) console.error("mail send failed", r.status);
+      return r.ok;
+    } catch (e) {
+      console.error("mail send failed", (e as Error).message);
+      return false;
+    }
+  },
+};
+
 export interface Services {
   wa: WaClient;
   push: PushClient;
   turnstile: TurnstileClient;
+  mail: MailClient;
 }
 
 /** Real clients: Meta Graph (v21.0) and FCM v1. */
@@ -109,6 +142,7 @@ const REAL: Services = {
   wa: graphWaClient(),
   push: fcmPush,
   turnstile: cfTurnstile,
+  mail: resendMail,
 };
 
 let override: ((env: Env) => Services) | null = null;

@@ -25,6 +25,15 @@ export interface SignupBody {
   turnstile?: string;
 }
 
+/** Same rules as the API: the email is also the owner's username (at most 60, safe characters). */
+export const EMAIL_RE = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
+/** A typed phone is fine when it is digits with spaces, dashes, dots, brackets and an optional +, 6-15 digits. */
+export function phoneOk(raw: string): boolean {
+  if (!raw.trim()) return true;
+  const digits = raw.replace(/\D/g, "");
+  return /^[+\d\s().-]+$/.test(raw) && digits.length >= 6 && digits.length <= 15;
+}
+
 const host = (slug: string) => (ROOT_DOMAIN ? `${slug}.${ROOT_DOMAIN}` : slug);
 
 /** Salon name -> suggested salon ID (live-checked), owner details, then straight into the new salon, signed in. */
@@ -95,7 +104,9 @@ export function SignupForm() {
     }
   }
 
-  const ready = salon.trim().length >= 2 && slugState.state === "ok" && name.trim().length >= 2 && /\S+@\S+\.\S+/.test(email) && password.length >= 8;
+  const emailBad = email.trim() !== "" && (!EMAIL_RE.test(email.trim()) || email.trim().length > 60);
+  const phoneBad = !phoneOk(phone);
+  const ready = salon.trim().length >= 2 && slugState.state === "ok" && name.trim().length >= 2 && EMAIL_RE.test(email.trim()) && !emailBad && !phoneBad && password.length >= 8;
 
   return (
     <form onSubmit={submit} className="grid gap-4" data-testid="signup-form">
@@ -147,11 +158,13 @@ export function SignupForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className="h-11" />
+          <Input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={emailBad} className="h-11" />
+          {emailBad && <p className="text-xs text-destructive">Enter a valid email (at most 60 characters)</p>}
         </div>
         <div className="grid gap-2">
           <Label htmlFor="phone">Mobile (optional)</Label>
-          <Input id="phone" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Your mobile number" className="h-11" />
+          <Input id="phone" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Your mobile number" aria-invalid={phoneBad} className="h-11" />
+          {phoneBad && <p className="text-xs text-destructive">Enter a valid mobile number</p>}
         </div>
       </div>
       <div className="grid gap-2">

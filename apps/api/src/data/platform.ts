@@ -238,7 +238,7 @@ export function signupRepo(db: D1Database) {
     },
     /**
      * Creates the salon in ONE batch (all or nothing): org (trial), settings (country defaults), subscription row, owner,
-     * owner link, and the handoff token. 6 statements. Throws on a duplicate slug/email (UNIQUE) with nothing written.
+     * owner link, the handoff token and the queued welcome email. 7 statements. Throws on a duplicate slug/email (UNIQUE) with nothing written.
      */
     async create(i: SignupInput): Promise<void> {
       const d = i.defaults;
@@ -265,7 +265,12 @@ export function signupRepo(db: D1Database) {
             "INSERT INTO login_handoffs(token_hash,org_id,user_id,expires_at) VALUES(?1,?2,(SELECT id FROM users WHERE org_id = ?2 AND username = ?3),?4)",
           )
           .bind(i.handoffHash, i.orgId, i.ownerUsername, i.handoffExpiresAt),
+        db.prepare(`INSERT INTO email_log(org_id,kind,"to",status) VALUES(?,'welcome',?,'queued')`).bind(i.orgId, i.ownerEmail),
       ]);
+    },
+    /** Records how the welcome email went (sent / failed / skipped); the cron retries failed ones in Plan 6. */
+    async markEmail(orgId: string, kind: string, status: "sent" | "failed" | "skipped", at: number): Promise<void> {
+      await db.prepare("UPDATE email_log SET status = ?3, sent_at = CASE WHEN ?3 = 'sent' THEN ?4 ELSE sent_at END WHERE org_id = ?1 AND kind = ?2").bind(orgId, kind, status, at).run();
     },
     /** Uses a handoff token once: returns its org and user, or null if unknown, used or expired. 1 statement. */
     async consumeHandoff(tokenHash: string, now: number): Promise<{ orgId: string; userId: number } | null> {

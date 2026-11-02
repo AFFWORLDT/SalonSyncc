@@ -22,6 +22,8 @@ export interface Env {
   WA_APP_SECRET?: string;
   /** Secret: the webhook GET handshake token. */
   WA_VERIFY_TOKEN?: string;
+  /** Secret: Resend API key for platform email (welcome, reminders). Unset: emails are logged as skipped. */
+  RESEND_API_KEY?: string;
   /** Secret: Cloudflare Turnstile secret for signup. Unset: the check is skipped (the IP rate limit still applies). */
   TURNSTILE_SECRET?: string;
   /** Static dashboard export (wrangler assets). Only /api/* reaches the Worker (run_worker_first). */

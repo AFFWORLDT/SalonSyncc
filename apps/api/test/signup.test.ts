@@ -5,8 +5,11 @@ import type { Env } from "../src/env";
 import { setServicesForTest } from "../src/core/services";
 import { fakeServices } from "./fakes";
 import { countingDb } from "./counting-db";
+import { ipKey } from "../src/platform/signup";
 
-const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
+const pending: Promise<unknown>[] = [];
+const ctx = { waitUntil(p: Promise<unknown>) { pending.push(p); }, passThroughOnException() {} } as unknown as ExecutionContext;
+const flush = async () => { while (pending.length) await pending.shift(); };
 const E = { ...env, ROOT_DOMAIN: "salonkit.online" } as Env;
 let ipN = 0;
 const freshIp = () => `10.9.${Math.floor(++ipN / 250)}.${ipN % 250}`;
@@ -146,5 +149,75 @@ describe("handoff", () => {
     const b: any = await (await signup({ slug: "hand-old" })).json();
     await env.DB.prepare("UPDATE login_handoffs SET expires_at = ? WHERE org_id = (SELECT id FROM orgs WHERE slug = 'hand-old')").bind(Date.now() - 1).run();
     expect((await handoff("hand-old", tokenOf(b.handoff_url))).status).toBe(401);
+  });
+});
+
+describe("welcome email", () => {
+  it("is sent after signup with the salon address, ID and trial end, and logged", async () => {
+    const f = fakeServices();
+    setServicesForTest(() => f.services);
+    const r = await signup({ slug: "mail-salon", email: "owner@mail-salon.com", owner_name: "Riya Kapoor", salon_name: "Mail Salon" }, {}, { RESEND_API_KEY: "re_test", MAIL_FROM: "SalonKit <hello@salonkit.online>" });
+    expect(r.status).toBe(201);
+    await flush();
+    expect(f.mails).toHaveLength(1);
+    const m = f.mails[0]!;
+    expect(m.to).toBe("owner@mail-salon.com");
+    expect(m.subject).toContain("Mail Salon");
+    expect(m.html).toContain("https://mail-salon.salonkit.online/");
+    expect(m.html).toContain("Welcome, Riya!");
+    expect(m.text).toContain("Salon ID: mail-salon");
+    const log = await env.DB.prepare("SELECT status, sent_at FROM email_log WHERE kind = 'welcome' AND org_id = (SELECT id FROM orgs WHERE slug = 'mail-salon')").first<any>();
+    expect(log.status).toBe("sent");
+    expect(log.sent_at).toBeGreaterThan(0);
+  });
+  it("is logged as skipped without a Resend key, and as failed when the provider refuses", async () => {
+    await signup({ slug: "mail-skip" });
+    await flush();
+    expect((await env.DB.prepare("SELECT status FROM email_log WHERE org_id = (SELECT id FROM orgs WHERE slug = 'mail-skip')").first<any>()).status).toBe("skipped");
+    setServicesForTest(() => fakeServices({ mailOk: false }).services);
+    await signup({ slug: "mail-fail" }, {}, { RESEND_API_KEY: "re_test", MAIL_FROM: "x <a@b.co>" });
+    await flush();
+    expect((await env.DB.prepare("SELECT status FROM email_log WHERE org_id = (SELECT id FROM orgs WHERE slug = 'mail-fail')").first<any>()).status).toBe("failed");
+  });
+  it("escapes the salon name in the HTML", async () => {
+    const f = fakeServices();
+    setServicesForTest(() => f.services);
+    await signup({ slug: "mail-xss", salon_name: "<b>Evil</b> & Co" }, {}, { RESEND_API_KEY: "re_test", MAIL_FROM: "x <a@b.co>" });
+    await flush();
+    expect(f.mails[0]!.html).not.toContain("<b>Evil</b>");
+    expect(f.mails[0]!.html).toContain("&lt;b&gt;Evil&lt;/b&gt; &amp; Co");
+  });
+});
+
+describe("final review fixes", () => {
+  it("accepts common phone formats and stores digits", async () => {
+    expect((await signup({ slug: "phone-ok", phone: "+971 50-123-4567" })).status).toBe(201);
+    const o = await env.DB.prepare("SELECT owner_phone FROM orgs WHERE slug = 'phone-ok'").first<any>();
+    expect(o.owner_phone).toBe("+971501234567");
+    expect((await signup({ phone: "(050) 123 4567" })).status).toBe(201);
+    expect((await signup({ phone: "call me" })).status).toBe(400);
+  });
+  it("emails must be valid usernames (at most 60, safe characters)", async () => {
+    expect((await signup({ email: `${"a".repeat(55)}@x.com` })).status).toBe(400);
+    expect((await signup({ email: "o'brien@x.com" })).status).toBe(400);
+  });
+  it("invalid forms don't use up the hourly tries", async () => {
+    const ip = "10.251.1.1";
+    for (let i = 0; i < 7; i++) expect((await signup({ email: "bad" }, { ip })).status).toBe(400);
+    expect((await signup({}, { ip })).status).toBe(201);
+  });
+  it("IPv6 is limited per /64", async () => {
+    expect(ipKey("2001:db8:1:2:aaaa::1")).toBe("2001:db8:1:2::/64");
+    expect(ipKey("2001:db8:1:2:3:4:5:6")).toBe("2001:db8:1:2::/64");
+    expect(ipKey("10.0.0.1")).toBe("10.0.0.1");
+    for (let i = 0; i < 5; i++) expect((await signup({}, { ip: `2001:db8:9:9::${i + 1}` })).status).toBe(201);
+    expect((await signup({}, { ip: "2001:db8:9:9::99" })).status).toBe(429);
+  });
+  it("caps signups across all IPs while Turnstile is off", async () => {
+    await env.DB.prepare("INSERT INTO rate_hits(key, window, n) VALUES('signup:all', ?, 999) ON CONFLICT(key) DO UPDATE SET n = 999, window = excluded.window").bind(Math.floor(Date.now() / 3_600_000)).run();
+    expect((await signup()).status).toBe(429);
+    setServicesForTest(() => fakeServices().services);
+    expect((await signup({ turnstile: "ok" }, {}, { TURNSTILE_SECRET: "s" })).status).toBe(201);
+    await env.DB.prepare("DELETE FROM rate_hits WHERE key = 'signup:all'").run();
   });
 });

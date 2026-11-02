@@ -13,13 +13,23 @@ import { tenantRepo } from "../data/tenant";
 import { billPrefixFor, countryDefaults } from "../lib/countries";
 import { SIGNUP_PER_HOUR, hourWindow } from "../lib/limits";
 import { auth } from "./auth";
+import { welcomeEmail } from "../emails/welcome";
 
 const DAY = 86_400_000;
 export const TRIAL_DAYS = 7;
 export const GRACE_DAYS = 7;
 /** How long the post-signup sign-in link works. */
 export const HANDOFF_MS = 120_000;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+/** The owner signs in with their email, so it must also be a valid username (staff USERNAME_RE, at most 60). */
+const EMAIL_RE = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
+/** Signups per hour across all IPs while Turnstile is off (protects the free plan's daily D1 writes). */
+export const SIGNUP_GLOBAL_PER_HOUR = 50;
+/** Rate-limit key for a client: IPv6 by its /64 (one household or host gets one), IPv4 whole. */
+export function ipKey(raw: string): string {
+  if (!raw.includes(":")) return raw;
+  const parts = raw.split("::")[0]!.split(":");
+  return `${parts.slice(0, 4).join(":")}::/64`;
+}
 const bad = (m: string) => new HttpError(400, m);
 const ip = (c: Context<AppEnv>) => c.req.header("CF-Connecting-IP") ?? "unknown";
 
@@ -42,10 +52,6 @@ publicApi.get("/slug", publicRateLimit("slug"), async (c) => {
  */
 publicApi.post("/signup", originGuard, async (c) => {
   const at = Date.now();
-  if ((await rateHit(c.env.DB, `signup:${ip(c)}`, hourWindow(at))) > SIGNUP_PER_HOUR) {
-    c.header("Retry-After", "3600");
-    throw new HttpError(429, "Too many signups from here. Try again in an hour.");
-  }
   let b: Record<string, unknown> = {};
   try {
     const parsed = await c.req.json();
@@ -57,16 +63,27 @@ publicApi.post("/signup", originGuard, async (c) => {
   const salonName = str("salon_name", 80);
   const ownerName = str("owner_name", 80);
   const email = str("email", 120).toLowerCase();
-  const phone = str("phone", 20);
+  // Phones are typed in many ways ("+971 50-123-4567", "(050) 123 4567"): keep the digits and a leading +.
+  const phoneRaw = str("phone", 30);
+  const phone = phoneRaw ? (phoneRaw.trim().startsWith("+") ? "+" : "") + phoneRaw.replace(/\D/g, "") : "";
   const country = str("country", 2).toUpperCase();
   const password = typeof b.password === "string" ? b.password : "";
   const slug = normalizeSlug(str("slug", 30));
   if (salonName.length < 2 || salonName.length > 80) throw bad("Enter your salon's name");
   if (ownerName.length < 2 || ownerName.length > 80) throw bad("Enter your name");
-  if (!EMAIL_RE.test(email) || email.length > 120) throw bad("Enter a valid email");
-  if (phone && !/^\+?[0-9 ]{6,20}$/.test(phone)) throw bad("Enter a valid mobile number");
+  if (!EMAIL_RE.test(email) || email.length > 60) throw bad("Enter a valid email (at most 60 characters)");
+  if (phoneRaw && (!/^[+\d\s().-]+$/.test(phoneRaw) || !/^\+?\d{6,15}$/.test(phone))) throw bad("Enter a valid mobile number");
   if (password.length < 8 || password.length > 200) throw bad("Password must be at least 8 characters");
   if (!isValidSlug(slug)) throw bad("Salon ID: 3-30 letters, numbers or dashes");
+
+  // Counted only once the form is valid, so a typo never uses up an owner's tries.
+  const window = hourWindow(at);
+  const tooMany = () => {
+    c.header("Retry-After", "3600");
+    return new HttpError(429, "Too many signups from here. Try again in an hour.");
+  };
+  if ((await rateHit(c.env.DB, `signup:${ipKey(ip(c))}`, window)) > SIGNUP_PER_HOUR) throw tooMany();
+  if (!c.env.TURNSTILE_SECRET && (await rateHit(c.env.DB, "signup:all", window)) > SIGNUP_GLOBAL_PER_HOUR) throw tooMany();
 
   if (c.env.TURNSTILE_SECRET) {
     const token = typeof b.turnstile === "string" ? b.turnstile : "";
@@ -80,9 +97,11 @@ publicApi.post("/signup", originGuard, async (c) => {
 
   const token = randomToken(24);
   const defaults = countryDefaults(country || "AE");
+  const orgId = `org_${randomToken(12)}`;
+  const trialEndsAt = at + TRIAL_DAYS * DAY;
   try {
     await repo.create({
-      orgId: `org_${randomToken(12)}`,
+      orgId,
       slug,
       salonName,
       ownerName,
@@ -95,7 +114,7 @@ publicApi.post("/signup", originGuard, async (c) => {
       billPrefix: billPrefixFor(slug),
       handoffHash: await sha256(token),
       now: at,
-      trialEndsAt: at + TRIAL_DAYS * DAY,
+      trialEndsAt,
       graceEndsAt: at + (TRIAL_DAYS + GRACE_DAYS) * DAY,
       handoffExpiresAt: at + HANDOFF_MS,
     });
@@ -108,6 +127,16 @@ publicApi.post("/signup", originGuard, async (c) => {
     throw e;
   }
   const root = c.env.ROOT_DOMAIN;
+  // Welcome email after the response (waitUntil): 1 subrequest + 1 statement, never blocks or fails the signup.
+  const salonUrl = root ? `https://${slug}.${root}/` : `${new URL(c.req.url).origin}/login/?org=${encodeURIComponent(slug)}`;
+  const siteUrl = root ? `https://${root}` : new URL(c.req.url).origin;
+  const mail = welcomeEmail({ brand: c.env.BRAND_NAME, siteUrl, salonName, ownerName, slug, salonUrl, username: email, trialEndsAt, supportEmail: c.env.SUPPORT_EMAIL });
+  const sendWelcome = async () => {
+    const configured = !!c.env.RESEND_API_KEY && !!c.env.MAIL_FROM;
+    const ok = configured && (await services(c.env).mail.send(c.env, { to: email, ...mail, replyTo: c.env.SUPPORT_EMAIL || undefined }));
+    await repo.markEmail(orgId, "welcome", ok ? "sent" : configured ? "failed" : "skipped", Date.now());
+  };
+  c.executionCtx.waitUntil(sendWelcome().catch((e) => console.error("welcome email failed", (e as Error).message)));
   const q = `handoff=${encodeURIComponent(token)}`;
   const handoff_url = root ? `https://${slug}.${root}/login/?${q}` : `/login/?org=${encodeURIComponent(slug)}&${q}`;
   return c.json({ slug, handoff_url }, 201);

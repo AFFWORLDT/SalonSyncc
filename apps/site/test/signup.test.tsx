@@ -72,3 +72,17 @@ describe("signup form", () => {
     expect(document.querySelector('script[src*="turnstile"]')).toBeNull();
   });
 });
+
+import { EMAIL_RE, phoneOk } from "@/components/signup-form";
+describe("form rules match the API", () => {
+  it("phones", () => {
+    expect(phoneOk("+971 50-123-4567")).toBe(true);
+    expect(phoneOk("(050) 123 4567")).toBe(true);
+    expect(phoneOk("")).toBe(true);
+    expect(phoneOk("call me")).toBe(false);
+  });
+  it("emails", () => {
+    expect(EMAIL_RE.test("sam@example.com")).toBe(true);
+    expect(EMAIL_RE.test("o'brien@x.com")).toBe(false);
+  });
+});
