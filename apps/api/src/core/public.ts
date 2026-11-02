@@ -191,7 +191,8 @@ publicApi.get("/feedback/:token", publicRateLimit("pub"), async (c) => {
  */
 publicApi.post("/feedback/:token", publicRateLimit("pub"), async (c) => {
   const rs = await ratedSale(c, c.req.param("token"));
-  if (!rs) return c.json({ error: "Not found" }, 404);
+  // M8: a lapsed (expired) org takes no new ratings and sends no alert; ratedSale already refuses deactivated/deleted.
+  if (!rs || rs.org.status === "expired") return c.json({ error: "Not found" }, 404);
   const { org, sale } = rs;
   const raw = await c.req.json().catch(() => null);
   const b: Partial<FeedbackInput> = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
@@ -204,12 +205,15 @@ publicApi.post("/feedback/:token", publicRateLimit("pub"), async (c) => {
   await repo.upsert(sale, stars, comment);
   if (stars <= 3 && (!before || before.stars > 3)) {
     const ids = await notificationsRepo(c.env.DB, org.id).adminIds();
-    await notifyUsers(c.env, org.id, ids, {
-      title: `${"★".repeat(stars)}${"☆".repeat(5 - stars)} from ${sale.customer_label} · ${sale.barber_name}`,
-      body: comment ? comment.slice(0, 140) : `Bill ${sale.bill_no}: call the customer to make it right.`,
-      path: "/ratings/",
-      tag: `rating-${sale.id}`,
-    });
+    // M2: after the response (same invocation and budget; notifyUsers never throws), so the customer never waits on FCM.
+    c.executionCtx.waitUntil(
+      notifyUsers(c.env, org.id, ids, {
+        title: `${"★".repeat(stars)}${"☆".repeat(5 - stars)} from ${sale.customer_label} · ${sale.barber_name}`,
+        body: comment ? comment.slice(0, 140) : `Bill ${sale.bill_no}: call the customer to make it right.`,
+        path: "/ratings/",
+        tag: `rating-${sale.id}`,
+      }),
+    );
   }
   return c.json(await feedbackPage(c, rs));
 });
@@ -224,7 +228,21 @@ publicApi.get("/review/:token", publicRateLimit("pub"), async (c) => {
   if (!rs) return c.json({ error: "Not found" }, 404);
   const { org } = rs;
   const [s] = await Promise.all([settingsRepo(c.env.DB, org.id).get(), ratingsRepo(c.env.DB, org.id).markReviewClicked(token)]);
-  const url = /^https:\/\//i.test(s.google_review_url ?? "") ? s.google_review_url! : `${orgAppUrl(c.env, org)}/rate/?t=${token}`;
   c.header("Cache-Control", "no-store");
-  return c.redirect(url, 302);
+  return c.redirect(reviewTarget(s.google_review_url) ?? `${orgAppUrl(c.env, org)}/rate/?t=${token}`, 302);
 });
+
+/**
+ * M1: the org's review URL, parsed. Only an https URL is followed, as its normalised href (non-ASCII percent-encoded,
+ * so the Location header can't throw); a parse failure or any other scheme is null (the caller falls back).
+ */
+function reviewTarget(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+

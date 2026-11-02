@@ -6,6 +6,7 @@ import { requireAdmin } from "../../core/roles";
 import { requireFeature } from "../../core/pipeline";
 import { assetsRepo, logoUrl, settingsRepo, withWaReady } from "../../data/tenant";
 import { publicRateLimit, resolvePublicOrg } from "../../core/public";
+import { pngSize } from "../../lib/pdf";
 
 const bad = (m: string) => new HttpError(400, m);
 
@@ -203,6 +204,7 @@ settings.put("/", requireAdmin, async (c) => {
 
 const LOGO_TYPES = ["image/webp", "image/jpeg", "image/png"];
 const LOGO_MAX = 200 * 1024;
+const LOGO_PNG_MAX_PX = 512;
 
 settings.put("/logo", requireAdmin, async (c) => {
   const type = (c.req.header("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
@@ -211,6 +213,11 @@ settings.put("/logo", requireAdmin, async (c) => {
   const bytes = await c.req.arrayBuffer();
   if (!bytes.byteLength) throw bad("The logo is empty");
   if (bytes.byteLength > LOGO_MAX) throw bad("Logo is too large (max 200 KB)");
+  // CPU guard (lib/pdf): the PDF bill decodes a PNG logo; keep uploads small enough (bills draw PNGs up to 256 x 256).
+  const px = type === "image/png" ? pngSize(new Uint8Array(bytes)) : null;
+  if (px && (px.w > LOGO_PNG_MAX_PX || px.h > LOGO_PNG_MAX_PX)) {
+    throw bad(`PNG logo is too big (${px.w} x ${px.h} px): use at most ${LOGO_PNG_MAX_PX} x ${LOGO_PNG_MAX_PX} px, or a JPEG`);
+  }
   const { org } = c.var.tenant;
   const v = await assetsRepo(c.env.DB, org.id).setLogo(bytes, type);
   return c.json({ logo_url: logoUrl(v, org.slug) });

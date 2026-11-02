@@ -3,7 +3,8 @@
  * (or a text header), the bill details, the services table, VAT and the total. Per org: the currency label, the time zone
  * and locale, and "TAX INVOICE"/TRN only when the org has VAT on. Drawn with pdf-lib's standard Helvetica (no font
  * embedding, cheap on CPU), which only knows Latin text: anything else (Arabic names, emoji) becomes "?" or is dropped.
- * Only jpeg/png logos are embedded; a webp or unreadable logo falls back to the text header.
+ * Only jpeg/png logos are embedded (png up to 256 x 256, jpeg up to 200 KB: the CPU guard below); a webp, oversized or
+ * unreadable logo falls back to the text header.
  */
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import type { Receipt } from "@ss/contract";
@@ -79,12 +80,33 @@ export function pdfMoney(minor: number, s: { currency_minor: number; locale: str
 
 const PAYMENT: Record<string, string> = { cash: "Cash", card: "Card" };
 
-/** The logo as a pdf-lib image, or null (no logo, webp, or bytes pdf-lib can't read). */
+/**
+ * CPU guard for the free plan's 10 ms (D19): pdf-lib DECODES a PNG in JS and re-deflates it (about 6 ms at 256 x 256,
+ * 16 ms at 512 x 512, 48 ms at 1000 x 1000), so a PNG logo is embedded only up to PDF_PNG_MAX on each side; a JPEG is
+ * passed through undecoded (cheap), up to PDF_JPEG_MAX bytes. A logo over either is left out (text header), never an error.
+ */
+export const PDF_PNG_MAX = 256;
+export const PDF_JPEG_MAX = 200 * 1024;
+const PNG_SIG = [137, 80, 78, 71, 13, 10, 26, 10];
+
+/** A PNG's width and height from its IHDR (bytes 16-23), without decoding; null when the bytes don't start like a PNG. */
+export function pngSize(b: Uint8Array): { w: number; h: number } | null {
+  if (b.length < 24 || PNG_SIG.some((x, i) => b[i] !== x)) return null;
+  if (String.fromCharCode(b[12]!, b[13]!, b[14]!, b[15]!) !== "IHDR") return null;
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  return { w: v.getUint32(16), h: v.getUint32(20) };
+}
+
+/** The logo as a pdf-lib image, or null (no logo, webp, over the CPU guard, or bytes pdf-lib can't read). */
 async function embedLogo(doc: PDFDocument, b: BillBranding): Promise<PDFImage | null> {
   if (!b.logo?.length) return null;
   try {
-    if (b.logoType === "image/png") return await doc.embedPng(b.logo);
-    if (b.logoType === "image/jpeg" || b.logoType === "image/jpg") return await doc.embedJpg(b.logo);
+    if (b.logoType === "image/png") {
+      const size = pngSize(b.logo);
+      if (!size || size.w > PDF_PNG_MAX || size.h > PDF_PNG_MAX) return null;
+      return await doc.embedPng(b.logo);
+    }
+    if (b.logoType === "image/jpeg" || b.logoType === "image/jpg") return b.logo.length > PDF_JPEG_MAX ? null : await doc.embedJpg(b.logo);
   } catch {
     // unreadable bytes: fall back to the text header
   }

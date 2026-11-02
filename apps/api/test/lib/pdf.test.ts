@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { PDFDocument, PDFName, PDFRawStream } from "pdf-lib";
 import { pdfText } from "../pdf-text";
 import type { Receipt } from "@ss/contract";
-import { billPdf, pdfMoney, pdfSafe } from "../../src/lib/pdf";
+import { billPdf, pdfMoney, pdfSafe, pngSize } from "../../src/lib/pdf";
+import { makePng } from "../png";
 
 // 1x1 images (valid headers; pdf-lib only parses them).
 const PNG = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
@@ -123,5 +124,30 @@ describe("billPdf", () => {
     expect(new TextDecoder().decode(junk.slice(0, 5))).toBe("%PDF-");
     expect(await images(junk)).toBe(0);
     expect(await pdfText(junk)).toContain("Faizan Mohammed Gents Salon");
+  });
+  it("I1 CPU guard: a PNG logo over 256x256 is not embedded (the bill still renders); 200x200 is; a JPEG over 200 KB is skipped", async () => {
+    const big = await makePng(1000, 1000);
+    expect(pngSize(big)).toEqual({ w: 1000, h: 1000 });
+    expect(big.length).toBeLessThan(200 * 1024);
+    const without = await billPdf({ receipt: receipt(), vatEnabled: true, branding: { logo: big, logoType: "image/png" }, link: LINK });
+    expect(await images(without)).toBe(0);
+    expect(await pdfText(without)).toContain("Faizan Mohammed Gents Salon");
+    const wide = await billPdf({ receipt: receipt(), vatEnabled: true, branding: { logo: await makePng(300, 10), logoType: "image/png" }, link: LINK });
+    expect(await images(wide)).toBe(0);
+    const ok = await makePng(200, 200);
+    const withLogo = await billPdf({ receipt: receipt(), vatEnabled: true, branding: { logo: ok, logoType: "image/png" }, link: LINK });
+    expect(await images(withLogo)).toBeGreaterThan(0);
+    const edge = await billPdf({ receipt: receipt(), vatEnabled: true, branding: { logo: await makePng(256, 256), logoType: "image/png" }, link: LINK });
+    expect(await images(edge)).toBeGreaterThan(0);
+    const hugeJpeg = new Uint8Array(200 * 1024 + 1);
+    hugeJpeg.set([0xff, 0xd8, 0xff]);
+    const j = await billPdf({ receipt: receipt(), vatEnabled: true, branding: { logo: hugeJpeg, logoType: "image/jpeg" }, link: LINK });
+    expect(await images(j)).toBe(0);
+  });
+
+  it("pngSize reads the IHDR without decoding; null for anything that is not a PNG header", () => {
+    expect(pngSize(PNG)).toEqual({ w: 1, h: 1 });
+    expect(pngSize(new Uint8Array(100).fill(7))).toBeNull();
+    expect(pngSize(PNG.slice(0, 20))).toBeNull();
   });
 });

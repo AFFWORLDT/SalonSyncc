@@ -6,11 +6,13 @@ import { fakeServices } from "./fakes";
 import { setServicesForTest } from "../src/core/services";
 import { businessDay } from "../src/lib/clock";
 
-const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
+const pending: Promise<unknown>[] = [];
+const ctx = { waitUntil(p: Promise<unknown>) { pending.push(p); }, passThroughOnException() {} } as unknown as ExecutionContext;
+const flush = async () => { while (pending.length) await pending.shift(); };
 const E = { ...env, ROOT_DOMAIN: "", FCM_SERVICE_ACCOUNT: "{\"fake\":true}" };
 let ip = 0;
-const raw = (method: string, path: string, opts: { cookie?: string; body?: unknown } = {}) =>
-  app.fetch(
+const raw = async (method: string, path: string, opts: { cookie?: string; body?: unknown } = {}): Promise<Response> => {
+  const r = await app.fetch(
     new Request(`https://x.test/api${path}`, {
       method,
       redirect: "manual",
@@ -20,6 +22,9 @@ const raw = (method: string, path: string, opts: { cookie?: string; body?: unkno
     E,
     ctx,
   );
+  await flush();
+  return r;
+};
 const json = async (r: Response): Promise<any> => r.json();
 
 async function setup(slug: string, plan: "free" | "pro" | "pro_max" = "pro") {
@@ -115,6 +120,63 @@ describe("public feedback", () => {
     const s2 = await a.sale();
     await raw("POST", `/public/feedback/${s2.token}`, { body: { stars: 3 } });
     expect(await notes(a.org.id)).toHaveLength(6);
+  });
+});
+
+describe("M8 / M2: lapsed orgs and the low-star alert", () => {
+  it("POST /feedback for an expired, deactivated or deleted org is 404, writes nothing and sends no push", async () => {
+    install();
+    for (const status of ["expired", "deactivated", "deleted"]) {
+      const a = await setup(`rt-lapsed-${status}`);
+      await env.DB.prepare("INSERT INTO push_tokens (token, org_id, user_id, created_at, updated_at) VALUES (?, ?, ?, 1, 1)").bind(`t-${status}`, a.org.id, a.own.id).run();
+      const s = await a.sale("Sam");
+      await env.DB.prepare("UPDATE orgs SET status = ? WHERE id = ?").bind(status, a.org.id).run();
+      const r = await raw("POST", `/public/feedback/${s.token}`, { body: { stars: 1, comment: "bad" } });
+      expect(r.status, status).toBe(404);
+      expect(await env.DB.prepare("SELECT COUNT(*) AS n FROM ratings WHERE org_id = ?").bind(a.org.id).first<any>()).toEqual({ n: 0 });
+      expect(await notes(a.org.id)).toEqual([]);
+    }
+    expect(f.pushes).toHaveLength(0);
+  });
+
+  it("the low-star alert runs in waitUntil: the customer's response does not wait for the push", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    install();
+    const send = f.services.push.send;
+    f.services.push.send = async (...a) => (await gate, send(...a));
+    const a = await setup("rt-wait");
+    await env.DB.prepare("INSERT INTO push_tokens (token, org_id, user_id, created_at, updated_at) VALUES ('t-wait', ?, ?, 1, 1)").bind(a.org.id, a.own.id).run();
+    const s = await a.sale("Sam");
+    const res = Promise.resolve(app.fetch(
+      new Request(`https://x.test/api/public/feedback/${s.token}`, { method: "POST", headers: { "content-type": "application/json", "CF-Connecting-IP": "7.9.9.9" }, body: JSON.stringify({ stars: 1 }) }),
+      E,
+      ctx,
+    ));
+    const first = await Promise.race([res.then(() => "response"), new Promise((r) => setTimeout(() => r("timeout"), 300))]);
+    expect(first).toBe("response");
+    expect((await res).status).toBe(200);
+    release();
+    await flush();
+    expect(f.pushes).toHaveLength(1);
+  });
+});
+
+describe("M1: the review redirect URL is parsed, not pattern-matched", () => {
+  it("a non-ASCII https URL is percent-encoded (no 500); an unparseable or non-https one falls back to the rating page", async () => {
+    const a = await setup("rv-m1");
+    const s = await a.sale();
+    const fallback = `${env.APP_ORIGIN.replace(/\/+$/, "")}/rate/?t=${s.token}`;
+    await setSettings(a.org.id, "google_review_url = ?", "https://g.page/café");
+    const r = await raw("GET", `/public/review/${s.token}`);
+    expect(r.status).toBe(302);
+    expect(r.headers.get("location")).toBe("https://g.page/caf%C3%A9");
+    for (const bad of ["https://", "https://exa mple.com/x", "ftp://g.page/x", "javascript:alert(1)"]) {
+      await setSettings(a.org.id, "google_review_url = ?", bad);
+      const b = await raw("GET", `/public/review/${s.token}`);
+      expect(b.status, bad).toBe(302);
+      expect(b.headers.get("location"), bad).toBe(fallback);
+    }
   });
 });
 

@@ -6,6 +6,7 @@ import { orgAppUrl } from "../src/core/links";
 import { services } from "../src/core/services";
 import { makeOrg, makeUser, loginAs } from "./helpers";
 import { fakeServices } from "./fakes";
+import { makePng } from "./png";
 
 const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
 const E = { ...env, ROOT_DOMAIN: "" };
@@ -187,6 +188,15 @@ describe("org logo", () => {
     expect((await call("PUT", "/settings/logo", ck, img(0))).status).toBe(400);
     expect((await call("PUT", "/settings/logo", ck, img(200 * 1024 + 1))).status).toBe(400);
     expect((await call("PUT", "/settings/logo", ck, img(200 * 1024))).status).toBe(200);
+  });
+
+  it("I1: a PNG logo over 512x512 is refused at upload with a clear 400; 512x512 is accepted", async () => {
+    const { ck } = await setup("lg-px");
+    const r = await call("PUT", "/settings/logo", ck, await makePng(1000, 1000));
+    expect(r.status).toBe(400);
+    expect(((await r.json()) as any).error).toMatch(/512 x 512/);
+    expect((await call("PUT", "/settings/logo", ck, await makePng(513, 100))).status).toBe(400);
+    expect((await call("PUT", "/settings/logo", ck, await makePng(512, 512))).status).toBe(200);
   });
 
   it("another org's host gets 404 for this org's logo version", async () => {
