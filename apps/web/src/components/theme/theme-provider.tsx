@@ -16,8 +16,10 @@ interface AppThemeValue extends UiPrefsValue {
   setAccent: (hex: string) => void;
 }
 
-const DEFAULTS: UiPrefsValue = { appearance: "system", accent: DEFAULT_ACCENT };
-const PREFS_KEY = "ss_ui_prefs";
+/** Light (cream and green) by default; dark or "follow my device" are a choice in the account menu. */
+const DEFAULTS: UiPrefsValue = { appearance: "light", accent: DEFAULT_ACCENT };
+// v2: the default became light (2026-11-03); older saved "follow the device" prefs start fresh.
+const PREFS_KEY = "ss_ui_prefs_v2";
 const PREFS_EVENT = "ss-ui-prefs";
 
 const AppThemeContext = createContext<AppThemeValue | null>(null);
@@ -25,7 +27,7 @@ const AppThemeContext = createContext<AppThemeValue | null>(null);
 function normalize(raw: unknown): UiPrefsValue | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Partial<UiPrefsValue>;
-  const appearance: Appearance = r.appearance === "light" || r.appearance === "dark" ? r.appearance : "system";
+  const appearance: Appearance = r.appearance === "light" || r.appearance === "dark" || r.appearance === "system" ? r.appearance : "light";
   return { appearance, accent: isHexColor(r.accent) ? r.accent.toUpperCase() : DEFAULT_ACCENT };
 }
 
