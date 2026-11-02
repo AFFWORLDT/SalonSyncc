@@ -14,12 +14,12 @@ export default function SignupPage() {
         <div className="text-[#fffdf8]">
           <h1 className="text-balance text-4xl font-semibold tracking-tight sm:text-5xl">Your salon, live in a minute.</h1>
           <p className="mt-4 max-w-md text-lg text-[#fffdf8]/80">
-            Pick your salon ID and you get your own address, ready for bills, staff and reports. Every salon starts with 7 days
-            of Pro Max, free.
+            Made for salons in Dubai and across the UAE. Pick your salon ID and you get your own address, ready for bills,
+            staff and reports. Every salon starts with 7 days of Pro Max, free.
           </p>
           <ul className="mt-6 space-y-2 text-[15px] text-[#fffdf8]/85">
             <li>✓ Bills, commission and the daily sheet from day one</li>
-            <li>✓ Your currency, time zone and VAT</li>
+            <li>✓ AED pricing, 5% UAE VAT and TRN on bills</li>
             <li>✓ Add your barbers and services in minutes</li>
           </ul>
         </div>

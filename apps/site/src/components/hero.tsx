@@ -19,8 +19,8 @@ export function Hero() {
         </div>
         <h1 className={`${up} mt-8 text-balance text-5xl font-semibold tracking-tight [animation-delay:80ms] sm:text-7xl`}>Run your salon. We&apos;ll keep the books.</h1>
         <p className={`${up} mt-6 max-w-xl text-pretty text-lg leading-relaxed text-[#fffdf8]/80 [animation-delay:150ms]`}>
-          Bills in seconds, staff commission worked out for you, the daily sheet and ledger kept to the cent, and WhatsApp
-          reminders that bring customers back.
+          The salon app made in Dubai, for UAE salons. Bills with VAT in seconds, staff commission worked out for you, the
+          daily sheet and ledger kept to the fils, and WhatsApp reminders that bring customers back.
         </p>
         <div className={`${up} mt-10 flex flex-col items-center gap-4 [animation-delay:220ms]`}>
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -38,7 +38,7 @@ export function Hero() {
               Sign in
             </Link>
           </div>
-          <span className="text-[13px] text-[#fffdf8]/65">7 days free · No card needed · Your salon at its own address</span>
+          <span className="text-[13px] text-[#fffdf8]/65">7 days free · No card needed · Prices in AED</span>
         </div>
       </div>
     </section>

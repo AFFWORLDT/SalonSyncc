@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ROOT_DOMAIN } from "@/lib/brand";
-import { COUNTRIES } from "@/lib/countries";
 import { SLUG_RE, normalizeSlug, suggestSlug } from "@/lib/slug";
 import { TURNSTILE_SITE_KEY, mountTurnstile } from "@/lib/turnstile";
 
@@ -45,7 +44,8 @@ export function SignupForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [country, setCountry] = useState("AE");
+  // Built for the UAE: every salon starts on AED, Dubai time and +971 (changeable later in Settings).
+  const country = "AE";
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [token, setToken] = useState("");
@@ -139,20 +139,10 @@ export function SignupForm() {
           {slugState.state === "checking" ? "Checking…" : (slugState.message ?? "Your salon's own address")}
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4">
         <div className="grid gap-2">
           <Label htmlFor="owner">Your name</Label>
           <Input id="owner" required autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} className="h-11" />
-        </div>
-        <div className="grid gap-2">
-          <Label htmlFor="country">Country</Label>
-          <select id="country" value={country} onChange={(e) => setCountry(e.target.value)} className="h-11 rounded-lg border border-input bg-transparent px-3 text-sm">
-            {COUNTRIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.name}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -163,7 +153,7 @@ export function SignupForm() {
         </div>
         <div className="grid gap-2">
           <Label htmlFor="phone">Mobile (optional)</Label>
-          <Input id="phone" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Your mobile number" aria-invalid={phoneBad} className="h-11" />
+          <Input id="phone" type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="05x xxx xxxx" aria-invalid={phoneBad} className="h-11" />
           {phoneBad && <p className="text-xs text-destructive">Enter a valid mobile number</p>}
         </div>
       </div>

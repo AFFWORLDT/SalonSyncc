@@ -45,12 +45,11 @@ describe("signup form", () => {
     fill("Your name", "Sam Owner");
     fill("Email", "sam@example.com");
     fill("Password", "longpass1");
-    fireEvent.change(screen.getByLabelText("Country"), { target: { value: "IN" } });
     await waitFor(() => expect((screen.getByText("Start my free trial").closest("button") as HTMLButtonElement).disabled).toBe(false), { timeout: 3000 });
     fireEvent.click(screen.getByText("Start my free trial"));
     await waitFor(() => expect(assign).toHaveBeenCalledWith("https://fresh-cuts.salonkit.online/login/?handoff=x"));
     const body = JSON.parse(calls.find((c) => c.url === "/api/public/signup")!.body!);
-    expect(body).toEqual({ salon_name: "Fresh Cuts", slug: "fresh-cuts", owner_name: "Sam Owner", email: "sam@example.com", phone: "", password: "longpass1", country: "IN" });
+    expect(body).toEqual({ salon_name: "Fresh Cuts", slug: "fresh-cuts", owner_name: "Sam Owner", email: "sam@example.com", phone: "", password: "longpass1", country: "AE" });
   });
 
   it("a 409 from the API is shown", async () => {

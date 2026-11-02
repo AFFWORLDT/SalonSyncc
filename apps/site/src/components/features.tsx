@@ -6,7 +6,7 @@ const FEATURES = [
   { icon: Sheet, title: "Daily sheet and Excel", body: "Sales, expenses, commission and profit per day and per barber, exported in one click." },
   { icon: MessageCircle, title: "WhatsApp that works for you", body: "Bills, visit reminders and announcements from your own WhatsApp Business number." },
   { icon: Star, title: "Ratings and Google reviews", body: "Ask every customer how it went, and send the happy ones to your Google review page." },
-  { icon: Globe2, title: "Any country, any currency", body: "Your time zone, currency, VAT and phone format. Your salon gets its own web address." },
+  { icon: Globe2, title: "Made for the UAE", body: "AED amounts, 5% VAT and TRN on tax invoices, Dubai time and +971 numbers. Your salon gets its own web address." },
 ];
 
 /** Six glass cards on the cream canvas with soft green and gold glows behind them. */
@@ -17,7 +17,7 @@ export function Features() {
       <div aria-hidden className="pointer-events-none absolute -right-40 bottom-0 size-[520px] rounded-full bg-[#b8935a]/25 blur-3xl" />
       <div className="relative mx-auto max-w-6xl">
         <h2 className="max-w-2xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">Everything the front desk does, without the notebook.</h2>
-        <p className="mt-4 max-w-xl text-lg text-muted-foreground">Built with a real salon, for owners, managers and barbers on their phones.</p>
+        <p className="mt-4 max-w-xl text-lg text-muted-foreground">Built with a real Dubai salon, for owners, managers and barbers on their phones.</p>
         <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
             <div key={f.title} className="glass rounded-2xl p-6">

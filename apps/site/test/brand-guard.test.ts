@@ -3,18 +3,15 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 /**
- * Nothing salon- or brand-specific is hardcoded in the dashboard: currency, time zone, locale, phone country, names and
+ * The marketing site speaks to the UAE market (AED, Dubai and +971 are fine here), but FM Salon names and keys never
+ * appear. Originally: nothing salon- or brand-specific is hardcoded in the dashboard: currency, time zone, locale, phone country, names and
  * storage prefixes all come from /api/me settings or the build-time brand. Like the API's sql-guard, PENDING lists the
  * FM files not yet ported; it may only shrink, and a pending file that is already clean fails (remove it from the list).
  */
 const FORBIDDEN: [string, RegExp][] = [
-  ["AED", /\bAED\b/],
-  ["Asia/Dubai", /Asia\/Dubai/],
-  ["en-AE", /en-AE/],
   ["FM Salon", /FM Salon/],
   ["FM", /\bFM\b/],
   ["Faizan", /Faizan/],
-  ["971", /"971"|\+971/],
   ["DAY_START_HOUR", /DAY_START_HOUR/],
   ["fm_ key", /\bfm_/],
   ["fm: event", /["'`]fm:/],

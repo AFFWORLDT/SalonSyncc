@@ -14,8 +14,8 @@ const COLUMNS: FooterColumn[] = [
     ],
   },
   {
-    title: "Works in",
-    links: [{ label: "UAE" }, { label: "India" }, { label: "Saudi Arabia" }, { label: "+ any country" }],
+    title: "Across the UAE",
+    links: [{ label: "Dubai" }, { label: "Abu Dhabi" }, { label: "Sharjah" }, { label: "Ajman & the Northern Emirates" }],
   },
   {
     title: "Help",
@@ -41,7 +41,7 @@ export function SiteFooter() {
       logoSrc="/brand/mark.png"
       wordmark="SALONKIT"
       brand={BRAND_NAME}
-      blurb="Sales, bills, staff commission, WhatsApp reminders and reports for salons. Your salon at its own address, on your phone."
+      blurb="The salon app made in Dubai: sales, VAT bills, staff commission, WhatsApp reminders and reports, in AED, on your phone."
       tagline="Ring up the bill. We'll do the maths, the sheet and the reminders."
       columns={COLUMNS}
       actions={[
