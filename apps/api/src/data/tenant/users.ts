@@ -86,7 +86,7 @@ export function usersRepo(db: D1Database, orgId: string) {
      * Whether the user is referenced by business records, in which case they are deactivated rather than deleted.
      * Counts sales (as barber or creator, soft-deleted ones too: they still reference the user), ledger lines (barber book
      * or as actor), expenses, payouts (as barber or creator), company expenses and transfers they entered, and audit rows
-     * they authored: anyone whose name the history shows is kept.
+     * they authored, and announcements they sent or were the one-barber target of (FK to users): anyone whose name the history shows is kept.
      */
     async userHasActivity(id: number): Promise<boolean> {
       const r = await db
@@ -100,7 +100,9 @@ export function usersRepo(db: D1Database, orgId: string) {
                 + EXISTS (SELECT 1 FROM barber_payouts WHERE org_id = ?1 AND created_by = ?2)
                 + EXISTS (SELECT 1 FROM company_expenses WHERE org_id = ?1 AND created_by = ?2)
                 + EXISTS (SELECT 1 FROM money_transfers WHERE org_id = ?1 AND created_by = ?2)
-                + EXISTS (SELECT 1 FROM audit_log WHERE org_id = ?1 AND actor_id = ?2) AS n`,
+                + EXISTS (SELECT 1 FROM audit_log WHERE org_id = ?1 AND actor_id = ?2)
+                + EXISTS (SELECT 1 FROM announcements WHERE org_id = ?1 AND sender_id = ?2)
+                + EXISTS (SELECT 1 FROM announcements WHERE org_id = ?1 AND target_id = ?2) AS n`,
         )
         .bind(orgId, id)
         .first<{ n: number }>();
