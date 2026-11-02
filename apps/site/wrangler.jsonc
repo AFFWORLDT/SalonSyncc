@@ -1,0 +1,14 @@
+{
+  "$schema": "../api/node_modules/wrangler/config-schema.json",
+  "name": "salonkit-site",
+  // Affworld0@gmail.com's Cloudflare account. Never deploy this to any other account.
+  "account_id": "dd501fac7d8aa896ead9530b9cd1b913",
+  "compatibility_date": "2026-10-01",
+  // Static only: no Worker script. salonkit.online/api/* is routed to salonkit-app (more specific route wins).
+  "assets": { "directory": "./out", "not_found_handling": "404-page" },
+  "routes": [
+    { "pattern": "salonkit.online/*", "zone_name": "salonkit.online" },
+    { "pattern": "www.salonkit.online/*", "zone_name": "salonkit.online" }
+  ],
+  "workers_dev": false
+}

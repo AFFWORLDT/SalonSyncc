@@ -1,0 +1,5 @@
+out/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+test-results/
