@@ -2,6 +2,7 @@
 
 import DoodleCrewFooter, { type CrewMember, type FooterColumn } from "@/components/ui/doodle-crew-footer";
 import { BRAND_NAME, COMPANY, SUPPORT_EMAIL } from "@/lib/brand";
+import { FEATURE_PAGES } from "@/lib/content";
 
 const COLUMNS: FooterColumn[] = [
   {
@@ -13,13 +14,14 @@ const COLUMNS: FooterColumn[] = [
       { label: "Features", href: "/#features" },
     ],
   },
+  { title: "Features", links: FEATURE_PAGES.map((p) => ({ label: p.label, href: `/${p.slug}/` })) },
   {
     title: "Across the UAE",
     links: [{ label: "Dubai" }, { label: "Abu Dhabi" }, { label: "Sharjah" }, { label: "Ajman & the Northern Emirates" }],
   },
   {
     title: "Help",
-    links: [...(SUPPORT_EMAIL ? [{ label: "Email us", href: `mailto:${SUPPORT_EMAIL}` }] : []), { label: "Pricing", href: "/pricing/" }],
+    links: [...(SUPPORT_EMAIL ? [{ label: "Email us", href: `mailto:${SUPPORT_EMAIL}` }] : []), { label: "Questions", href: "/#faq" }, { label: "Pricing", href: "/pricing/" }],
   },
   { title: "Company", links: [{ label: COMPANY }] },
 ];

@@ -22,6 +22,8 @@ export interface ShaderFeature {
     lead: string;
     points: { title: string; body: string }[];
     plan?: string;
+    /** The full feature page, linked from the window. */
+    href?: string;
   };
 }
 
@@ -206,9 +208,14 @@ export function FeatureShaderCards({
                       </li>
                     ))}
                   </ul>
+                  {f.details.href && (
+                    <Link href={f.details.href} className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
+                      Read the full guide <ArrowRight className="size-4" aria-hidden />
+                    </Link>
+                  )}
                   <Link
                     href="/signup/"
-                    className="mt-7 inline-flex h-11 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-110"
+                    className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground transition hover:brightness-110"
                   >
                     Start your 7-day free trial
                   </Link>

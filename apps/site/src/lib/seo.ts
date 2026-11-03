@@ -43,7 +43,7 @@ export function structuredData() {
       name: BRAND_NAME,
       url: SITE_URL,
       applicationCategory: "BusinessApplication",
-      operatingSystem: "Web, iOS, Android",
+      operatingSystem: "Web browser (phones, tablets and computers)",
       description: SEO_DESCRIPTION,
       offers: plans.map((p) => ({ "@type": "Offer", name: p.name, price: String(p.priceMonthly ?? 0), priceCurrency: p.currency || "AED" })),
     },

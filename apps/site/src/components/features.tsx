@@ -11,6 +11,7 @@ const FEATURES: ShaderFeature[] = [
     description: "Tap the services, pick the barber, done. Print it, share a link, or send it on WhatsApp.",
     colors: ["#0f2e29", "#1f7a6a", "#2a9d88", "#cfe9e2"],
     details: {
+      href: "/salon-billing-software-dubai/",
       plan: "Every plan",
       lead: "A bill takes a few taps at the front desk, on a phone, tablet or computer.",
       points: [
@@ -27,6 +28,7 @@ const FEATURES: ShaderFeature[] = [
     description: "Every bill credits the barber's commission. Pay them out and the ledger stays balanced.",
     colors: ["#2b2114", "#8c6a3a", "#b8935a", "#f2dcae"],
     details: {
+      href: "/barber-commission-app/",
       plan: "Commission on every plan · ledger and payouts on Pro Max",
       lead: "No more working out each barber's share at the end of the month.",
       points: [
@@ -42,6 +44,7 @@ const FEATURES: ShaderFeature[] = [
     description: "Sales, expenses, commission and profit per day and per barber, exported in one click.",
     colors: ["#0b2e1a", "#0f9d58", "#34a853", "#c8f0d4"],
     details: {
+      href: "/salon-daily-sheet-excel/",
       plan: "Daily sheet on every plan · reports and Excel on Pro",
       lead: "The notebook page you used to fill in by hand, done for you every day.",
       points: [
@@ -58,6 +61,7 @@ const FEATURES: ShaderFeature[] = [
     description: "Bills, visit reminders and announcements from your own WhatsApp Business number.",
     colors: ["#06302a", "#128c7e", "#25d366", "#dcf8c6"],
     details: {
+      href: "/whatsapp-for-salons/",
       plan: "Pro Max",
       lead: "Messages go out from your salon's own WhatsApp Business number, with your name on them.",
       points: [
@@ -73,6 +77,7 @@ const FEATURES: ShaderFeature[] = [
     description: "Ask every customer how it went, and send the happy ones to your Google review page.",
     colors: ["#2e2105", "#b8860b", "#fbbc04", "#fff1c2"],
     details: {
+      href: "/google-reviews-for-salons/",
       plan: "Pro",
       lead: "Hear from every customer, and turn happy ones into Google reviews.",
       points: [
@@ -88,6 +93,7 @@ const FEATURES: ShaderFeature[] = [
     description: "AED amounts, 5% VAT and TRN on tax invoices, Dubai time and +971 numbers. Your salon gets its own web address.",
     colors: ["#0c1f33", "#1a73e8", "#1f7a6a", "#a8c7fa"],
     details: {
+      href: "/salon-vat-invoice-uae/",
       plan: "Every plan",
       lead: "Built with a real Dubai salon, so the details are already right.",
       points: [
