@@ -22,8 +22,9 @@ import { LogoMark } from "@/components/logo";
 import { titleForPath } from "./nav";
 import { BRAND_NAME } from "@/lib/brand";
 import { useSaleSheet } from "@/components/app/sale-sheet";
+import { CommandPalette } from "@/components/app/command-palette";
 
-export function TopBar({ onOpenMobileNav, onToggleCollapsed }: { onOpenMobileNav: () => void; onToggleCollapsed: () => void }) {
+export function TopBar({ onOpenMobileNav, onToggleCollapsed, safeTop = true }: { onOpenMobileNav: () => void; onToggleCollapsed: () => void; safeTop?: boolean }) {
   const { me, user, settings, isAdmin, readOnly, logout, has } = useAuth();
   const { resolved, setAppearance } = useAppTheme();
   const { openNew } = useSaleSheet();
@@ -38,7 +39,7 @@ export function TopBar({ onOpenMobileNav, onToggleCollapsed }: { onOpenMobileNav
   }, [title, salon]);
 
   return (
-    <header className="box-content flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card px-3 pt-[env(safe-area-inset-top)] sm:px-4 lg:px-6">
+    <header className={`box-content flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card px-3 sm:px-4 lg:px-6 ${safeTop ? "pt-[env(safe-area-inset-top)]" : ""}`}>
       {isAdmin ? (
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={onOpenMobileNav} aria-label="Open navigation">
           <Menu />
@@ -50,6 +51,9 @@ export function TopBar({ onOpenMobileNav, onToggleCollapsed }: { onOpenMobileNav
         <PanelLeft />
       </Button>
       <p className="min-w-0 flex-1 truncate text-base font-semibold">{title}</p>
+      <div className="flex justify-center md:flex-1">
+        <CommandPalette />
+      </div>
       <Button size="sm" data-tour="new-sale" className="hidden lg:inline-flex" onClick={() => openNew()} disabled={readOnly}>
         <Plus />
         New sale
