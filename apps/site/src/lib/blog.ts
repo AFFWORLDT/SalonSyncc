@@ -33,6 +33,90 @@ export interface Post {
 
 export const POSTS: Post[] = [
   {
+    slug: "how-to-get-more-google-reviews-for-your-salon",
+    title: "How to get more Google reviews for your salon (the right way)",
+    description: "Practical ways for UAE salons and barber shops to get more Google reviews, what Google's rules forbid, and how to reply to good and bad reviews.",
+    date: "2026-11-04",
+    minutes: 6,
+    tag: "Marketing",
+    feature: "google-reviews-for-salons",
+    intro:
+      "When someone in Dubai searches for a barber or salon near them, Google Maps shows the star rating and the number of reviews before anything else. More recent, real reviews help you show up and get chosen. Here is how to get them without breaking Google's rules.",
+    body: [
+      { h2: "Why reviews matter for a salon" },
+      {
+        ul: [
+          "They are the first thing people see in Google Maps and local search results.",
+          "Recent reviews show you are busy and still good today, not three years ago.",
+          "Reviews that mention a service (\"skin fade\", \"beard trim\", \"keratin\") help you appear for those searches.",
+          "Your replies show new customers how you treat people when something goes wrong.",
+        ],
+      },
+      { h2: "Step 1: set up your Google Business Profile" },
+      {
+        p: "Claim your salon at business.google.com, choose the right category (for example \"Barber shop\" or \"Beauty salon\"), and fill in your hours, phone, services, photos and booking or WhatsApp link. A complete profile is more likely to be shown, and it is where your reviews appear.",
+      },
+      {
+        p: "In your profile, choose \"Ask for reviews\" to get your short review link. That link opens the review box straight away, which makes leaving a review much easier.",
+      },
+      { h2: "Step 2: ask every customer, at the right moment" },
+      {
+        p: "The best moment is just after the visit, while the fresh cut still feels good. Ask in person (\"If you liked it, a Google review really helps us\") and send the link, so it takes one tap.",
+      },
+      {
+        ul: [
+          "Send the link on WhatsApp soon after the visit, not days later.",
+          "Ask everyone, not only regulars or the customers who seemed happy.",
+          "Keep the message short and personal, with the barber's name.",
+          "One reminder at most. Don't keep chasing.",
+          "Put a QR code for your review link at the counter or mirror.",
+        ],
+      },
+      { h2: "What Google's rules don't allow" },
+      {
+        p: "Google removes reviews, and can restrict a business profile, when reviews are collected in ways its policies forbid. Avoid all of these:",
+      },
+      {
+        ul: [
+          "Review gating: asking only happy customers to review you, or first checking if someone is happy and sending only them to Google.",
+          "Incentives: discounts, free services or gifts in exchange for a review, even for an honest one.",
+          "Reviews from your team, their families or friends, or reviews written on a customer's behalf.",
+          "Buying reviews, or swapping reviews with other businesses.",
+          "Asking customers to review you on a tablet or phone at the salon, which Google advises against.",
+        ],
+      },
+      {
+        tip: "Asking every customer is also better for you. A few honest 4-star reviews among many 5-star ones look more believable than a wall of perfect scores.",
+      },
+      { h2: "Step 3: reply to every review" },
+      { h3: "Good reviews" },
+      {
+        p: "Thank them by name, mention what they had or who served them, and invite them back. Keep it short and different each time: \"Thanks Omar! Glad Sami's fade hit the spot. See you in three weeks.\"",
+      },
+      { h3: "Bad reviews" },
+      {
+        ol: [
+          "Reply within a day or two, calmly and politely, in public.",
+          "Thank them, apologise for the experience, and don't argue about details.",
+          "Offer to put it right, and move the conversation to a phone call or WhatsApp.",
+          "Fix the cause inside the salon, then follow up.",
+        ],
+      },
+      {
+        p: "If a review breaks Google's rules (spam, hate speech, someone who was never a customer), you can report it from your Business Profile. Don't report a review just because it is negative.",
+      },
+      { h2: "Hear from unhappy customers first" },
+      {
+        p: "You can still ask customers to rate their visit privately, so you know about a bad haircut before it becomes a bad review. The rule is only that the Google review invitation goes to everyone, whatever they told you.",
+      },
+      { h2: "How SalonKit does it" },
+      {
+        p: "In SalonKit you paste your Google review link in Settings. On Pro Max, every customer gets a WhatsApp message after their visit with a \"Rate your visit\" button that opens your Google review page, with one reminder if they don't tap it (only between 9 am and 10 pm). If you haven't added a Google link yet, the button opens SalonKit's own rating page instead, where customers give 1 to 5 stars and a comment that only you see, shown per barber. Either way, no customer is ever left out of the Google invitation because of what they rated.",
+      },
+      { cta: { text: "See ratings and Google reviews in SalonKit.", href: "/google-reviews-for-salons/", label: "Google reviews for salons" } },
+    ],
+  },
+  {
     slug: "how-to-calculate-barber-commission",
     title: "How to calculate barber commission (with examples in AED)",
     description: "A simple guide to barber and stylist commission in the UAE: percentage, tiered and fixed pay, worked examples in AED, and how to pay it out without disputes.",

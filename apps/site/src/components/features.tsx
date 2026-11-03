@@ -74,16 +74,16 @@ const FEATURES: ShaderFeature[] = [
   {
     icon: img("/icons/google-review.png", "Google reviews", "size-12! max-w-none"),
     title: "Ratings and Google reviews",
-    description: "Ask every customer how it went, and send the happy ones to your Google review page.",
+    description: "Ask every customer how it went, see ratings per barber, and invite every customer to review you on Google.",
     colors: ["#2e2105", "#b8860b", "#fbbc04", "#fff1c2"],
     details: {
       href: "/google-reviews-for-salons/",
-      plan: "Pro",
-      lead: "Hear from every customer, and turn happy ones into Google reviews.",
+      plan: "Ratings on Pro · WhatsApp messages on Pro Max",
+      lead: "Hear from every customer, and invite them all to review you on Google.",
       points: [
-        { title: "A rating after each visit", body: "Customers rate their visit from 1 to 5 stars and can leave a comment. One gentle reminder goes out if they forget." },
-        { title: "Ratings per barber", body: "See each barber's average and read every comment, so you know who's delighting customers." },
-        { title: "More Google reviews", body: "Happy customers are taken straight to your Google review page to share it there too." },
+        { title: "A message after each visit", body: "A \"Rate your visit\" message on WhatsApp after the visit, with one gentle reminder if they don't tap it (Pro Max)." },
+        { title: "Private ratings per barber", body: "Ratings of 1 to 5 stars with comments come to you privately, with each barber's average, so you know who's delighting customers." },
+        { title: "More Google reviews", body: "Every customer gets a one-tap link to your Google review page, so more of your real customers leave a review." },
       ],
     },
   },

@@ -53,6 +53,15 @@ describe("public rating page", () => {
     expect(screen.getByText("Review us on Google").closest("a")?.getAttribute("href")).toBe("/api/public/review/tok");
     expect(calls.some((c) => c.includes("/api/me"))).toBe(false);
   });
+  it("offers Google to every customer, not only happy ones (Google forbids review gating)", async () => {
+    window.history.pushState({}, "", "/rate/?t=tok");
+    serve({ "/api/public/feedback/tok": (init) => json(init?.method === "POST" ? { ...page, stars: 2 } : page) });
+    render(<RatePage />);
+    fireEvent.click(await screen.findByLabelText("2 stars"));
+    fireEvent.click(screen.getByText("Send rating"));
+    await waitFor(() => expect(screen.getByTestId("rate-thanks")).toBeTruthy());
+    expect(screen.getByText("Review us on Google").closest("a")?.getAttribute("href")).toBe("/api/public/review/tok");
+  });
   it("an unknown or expired link says so", async () => {
     window.history.pushState({}, "", "/rate/?t=gone");
     serve({});
