@@ -130,10 +130,19 @@ app.onError((err, c) => {
  * Security headers on every API answer (FM index.ts). Added outside Hono: an app.use("/api/*") would count as a matched
  * route and defeat tenantGuard's "unknown path stays 404" check. Routes that set their own Cache-Control keep it.
  */
+/** Salons that run their own app: every request on their SalonKit host goes to it (302, so it can be undone). */
+export const MOVED_HOSTS: Record<string, string> = { "fmsalon.salonkit.online": "https://fm-salon.affworld0.workers.dev" };
+
 async function fetchWithHeaders(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  const url = new URL(req.url);
+  const moved = MOVED_HOSTS[url.hostname];
+  if (moved) return new Response(null, { status: 302, headers: { Location: moved + url.pathname + url.search, "Cache-Control": "no-store" } });
+  const path = url.pathname;
+  const workerPath = path.startsWith("/api/") || path === "/mcp" || path.startsWith("/oauth/") || path.startsWith("/.well-known/");
+  // run_worker_first sends pages through the Worker (for MOVED_HOSTS); everything else is still the static site.
+  if (!workerPath && env.ASSETS) return env.ASSETS.fetch(req);
   const res = await app.fetch(req, env, ctx);
-  const path = new URL(req.url).pathname;
-  if (!path.startsWith("/api/") && path !== "/mcp" && !path.startsWith("/oauth/") && !path.startsWith("/.well-known/")) return res;
+  if (!workerPath) return res;
   const out = new Response(res.body, res);
   const h = out.headers;
   if (!h.has("Cache-Control")) h.set("Cache-Control", "no-store");
