@@ -6,7 +6,7 @@ import { lastOrg, useAuth } from "@/lib/auth-context";
 import { salonFromHost } from "@/lib/host";
 import { BRAND_NAME } from "@/lib/brand";
 import { api, clearSessionCaches, errorMessage } from "@/lib/api";
-import { BrandLogo } from "@/components/logo";
+import { BrandLogo, LogoBadge } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +27,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // The salon's own name and logo (GET /api/public/brand), so its team sees their salon, not SalonKit.
+  // undefined while loading on a salon host (nothing drawn, so the SalonKit logo never flashes first).
+  const [brand, setBrand] = useState<{ name: string | null; logo_url: string | null } | null | undefined>(undefined);
 
   // A sign-in link in the address bar is checked first; a cached session must not skip past its outcome.
   const [handingOff, setHandingOff] = useState(() => typeof window !== "undefined" && (new URLSearchParams(window.location.search).has("handoff") || new URLSearchParams(window.location.search).has("support")));
@@ -35,9 +38,16 @@ export default function LoginPage() {
   }, [authLoading, user, router, handingOff]);
 
   useEffect(() => {
+    const host = salonFromHost(window.location.host);
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHostSalon(salonFromHost(window.location.host));
+    setHostSalon(host);
     const q = new URLSearchParams(window.location.search);
+    const brandOrg = host ? "" : (q.get("org") ?? lastOrg());
+    if (host || brandOrg) {
+      api<{ name: string | null; logo_url: string | null }>(`/api/public/brand${host ? "" : `?org=${encodeURIComponent(brandOrg)}`}`, { redirectOn401: false })
+        .then((b) => setBrand(b.name ? b : null))
+        .catch(() => setBrand(null));
+    } else setBrand(null);
     setOrg(q.get("org") ?? lastOrg());
     // Fresh from signup: a single-use link signs the owner straight in.
     // Or a support link from the SalonKit admin panel (Log in as salon): same single-use flow, a 2-hour session.
@@ -85,12 +95,18 @@ export default function LoginPage() {
   return (
     <AuthSplit
       scene={scene}
-      quote={{ text: QUOTES, author: BRAND_NAME }}
+      quote={{ text: QUOTES, author: brand?.name ?? BRAND_NAME }}
     >
       <div className="mx-auto grid w-full max-w-[350px] gap-8">
         <div className="flex flex-col items-center gap-3 text-center">
-          <BrandLogo />
-          <h1 className="text-2xl font-bold">Sign in to your salon</h1>
+          {brand === undefined ? (
+            <div className="h-24" aria-hidden />
+          ) : brand?.logo_url ? (
+            <LogoBadge src={brand.logo_url} alt={brand.name ?? ""} size={96} />
+          ) : (
+            <BrandLogo />
+          )}
+          <h1 className="text-2xl font-bold">{brand?.name ? `Sign in to ${brand.name}` : "Sign in to your salon"}</h1>
           <p className="text-balance text-sm text-muted-foreground">
             {needOrg ? "Enter your salon ID and the username your salon gave you." : "Sign in with the username your salon gave you."}
           </p>

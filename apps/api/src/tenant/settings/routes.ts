@@ -246,3 +246,17 @@ logoPublic.get("/:v", publicRateLimit("avatar"), async (c) => {
     headers: { "content-type": img.type, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" },
   });
 });
+
+/**
+ * The salon's name and logo for its sign-in page, mounted on publicApi at /brand: GET /api/public/brand. Same org
+ * resolution as the logo (host, or ?org= on workers.dev); null fields when the host names no live salon.
+ */
+export const brandPublic = new Hono<AppEnv>();
+brandPublic.get("/", publicRateLimit("pub"), async (c) => {
+  const org = await resolvePublicOrg(c);
+  if (!org) return c.json({ name: null, logo_url: null });
+  const r = await c.env.DB.prepare(
+    "SELECT (SELECT display_name FROM org_settings WHERE org_id = ?1) AS display_name, (SELECT v FROM org_assets WHERE org_id = ?1 AND kind = 'logo') AS logo_v"
+  ).bind(org.id).first<{ display_name: string | null; logo_v: number | null }>();
+  return c.json({ name: r?.display_name?.trim() || org.name, logo_url: logoUrl(r?.logo_v, org.slug) }, 200, { "cache-control": "no-store" });
+});
