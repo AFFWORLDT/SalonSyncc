@@ -1,0 +1,11 @@
+// Deployed over the old FM Salon Worker at cutover (docs/fm-cutover.md). Same account (Affworld0), same name.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "fm-salon",
+  "account_id": "dd501fac7d8aa896ead9530b9cd1b913",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  // FM's hourly jobs stop here: SalonKit's cron runs them for org fm.
+  "triggers": { "crons": [] }
+}
