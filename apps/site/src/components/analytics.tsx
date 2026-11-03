@@ -1,5 +1,6 @@
 import Script from "next/script";
 import { GA_ID } from "@/lib/seo";
+import { TrackClicks } from "@/components/track-clicks";
 
 /** Google Analytics 4, only when NEXT_PUBLIC_GA_ID is set at build time. IPs are not stored by GA4. */
 export function Analytics() {
@@ -10,6 +11,7 @@ export function Analytics() {
       <Script id="ga4" strategy="afterInteractive">
         {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config',${JSON.stringify(GA_ID)});`}
       </Script>
+      <TrackClicks />
     </>
   );
 }

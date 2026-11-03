@@ -13,6 +13,9 @@ export function SiteNav({ dark = true }: { dark?: boolean }) {
           {BRAND_NAME}
         </Link>
         <nav className="flex items-center gap-1 text-sm sm:gap-3">
+          <Link href="/ar/" hrefLang="ar" lang="ar" className={`rounded-full px-3 py-2 ${tone}`}>
+            العربية
+          </Link>
           <Link href="/pricing/" className={`hidden rounded-full px-3 py-2 sm:inline ${tone}`}>
             Pricing
           </Link>

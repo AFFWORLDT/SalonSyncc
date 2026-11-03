@@ -7,6 +7,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Warp, type WarpProps } from "@paper-design/shaders-react";
 import { ArrowRight, CheckCircle2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { track } from "@/lib/track";
 
 export interface ShaderFeature {
   title: string;
@@ -18,7 +19,8 @@ export interface ShaderFeature {
   colors: string[];
   shape?: NonNullable<WarpProps["shape"]>;
   /** The "Learn more" window: a short lead and the points it explains. */
-  details: {
+  /** Omit for cards without a "Learn more" window. */
+  details?: {
     lead: string;
     points: { title: string; body: string }[];
     plan?: string;
@@ -139,17 +141,22 @@ export function FeatureShaderCards({
                 <p className="mt-2 flex-1 text-[15px] leading-relaxed text-white/80">
                   {feat.description}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setOpen(i)}
-                  className="mt-6 inline-flex w-fit items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                >
-                  Learn more
-                  <ArrowRight
-                    className="size-4 transition-transform group-hover:translate-x-0.5"
-                    aria-hidden
-                  />
-                </button>
+                {feat.details && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpen(i);
+                      void track("feature_details", { feature: feat.title });
+                    }}
+                    className="mt-6 inline-flex w-fit items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                  >
+                    Learn more
+                    <ArrowRight
+                      className="size-4 transition-transform group-hover:translate-x-0.5"
+                      aria-hidden
+                    />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -163,7 +170,7 @@ export function FeatureShaderCards({
         <Dialog.Portal>
           <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm duration-200 data-[open]:animate-in data-[open]:fade-in-0 data-[closed]:animate-out data-[closed]:fade-out-0" />
           <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[1.75rem] shadow-2xl outline-none duration-200 data-[open]:animate-in data-[open]:fade-in-0 data-[open]:zoom-in-95 data-[closed]:animate-out data-[closed]:fade-out-0 data-[closed]:zoom-out-95">
-            {f && (
+            {f?.details && (
               <div className="relative flex max-h-[calc(100dvh-2rem)] flex-col">
                 <div className="relative overflow-hidden px-7 pt-7 pb-6">
                   <Shader f={f} i={open ?? 0} still={still} speed={1.2} />
@@ -174,9 +181,9 @@ export function FeatureShaderCards({
                       <Dialog.Title className="text-2xl font-semibold text-white">
                         {f.title}
                       </Dialog.Title>
-                      {f.details.plan && (
+                      {f.details!.plan && (
                         <p className="mt-1 text-xs font-medium tracking-wide text-white/70 uppercase">
-                          {f.details.plan}
+                          {f.details!.plan}
                         </p>
                       )}
                     </div>
@@ -190,10 +197,10 @@ export function FeatureShaderCards({
                 </div>
                 <div className="overflow-y-auto bg-background px-7 py-6">
                   <Dialog.Description className="text-[15px] leading-relaxed text-muted-foreground">
-                    {f.details.lead}
+                    {f.details!.lead}
                   </Dialog.Description>
                   <ul className="mt-5 space-y-4">
-                    {f.details.points.map((p) => (
+                    {f.details!.points.map((p) => (
                       <li key={p.title} className="flex gap-3">
                         <CheckCircle2
                           className="mt-0.5 size-5 shrink-0 text-primary"
@@ -208,9 +215,13 @@ export function FeatureShaderCards({
                       </li>
                     ))}
                   </ul>
-                  {f.details.href && (
-                    <Link href={f.details.href} className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline">
-                      Read the full guide <ArrowRight className="size-4" aria-hidden />
+                  {f.details!.href && (
+                    <Link
+                      href={f.details!.href}
+                      className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+                    >
+                      Read the full guide{" "}
+                      <ArrowRight className="size-4" aria-hidden />
                     </Link>
                   )}
                   <Link

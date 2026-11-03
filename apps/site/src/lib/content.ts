@@ -275,10 +275,11 @@ export const FEATURE_PAGES: FeaturePage[] = [
 export const featurePage = (slug: string) => FEATURE_PAGES.find((p) => p.slug === slug);
 
 /** schema.org FAQPage for a list of questions. */
-export function faqJsonLd(faqs: Faq[]) {
+export function faqJsonLd(faqs: Faq[], inLanguage = "en") {
   return {
     "@context": "https://schema.org",
     "@type": "FAQPage",
+    inLanguage,
     mainEntity: faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
   };
 }

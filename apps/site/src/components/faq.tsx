@@ -3,7 +3,7 @@ import { faqJsonLd, type Faq } from "@/lib/content";
 import { cn } from "@/lib/utils";
 
 /** Questions and answers as plain <details> (all text is in the HTML for search engines), with FAQPage structured data. */
-export function FaqList({ faqs, className }: { faqs: Faq[]; className?: string }) {
+export function FaqList({ faqs, className, lang = "en" }: { faqs: Faq[]; className?: string; lang?: string }) {
   return (
     <div className={cn("grid gap-3", className)}>
       {faqs.map((f) => (
@@ -15,7 +15,7 @@ export function FaqList({ faqs, className }: { faqs: Faq[]; className?: string }
           <p className="mt-3 text-[15px] leading-relaxed text-muted-foreground">{f.a}</p>
         </details>
       ))}
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(faqs)).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd(faqs, lang)).replace(/</g, "\\u003c") }} />
     </div>
   );
 }
