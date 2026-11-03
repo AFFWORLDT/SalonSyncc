@@ -35,7 +35,7 @@ export const GLOBAL_RETENTION_SQL = [
 ] as const;
 
 /**
- * The cron's prune (R5), 7 D1 statements in one batch: rate_hits windows that ended more than 5 minutes ago (public
+ * The cron's prune (R5), 8 D1 statements in one batch: rate_hits windows that ended more than 5 minutes ago (public
  * limiter keys count in minutes, `login-ip:` device keys in 15-minute windows, `signup:` keys in hours, so each is compared in its own unit),
  * login_failures older than 24 hours and job_runs older than 7 days.
  */
@@ -55,10 +55,14 @@ export async function pruneInfra(db: D1Database, at: number): Promise<void> {
     db.prepare(GLOBAL_RETENTION_SQL[3]).bind(at),
     db.prepare(GLOBAL_RETENTION_SQL[4]).bind(at - 7 * 86_400_000),
     db.prepare(GLOBAL_RETENTION_SQL[5]).bind(at - 7 * 86_400_000),
+    // OAuth app registrations unused for 90 days (a live connection refreshes, and so marks its app, at least every 30 days).
+    db.prepare("DELETE FROM mcp_clients WHERE last_used_at < ?").bind(at - MCP_CLIENT_IDLE_MS),
   ]);
 }
 
 // ---------- AI connect OAuth clients (dynamic client registration happens before any salon is chosen) ----------
+
+export const MCP_CLIENT_IDLE_MS = 90 * 86_400_000;
 
 export interface McpClient {
   id: string;
@@ -68,7 +72,7 @@ export interface McpClient {
 
 export async function mcpClientCreate(db: D1Database, c: McpClient): Promise<void> {
   await db
-    .prepare("INSERT INTO mcp_clients (id, name, redirect_uris_json, created_at) VALUES (?, ?, ?, ?)")
+    .prepare("INSERT INTO mcp_clients (id, name, redirect_uris_json, created_at, last_used_at) VALUES (?1, ?2, ?3, ?4, ?4)")
     .bind(c.id, c.name, JSON.stringify(c.redirect_uris), Date.now())
     .run();
 }
@@ -76,4 +80,9 @@ export async function mcpClientCreate(db: D1Database, c: McpClient): Promise<voi
 export async function mcpClientById(db: D1Database, id: string): Promise<McpClient | null> {
   const r = await db.prepare("SELECT id, name, redirect_uris_json FROM mcp_clients WHERE id = ?").bind(id).first<{ id: string; name: string; redirect_uris_json: string }>();
   return r ? { id: r.id, name: r.name, redirect_uris: JSON.parse(r.redirect_uris_json) as string[] } : null;
+}
+
+/** Marks an OAuth client as in use (authorize, code exchange, refresh). */
+export async function mcpClientTouch(db: D1Database, id: string, now = Date.now()): Promise<void> {
+  await db.prepare("UPDATE mcp_clients SET last_used_at = ? WHERE id = ?").bind(now, id).run();
 }

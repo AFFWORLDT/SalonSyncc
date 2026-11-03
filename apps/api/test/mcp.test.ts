@@ -6,6 +6,8 @@ import { b64url } from "../src/core/crypto";
 import { PLAN_DEFAULTS } from "@ss/features";
 import { featuresFor, invalidateFeatures } from "../src/core/features-cache";
 import { AUTH_FAILS_BEFORE_BLOCK, MAX_BODY, PER_CONNECTION_PER_MIN } from "../src/mcp/http";
+import { pruneInfra } from "../src/data/infra";
+import { mcpRepo } from "../src/data/tenant/mcp";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
@@ -384,3 +386,92 @@ describe("AI connect: the official MCP client", () => {
     await client.close();
   });
 });
+
+describe("AI connect: small fixes", () => {
+  const verifier = "w".repeat(43);
+  const ch = async () => b64url(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)));
+  const post = (url: string, o: Record<string, string>) => go(url, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "cf-connecting-ip": freshIp() }, body: new URLSearchParams(o).toString() });
+  const CB = "https://claude.ai/api/mcp/auth_callback";
+  async function register(slug: string) {
+    return (await j(await go(`${host(slug)}/oauth/register`, { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": freshIp() }, body: JSON.stringify({ client_name: "Claude", redirect_uris: [CB] }) }))).client_id as string;
+  }
+  async function approveCode(slug: string, cookie: string, client_id: string) {
+    const auth = await go(`${host(slug)}/oauth/authorize?${new URLSearchParams({ response_type: "code", client_id, redirect_uri: CB, code_challenge: await ch(), code_challenge_method: "S256", state: "s" })}`, { redirect: "manual" });
+    const req = new URL(auth.headers.get("location")!, host(slug)).searchParams.get("req")!;
+    const ok = await j(await api(slug, "POST", `/mcp/requests/${req}`, cookie, { approve: true }));
+    return new URL(ok.redirect).searchParams.get("code")!;
+  }
+  const exchange = (slug: string, client_id: string, code: string) => post(`${host(slug)}/oauth/token`, { grant_type: "authorization_code", code, code_verifier: verifier, redirect_uri: CB, client_id });
+
+  it("an over-long state is refused, not cut", async () => {
+    await salon("mcp-state");
+    const client_id = await register("mcp-state");
+    const r = await go(`${host("mcp-state")}/oauth/authorize?${new URLSearchParams({ response_type: "code", client_id, redirect_uri: CB, code_challenge: await ch(), code_challenge_method: "S256", state: "x".repeat(501) })}`, { redirect: "manual" });
+    expect(r.status).toBe(400);
+    expect((await j(r)).error).toBe("invalid_request");
+  });
+
+  it("refresh needs the client_id; a user-revoked connection says so instead of 'already used'", async () => {
+    const s = await salon("mcp-rf2");
+    const client_id = await register("mcp-rf2");
+    const t = await j(await exchange("mcp-rf2", client_id, await approveCode("mcp-rf2", s.ck, client_id)));
+    const noClient = await j(await post(`${host("mcp-rf2")}/oauth/token`, { grant_type: "refresh_token", refresh_token: t.refresh_token }));
+    expect(noClient.error).toBe("invalid_request");
+    const conn = (await j(await api("mcp-rf2", "GET", "/mcp", s.ck))).connections[0];
+    expect(conn.last4).toBe(t.refresh_token.slice(-4));
+    await api("mcp-rf2", "DELETE", `/mcp/connections/${conn.connection_id}`, s.ck);
+    const after = await j(await post(`${host("mcp-rf2")}/oauth/token`, { grant_type: "refresh_token", refresh_token: t.refresh_token, client_id }));
+    expect(after.error).toBe("invalid_grant");
+    expect(after.error_description).toBe("This connection was revoked. Connect again.");
+  });
+
+  it("the connection cap holds when codes are exchanged after other connections were added", async () => {
+    const s = await salon("mcp-cap2");
+    const client_id = await register("mcp-cap2");
+    const codes = [await approveCode("mcp-cap2", s.ck, client_id), await approveCode("mcp-cap2", s.ck, client_id)];
+    for (let i = 0; i < 4; i++) await newKey("mcp-cap2", s.ck, "read");
+    expect((await exchange("mcp-cap2", client_id, codes[0]!)).status).toBe(200);
+    const sixth = await exchange("mcp-cap2", client_id, codes[1]!);
+    expect(sixth.status).toBe(400);
+    expect((await j(sixth)).error).toBe("invalid_grant");
+    expect(await mcpRepo(env.DB, s.org.id).countConnections()).toBe(5);
+  });
+
+  it("the 64 KB cap counts bytes, not characters", async () => {
+    const s = await salon("mcp-bytes");
+    const k = await newKey("mcp-bytes", s.ck, "read");
+    // 30 000 three-byte characters: 90 KB on the wire but under 64 K characters.
+    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping", params: { pad: "€".repeat(30_000) } });
+    const r = await go(`${host("mcp-bytes")}/mcp`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${k.secret}` }, body });
+    expect(r.status).toBe(413);
+  });
+
+  it("the hourly prune drops apps unused for 90 days and keeps ones still in use", async () => {
+    const s = await salon("mcp-cl");
+    const used = await register("mcp-cl");
+    await exchange("mcp-cl", used, await approveCode("mcp-cl", s.ck, used));
+    const idle = await register("mcp-cl");
+    const old = Date.now() - 91 * 86_400_000;
+    await env.DB.prepare("UPDATE mcp_clients SET last_used_at = ? WHERE id IN (?, ?)").bind(old, used, idle).run();
+    // A refresh marks the app as used again.
+    const t = await env.DB.prepare("SELECT 1 FROM mcp_tokens WHERE client_id = ?").bind(used).first();
+    expect(t).toBeTruthy();
+    await env.DB.prepare("UPDATE mcp_clients SET last_used_at = ? WHERE id = ?").bind(Date.now(), used).run();
+    await pruneInfra(env.DB, Date.now());
+    const left = (await env.DB.prepare("SELECT id FROM mcp_clients WHERE id IN (?, ?)").bind(used, idle).all<{ id: string }>()).results.map((r) => r.id);
+    expect(left).toEqual([used]);
+  });
+
+  it("exchanging a code and refreshing mark the app as used", async () => {
+    const s = await salon("mcp-cl2");
+    const client_id = await register("mcp-cl2");
+    await env.DB.prepare("UPDATE mcp_clients SET last_used_at = 1 WHERE id = ?").bind(client_id).run();
+    const t = await j(await exchange("mcp-cl2", client_id, await approveCode("mcp-cl2", s.ck, client_id)));
+    const at = async () => (await env.DB.prepare("SELECT last_used_at FROM mcp_clients WHERE id = ?").bind(client_id).first<{ last_used_at: number }>())!.last_used_at;
+    expect(await at()).toBeGreaterThan(1);
+    await env.DB.prepare("UPDATE mcp_clients SET last_used_at = 1 WHERE id = ?").bind(client_id).run();
+    await post(`${host("mcp-cl2")}/oauth/token`, { grant_type: "refresh_token", refresh_token: t.refresh_token, client_id });
+    expect(await at()).toBeGreaterThan(1);
+  });
+});
+

@@ -54,16 +54,20 @@ mcp.post("/mcp/keys", ...gate, notSupport, async (c) => {
   const days = b.expires_days;
   if (!(days === null || EXPIRY_DAYS.includes(days as (typeof EXPIRY_DAYS)[number]))) throw bad("Expiry must be 7, 30, 90 or 365 days, or never");
   const repo = repoOf(c);
-  if ((await repo.countConnections()) >= MAX_CONNECTIONS) throw new HttpError(409, `A salon can have ${MAX_CONNECTIONS} AI connections. Revoke one first.`, "mcp_limit");
+  const full = () => new HttpError(409, `A salon can have ${MAX_CONNECTIONS} AI connections. Revoke one first.`, "mcp_limit");
+  if ((await repo.countConnections()) >= MAX_CONNECTIONS) throw full();
   const connection_id = `cn_${randomToken(12)}`;
-  const { secret } = await repo.issue({
+  const made = await repo.issue({
     userId: c.var.tenant.user.id,
     kind: "key",
     connectionId: connection_id,
     name,
     scopes,
     expiresAt: days === null ? null : Date.now() + (days as number) * 86_400_000,
-  });
+  }, MAX_CONNECTIONS);
+  // The cap is re-checked inside the INSERT: a racing creation that filled the last slot wins.
+  if (!made) throw full();
+  const { secret } = made;
   const url = serverUrl(c);
   return c.json({ secret, connection_id, server_url: url, command: `claude mcp add --transport http salonkit ${url} --header "Authorization: Bearer ${secret}"` }, 201);
 });

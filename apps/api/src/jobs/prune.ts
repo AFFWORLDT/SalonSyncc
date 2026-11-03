@@ -1,8 +1,8 @@
 import type { Env } from "../env";
 import { pruneInfra } from "../data/infra";
 
-/** D1 statements one prune costs (one batch of 7), counted in the cron's budget. */
-export const PRUNE_STMTS = 7;
+/** D1 statements one prune costs (one batch of 8), counted in the cron's budget. */
+export const PRUNE_STMTS = 8;
 
 /**
  * Old throttling and bookkeeping rows (R5, FM scheduled.ts "throttle cleanup"): rate_hits windows that ended over
