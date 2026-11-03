@@ -227,10 +227,15 @@ export function ownerOf(users: Row[]): Row {
   return owner;
 }
 
+/** SalonKit only fills FM's picture templates (image header + values); the older text ones would fail at Meta. */
+const PICTURE_TEMPLATES = { wa_feedback_template: "fm_rating", wa_feedback_reminder_template: "fm_rating_reminder", wa_reminder_template: "fm_fresh_cut" } as const;
+
 /** All statements for the import, in foreign-key order. */
 export function buildFmImport(src: FmSource, o: ImportOpts): string[] {
   const settings = src.settings?.[0];
   if (!settings) throw new Error("FM settings row missing");
+  for (const [col, want] of Object.entries(PICTURE_TEMPLATES))
+    if (settings[col] !== want) throw new Error(`${col} is ${String(settings[col])}: switch FM to its picture templates (${want}) before importing`);
   const users = src.users ?? [];
   const owner = ownerOf(users);
   const org = lit(o.orgId);
@@ -275,6 +280,25 @@ export function buildFmImport(src: FmSource, o: ImportOpts): string[] {
 
   out.push(`INSERT INTO platform_audit(who,action,org_id,after_json,at) VALUES('fm-import','org.import',${org},${lit(JSON.stringify({ slug: o.slug, users: users.length, sales: (src.sales ?? []).length }))},${o.now});`);
   for (const s of out) if (s.length > MAX_STMT) throw new Error(`statement over ${MAX_STMT} bytes`);
+  return out;
+}
+
+/** Tables the import writes with shifted ids. */
+const ID_TABLES = ["users", ...TABLES.map((t) => t.table)];
+
+/**
+ * Run on salonkit-db right before the import: the slug must be free and every table's ids still below ID_OFFSET
+ * (a purge does not reset AUTOINCREMENT, so after a failed attempt other salons' new rows may sit above it).
+ */
+export function preflightSql(orgId: string, slug: string): string {
+  const cols = ID_TABLES.map((t) => `(SELECT MAX(id) FROM ${t}) AS ${t}`);
+  return `SELECT (SELECT COUNT(*) FROM orgs WHERE id = ${lit(orgId)} OR slug = ${lit(slug)}) AS taken, ${cols.join(", ")};`;
+}
+
+export function preflightProblems(row: Record<string, Value>, orgId = "org_fm", slug = "fm"): string[] {
+  const out: string[] = [];
+  if (Number(row.taken)) out.push(`the slug ${slug} or org ${orgId} already exists`);
+  for (const t of ID_TABLES) if (row[t] !== null && Number(row[t]) >= ID_OFFSET) out.push(`${t}: max id ${row[t]} >= ${ID_OFFSET}`);
   return out;
 }
 

@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { describe, it, expect, beforeEach } from "vitest";
-import { buildFmImport, purgeSql, totalsSql, compareTotals, percent, lit, ID_OFFSET, MAX_STMT, type FmSource, type Row } from "../scripts/fm-import/build";
+import { buildFmImport, purgeSql, totalsSql, compareTotals, percent, lit, preflightSql, preflightProblems, ID_OFFSET, MAX_STMT, type FmSource, type Row } from "../scripts/fm-import/build";
 import { makeOrg, makeUser, loginAs } from "./helpers";
 import { checkPassword, hashPassword } from "../src/core/crypto";
 
@@ -219,5 +219,17 @@ describe("FM import", () => {
     expect(() => lit(Number.NaN)).toThrow();
     expect(lit("it's")).toBe("'it''s'");
     expect(lit(new Uint8Array([0, 255]))).toBe("X'00ff'");
+  });
+
+  it("preflight refuses a taken slug or ids already at the offset, and passes on a fresh database", async () => {
+    const check = async () => preflightProblems((await env.DB.prepare(preflightSql(ORG, "fm")).all<Record<string, number | null>>()).results[0]!);
+    expect(await check()).toEqual([]);
+    await run(buildFmImport(src, opts));
+    expect(await check()).toEqual(expect.arrayContaining(["the slug fm or org org_fm already exists", expect.stringMatching(/^sales: max id \d+ >= 1000000$/)]));
+  });
+
+  it("refuses FM's older text-style WhatsApp templates, which SalonKit cannot fill", () => {
+    src.settings![0]!.wa_feedback_template = "fm_feedback";
+    expect(() => buildFmImport(src, opts)).toThrow(/picture templates/);
   });
 });

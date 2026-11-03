@@ -2,7 +2,8 @@
 //   import.sql       the org's rows for salonkit-db       (wrangler d1 execute salonkit-db --remote --file import.sql)
 //   purge.sql        removes them again, for a retry
 //   totals-fm.json   FM's totals, from the source
-//   totals-ss.sql    the same totals on salonkit-db        (… --file totals-ss.sql --json > totals-ss.json)
+//   totals-ss.sql    the same totals on salonkit-db        (… --json --command "$(cat totals-ss.sql)" > totals-ss.json)
+//   preflight.sql    run on salonkit-db first               (… --json --command "$(cat preflight.sql)" > pre.json; --preflight pre.json)
 // then: node --experimental-strip-types scripts/fm-import.ts --compare <outdir>/totals-fm.json totals-ss.json
 // Prints counts only: the files hold customer data and password hashes, so keep <outdir> outside the repo.
 //   wrangler d1 export fm-salon-db --remote --output /scratch/fm.sql && sqlite3 /scratch/fm.sqlite < /scratch/fm.sql
@@ -10,7 +11,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { buildFmImport, purgeSql, totalsSql, compareTotals, type FmSource, type Row } from "./fm-import/build.ts";
+import { buildFmImport, purgeSql, totalsSql, compareTotals, preflightSql, preflightProblems, type FmSource, type Row } from "./fm-import/build.ts";
 
 const ORG_ID = "org_fm";
 const SLUG = "fm";
@@ -27,6 +28,17 @@ const flag = (name: string) => {
   args.splice(i, 2);
   return v;
 };
+
+if (args[0] === "--preflight") {
+  const row = (JSON.parse(readFileSync(args[1]!, "utf8")) as { results: Record<string, number | null>[] }[])[0]!.results[0]!;
+  const problems = preflightProblems(row, ORG_ID, SLUG);
+  if (problems.length) {
+    console.error(`NOT SAFE TO IMPORT:\n${problems.join("\n")}`);
+    process.exit(1);
+  }
+  console.log("preflight ok");
+  process.exit(0);
+}
 
 if (args[0] === "--compare") {
   const fm = JSON.parse(readFileSync(args[1]!, "utf8")) as { k: string; v: number }[];
@@ -61,6 +73,7 @@ mkdirSync(outDir, { recursive: true });
 writeFileSync(join(outDir, "import.sql"), `${stmts.join("\n")}\n`);
 writeFileSync(join(outDir, "purge.sql"), `${purgeSql(ORG_ID).join("\n")}\n`);
 writeFileSync(join(outDir, "totals-fm.json"), JSON.stringify(fmTotals));
+writeFileSync(join(outDir, "preflight.sql"), `${preflightSql(ORG_ID, SLUG)}\n`);
 writeFileSync(join(outDir, "totals-ss.sql"), `${totalsSql("ss", ORG_ID).join("\n")}\n`);
 console.log(TABLES.map((t) => `${t}: ${src[t]!.length}`).join("\n"));
 console.log(`statements: ${stmts.length}, totals keys: ${fmTotals.length}, out: ${outDir}`);

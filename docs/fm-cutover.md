@@ -16,28 +16,38 @@ taps "Turn on notifications" again), and the WhatsApp token (a Cloudflare secret
 1. Set the WhatsApp secrets on SalonKit, the same values as FM's Meta app:
    `cd apps/api && XDG_CONFIG_HOME=~/.wrangler-affworld npx wrangler secret put WA_APP_SECRET`
    (and `WA_VERIFY_TOKEN`, any long random string, used only if Meta's webhook is set up again).
-2. Pick a quiet time: after the business day closes (FM's day ends at 4 am Dubai).
+   SalonKit checks every salon's webhook with this one secret, so FM's Meta app becomes SalonKit's Meta app;
+   other salons connect their numbers to the same app.
+2. Pick a quiet time: after the business day closes (FM's day ends at 4 am Dubai), and not 23:00–01:00
+   (the end-of-day summary would go out twice). The import blocks salonkit-db for a few seconds.
 
 ## Cutover (about 2 minutes)
 ```
-cd apps/api && scripts/fm-cutover.sh /tmp/fm-cutover      # any folder outside the repo; it holds customer data
+cd apps/api && FM_OWNER_EMAIL=owner@example.com scripts/fm-cutover.sh /tmp/fm-cutover   # folder outside the repo: it holds customer data
 ```
 It redirects FM's old URL (so no new sales go into the old database), exports `fm-salon-db`, imports it into
 `salonkit-db`, and compares the totals (counts, sales, commission, VAT, takings per day, every ledger balance).
+`FM_OWNER_EMAIL` is where account emails go (optional; without it the owner gets none).
+It first checks that `fm` is free and that no ids already sit at the import offset (it refuses a second run).
 It ends with `totals match` or stops and prints the rollback. Delete the folder afterwards.
+Rehearsed end to end on a throwaway remote D1 (2026-11-05): preflight ok, 45 statements, 63/63 totals, purge clean;
+the redirect Worker answered 302 for links and passed the webhook through.
 
 ## After
-1. The owner signs in at https://fm.salonkit.online → Settings → WhatsApp and connects:
+1. Straight away (until then WhatsApp replies such as STOP and delivery receipts are dropped), the owner signs in
+   at https://fm.salonkit.online → Settings → WhatsApp and connects:
    phone number ID `1349313824939474`, WABA ID `1154099460522173`, and the permanent token.
    Bill messages, rating requests and visit reminders resume with FM's own approved templates.
 2. Staff open https://fm.salonkit.online (the old link redirects too), sign in, turn notifications back on,
    and re-add the app to their home screen from the new address.
 3. Meta's webhook can stay on the old URL: the redirect Worker passes it through to SalonKit.
+4. **Keep the redirect Worker forever.** FM's approved rating templates have the old address built into their
+   button, so every rating link SalonKit sends for FM goes through it.
 
 ## Rollback
 ```
 cd apps/api && XDG_CONFIG_HOME=~/.wrangler-affworld npx wrangler d1 execute salonkit-db --remote --file /tmp/fm-cutover/out/purge.sql
-cd ../../../gents-salon/api && XDG_CONFIG_HOME=~/.wrangler-affworld npx wrangler deploy
+cd ../../../gents-salon/web && npm run build && cd ../api && XDG_CONFIG_HOME=~/.wrangler-affworld npx wrangler deploy
 ```
 FM's database is never written, so FM comes back exactly as it was. Anything entered on SalonKit after the cutover
 would be lost.
