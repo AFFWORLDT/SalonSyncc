@@ -3,6 +3,9 @@
 # 1. FM's old URL starts redirecting (FM stops taking new sales)  2. export fm-salon-db  3. import into salonkit-db
 # 4. compare totals (--command, not --file: a remote --file import returns no rows). Stops at the first failure and prints the rollback.
 set -euo pipefail
+# DISABLED 2026-11-03: the 09:17 run replaced FM's live app with a redirect during business hours and was rolled back.
+# FM stays on its own Worker (fm-salon). Never run this again without the owner's explicit yes naming the cutover and a time.
+echo "fm-cutover is disabled: FM Salon stays on its own app (fm-salon.affworld0.workers.dev). See docs/fm-cutover.md."; exit 1
 WORK=$(mkdir -p "${1:?usage: fm-cutover.sh <workdir>}" && cd "$1" && pwd) # absolute: the steps below cd elsewhere
 API=$(cd "$(dirname "$0")/.." && pwd)
 ROOT=$(cd "$API/../.." && pwd)

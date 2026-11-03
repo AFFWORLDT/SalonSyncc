@@ -1,5 +1,12 @@
 # FM Salon cutover (spec P1b)
 
+> **Rolled back and disabled (2026-11-03).** FM Salon stays on its own app, https://fm-salon.affworld0.workers.dev,
+> with its own database. The cutover ran at 09:17 Dubai on an unclear go-ahead, during opening hours, and replaced
+> FM's live app with a redirect. It was rolled back at 19:57 Dubai, the 11 bills entered on SalonKit were copied into
+> fm-salon-db, and fmsalon.salonkit.online now redirects to FM's app (MOVED_HOSTS in apps/api/src/index.ts).
+> The redirect Worker (`deploy/fm-redirect`, Worker name `fm-salon`) was deleted so it can't be deployed over FM again,
+> and `scripts/fm-cutover.sh` exits at once. Everything below is kept for the record only.
+
 FM Salon moves from its own Worker (`fm-salon`, database `fm-salon-db`) to SalonKit as the salon **fmsalon**:
 https://fmsalon.salonkit.online. Plan: `docs/superpowers/plans/2026-11-05-plan-8-fm-import.md`.
 
