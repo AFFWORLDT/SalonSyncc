@@ -10,7 +10,7 @@ import { publicApi } from "./core/public";
 import "./platform/signup";
 import "./platform/support";
 import { platformApi } from "./platform/admin";
-import { settings, logoPublic } from "./tenant/settings/routes";
+import { settings, logoPublic, brandPublic } from "./tenant/settings/routes";
 import { staff, avatarPublic } from "./tenant/staff/routes";
 import { services, servicesPublic } from "./tenant/services/routes";
 import { sales } from "./tenant/sales/routes";
@@ -46,6 +46,7 @@ app.route("/api/platform", platformApi);
 publicApi.route("/avatar", avatarPublic);
 publicApi.route("/services", servicesPublic);
 publicApi.route("/logo", logoPublic);
+publicApi.route("/brand", brandPublic);
 app.route("/api/public", publicApi);
 
 // Meta's WhatsApp webhook: no session (signature-checked), not behind the public rate limiter; the org comes from each
