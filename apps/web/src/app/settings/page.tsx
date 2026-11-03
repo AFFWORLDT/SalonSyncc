@@ -277,7 +277,7 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
         <Card>
           <CardHeader>
             <CardTitle>Reviews</CardTitle>
-            <CardDescription>Customers who rate you 4 or 5 stars are invited to review you on Google.</CardDescription>
+            <CardDescription>After rating their visit, every customer is invited to review you on Google. Their stars and comment come to you privately.</CardDescription>
           </CardHeader>
           <CardContent>
             <Field label="Google review link" htmlFor="s-google2">

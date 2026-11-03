@@ -189,7 +189,7 @@ export const FEATURE_PAGES: FeaturePage[] = [
       },
       {
         h2: "Rating requests and Google reviews",
-        body: "After a visit, customers get a short message asking how it went, with one reminder if they forget. Happy customers are then invited to review you on Google.",
+        body: "After a visit, customers get a short message asking how it went, with one reminder if they forget. Every customer is then invited to review you on Google with one tap.",
       },
       {
         h2: "Offers and announcements",
@@ -210,28 +210,28 @@ export const FEATURE_PAGES: FeaturePage[] = [
     slug: "google-reviews-for-salons",
     label: "Google reviews for salons",
     title: "Get more Google reviews for your salon",
-    description: "Ask every customer to rate their visit, see ratings per barber, and send happy customers straight to your Google review page. Built for UAE salons.",
+    description: "Ask every customer to rate their visit, see ratings per barber, and invite every customer to your Google review page with one tap. Built for UAE salons.",
     eyebrow: "Ratings and Google reviews",
     h1: "More Google reviews, from customers who loved their cut",
-    lead: "Ask every customer how it went. Unhappy ones tell you privately; happy ones are invited to share it on Google.",
-    plan: "Pro",
+    lead: "Ask every customer how it went. Their rating and comment come to you privately, and every customer is invited to review you on Google.",
+    plan: "Ratings on Pro · WhatsApp messages on Pro Max",
     icon: "google-review",
     sections: [
       {
-        h2: "A rating after every visit",
-        body: "Customers rate their visit from 1 to 5 stars and can leave a comment, from a link on their phone. No app to install, no account to make.",
+        h2: "A \"Rate your visit\" message after every visit",
+        body: "On Pro Max, every customer gets a WhatsApp message after their visit with a \"Rate your visit\" button, and one reminder if they don't tap it. No app to install, no account to make.",
       },
       {
-        h2: "Happy customers go to Google",
-        body: "Customers who give 4 or 5 stars are invited to post a review on your Google page with one tap. Add your Google review link in Settings and it works straight away.",
+        h2: "A one-tap Google review link for everyone",
+        body: "Add your Google review link in Settings and the button opens your Google review page, for every customer. Asking everyone, not only happy customers, is what Google's review rules require, and it keeps your reviews honest and safe.",
       },
       {
-        h2: "Ratings per barber",
-        body: "See each barber's average rating and read every comment, for any date range, so you know who is delighting customers and where to help.",
+        h2: "Private ratings per barber",
+        body: "Without a Google link, the button opens SalonKit's own rating page, where customers give 1 to 5 stars and a comment that only you see. You get each barber's average and every comment, for any date range, and the Google link is offered to every customer once you add it.",
       },
     ],
     faqs: [
-      { q: "Do unhappy customers get sent to Google?", a: "No. Only customers who give 4 or 5 stars are invited to review you on Google. Lower ratings and their comments come to you." },
+      { q: "Why not send only happy customers to Google?", a: "Google's review rules don't allow it: asking only customers who were happy is called review gating, and Google can remove reviews that were collected that way. SalonKit invites every customer, and still shows you each rating and comment privately, so you can follow up with anyone who had a bad visit." },
       { q: "How do customers get the rating link?", a: "On Pro Max it goes out automatically on WhatsApp after the visit, with one reminder if they haven't rated yet." },
       { q: "Where do I find my Google review link?", a: "In your Google Business Profile, choose 'Ask for reviews' and copy the link, then paste it in SalonKit's Settings." },
     ],

@@ -11,9 +11,10 @@ import { cn } from "@/lib/utils";
 
 /**
  * "Rate your visit" from WhatsApp (/rate/?t=<bill token>): the customer gives 1-5 stars and an optional comment
- * (GET/POST /api/public/feedback/:token). Happy customers (4-5 stars) are then invited to review the salon on
- * Google through /api/public/review/:token, which notes the tap and redirects. That link is only shown when the
- * salon has a Google review URL, so it can never bounce back here.
+ * (GET/POST /api/public/feedback/:token). Every customer, whatever they rated, is then invited to review the salon on
+ * Google through /api/public/review/:token, which notes the tap and redirects: Google's review policy forbids asking
+ * only happy customers (review gating). The stars and comment still go privately to the salon. The link is only
+ * shown when the salon has a Google review URL, so it can never bounce back here.
  */
 export default function RatePage() {
   const [token, setToken] = useState<string | null>(null);
@@ -53,7 +54,7 @@ export default function RatePage() {
     }
   }
 
-  const google = done && stars >= 4 && page?.google_review_url && token ? `/api/public/review/${encodeURIComponent(token)}` : null;
+  const google = done && page?.google_review_url && token ? `/api/public/review/${encodeURIComponent(token)}` : null;
 
   return (
     <div className="flex min-h-full justify-center bg-gradient-to-b from-zinc-900 via-zinc-900 to-background px-4 pt-16 pb-12">
