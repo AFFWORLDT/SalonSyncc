@@ -8,6 +8,7 @@ import { FaqList } from "@/components/faq";
 import { FeatureIcon } from "@/components/feature-icon";
 import { FEATURE_PAGES, featurePage } from "@/lib/content";
 import { pageOpenGraph, SITE_URL } from "@/lib/seo";
+import { POSTS } from "@/lib/blog";
 
 export const dynamicParams = false;
 export const generateStaticParams = () => FEATURE_PAGES.map((p) => ({ slug: p.slug }));
@@ -85,6 +86,25 @@ export default async function FeatureLanding({ params }: Props) {
             <h2 className="text-3xl font-semibold tracking-tight">Questions</h2>
             <FaqList faqs={p.faqs} className="mt-6" />
           </section>
+
+          {POSTS.some((g) => g.feature === p.slug) && (
+            <section className="mt-20">
+              <h2 className="text-3xl font-semibold tracking-tight">Guides</h2>
+              <ul className="mt-6 grid gap-3">
+                {POSTS.filter((g) => g.feature === p.slug).map((g) => (
+                  <li key={g.slug}>
+                    <Link href={`/blog/${g.slug}/`} className="glass group flex items-center justify-between gap-4 rounded-2xl p-5 transition hover:-translate-y-0.5 hover:shadow-md">
+                      <span>
+                        <span className="block font-semibold">{g.title}</span>
+                        <span className="mt-1 block text-sm text-muted-foreground">{g.minutes} min read</span>
+                      </span>
+                      <ArrowRight className="size-4 shrink-0 text-primary transition-transform group-hover:translate-x-0.5" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section className="mt-20">
             <h2 className="text-3xl font-semibold tracking-tight">More of what SalonKit does</h2>
