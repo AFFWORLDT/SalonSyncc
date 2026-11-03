@@ -74,23 +74,36 @@ export const parseScopes = (s: string): McpScope[] => {
   return set.has("write") ? ["read", "write"] : ["read"];
 };
 
+interface IssueInput {
+  userId: number;
+  kind: McpKind;
+  connectionId: string;
+  name: string;
+  scopes: McpScope[];
+  clientId?: string | null;
+  expiresAt: number | null;
+}
+
 export function mcpRepo(db: D1Database, orgId: string) {
   return {
-    /** Stores a new credential and returns its one-time secret. */
-    async issue(t: { userId: number; kind: McpKind; connectionId: string; name: string; scopes: McpScope[]; clientId?: string | null; expiresAt: number | null }): Promise<{ id: string; secret: string }> {
+    /**
+     * Stores a new credential and returns its one-time secret. With `cap`, only while the salon has fewer than `cap`
+     * live connections, checked inside the same INSERT (so racing creations can't pass the limit): null when full.
+     */
+    async issue(t: IssueInput, cap?: number): Promise<{ id: string; secret: string } | null> {
       const secret = newSecret();
       const id = `mt_${randomToken(12)}`;
-      await this.issueStmt(id, secret, t).then((s) => s.run());
-      return { id, secret };
-    },
-
-    async issueStmt(id: string, secret: string, t: { userId: number; kind: McpKind; connectionId: string; name: string; scopes: McpScope[]; clientId?: string | null; expiresAt: number | null }): Promise<D1PreparedStatement> {
-      return db
+      const now = Date.now();
+      const r = await db
         .prepare(
           `INSERT INTO mcp_tokens (id, org_id, user_id, user_sv, kind, connection_id, name, token_hash, last4, scopes, client_id, expires_at, created_at)
-           SELECT ?1, ?2, ?3, u.session_version, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12 FROM users u WHERE u.org_id = ?2 AND u.id = ?3`,
+           SELECT ?1, ?2, ?3, u.session_version, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12 FROM users u
+            WHERE u.org_id = ?2 AND u.id = ?3
+              AND (SELECT COUNT(DISTINCT connection_id) FROM mcp_tokens WHERE org_id = ?2 AND revoked_at IS NULL AND COALESCE(expires_at, 9e15) > ?12) < ?13`,
         )
-        .bind(id, orgId, t.userId, t.kind, t.connectionId, t.name, await sha256(secret), secret.slice(-4), t.scopes.join(" "), t.clientId ?? null, t.expiresAt, Date.now());
+        .bind(id, orgId, t.userId, t.kind, t.connectionId, t.name, await sha256(secret), secret.slice(-4), t.scopes.join(" "), t.clientId ?? null, t.expiresAt, now, cap ?? 1e9)
+        .run();
+      return (r.meta.changes ?? 0) > 0 ? { id, secret } : null;
     },
 
     /** One statement: the live credential with its user and the org's mcp_api override. Kind filter: `access`/`key` for /mcp, `refresh` for the token endpoint. */
@@ -138,8 +151,9 @@ export function mcpRepo(db: D1Database, orgId: string) {
     async connections(now = Date.now()): Promise<McpConnection[]> {
       const r = await db
         .prepare(
-          `SELECT t.connection_id, CASE WHEN t.kind = 'key' THEN 'key' ELSE 'oauth' END AS kind, t.name, t.scopes, t.last4, t.user_id,
-                  u.name AS user_name, t.client_id, MIN(t.created_at) AS created_at, MAX(t.expires_at) AS expires_at, MAX(t.last_used_at) AS last_used_at
+          `SELECT t.connection_id, MAX(CASE WHEN t.kind = 'key' THEN 'key' ELSE 'oauth' END) AS kind, MAX(t.name) AS name, MAX(t.scopes) AS scopes,
+                  MAX(CASE WHEN t.kind IN ('key', 'refresh') THEN t.last4 END) AS last4, MAX(t.user_id) AS user_id, MAX(u.name) AS user_name,
+                  MAX(t.client_id) AS client_id, MIN(t.created_at) AS created_at, MAX(t.expires_at) AS expires_at, MAX(t.last_used_at) AS last_used_at
              FROM mcp_tokens t JOIN users u ON u.id = t.user_id AND u.org_id = t.org_id
             WHERE t.org_id = ? AND t.revoked_at IS NULL AND COALESCE(t.expires_at, 9e15) > ?
             GROUP BY t.connection_id
@@ -183,17 +197,20 @@ export function mcpRepo(db: D1Database, orgId: string) {
      * one wins (the loser sees false and the caller treats it as reuse).
      */
     async consumeRefresh(tokenId: string, now = Date.now()): Promise<boolean> {
-      const r = await db.prepare("UPDATE mcp_tokens SET revoked_at = ? WHERE org_id = ? AND id = ? AND revoked_at IS NULL").bind(now, orgId, tokenId).run();
+      const r = await db.prepare("UPDATE mcp_tokens SET revoked_at = ?, replaced_by = 'rotated' WHERE org_id = ? AND id = ? AND revoked_at IS NULL").bind(now, orgId, tokenId).run();
       return (r.meta.changes ?? 0) > 0;
     },
 
-    /** A refresh token that was already used (rotated away): the connection it belonged to, for reuse revocation. */
-    async rotatedRefresh(secret: string): Promise<string | null> {
+    /**
+     * Why a refresh token is not live: `rotated` (already used: reuse, so the caller revokes `connection_id`), `revoked`
+     * (the salon revoked the connection), or null (unknown or expired).
+     */
+    async deadRefresh(secret: string): Promise<{ why: "rotated" | "revoked"; connection_id: string } | null> {
       const r = await db
-        .prepare("SELECT connection_id FROM mcp_tokens WHERE org_id = ? AND token_hash = ? AND kind = 'refresh' AND revoked_at IS NOT NULL")
+        .prepare("SELECT connection_id, replaced_by FROM mcp_tokens WHERE org_id = ? AND token_hash = ? AND kind = 'refresh' AND revoked_at IS NOT NULL")
         .bind(orgId, await sha256(secret))
-        .first<{ connection_id: string }>();
-      return r?.connection_id ?? null;
+        .first<{ connection_id: string; replaced_by: string | null }>();
+      return r ? { why: r.replaced_by ? "rotated" : "revoked", connection_id: r.connection_id } : null;
     },
 
     async calls(limit = 50): Promise<McpCall[]> {

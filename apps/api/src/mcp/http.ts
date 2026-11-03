@@ -11,8 +11,8 @@ import { platformRepo } from "../data/platform";
 import { slugFromHost } from "../core/tenant";
 import { featuresFor } from "../core/features-cache";
 import { settingsRepo } from "../data/tenant/settings";
-import { mcpRepo, parseScopes, TOKEN_RE, type McpPrincipal, type McpScope } from "../data/tenant/mcp";
-import { mcpClientById, mcpClientCreate, rateHit } from "../data/infra";
+import { mcpRepo, parseScopes, TOKEN_RE, MAX_CONNECTIONS, type McpPrincipal, type McpScope } from "../data/tenant/mcp";
+import { mcpClientById, mcpClientCreate, mcpClientTouch, rateHit } from "../data/infra";
 import { hourWindow, minuteWindow } from "../lib/limits";
 import { b64url, randomToken } from "../core/crypto";
 import { handleRpc, type Fetcher } from "./server";
@@ -29,6 +29,7 @@ const FAIL_WINDOW_MS = 10 * 60_000;
 const BLOCK_MS = 60 * 60_000;
 const REGISTER_PER_HOUR = 10;
 const AUTHORIZE_PER_MIN = 20;
+const MAX_STATE = 500;
 const TOKEN_PER_MIN = 30;
 
 const ip = (c: Context<AppEnv>) => c.req.header("CF-Connecting-IP") ?? "unknown";
@@ -88,11 +89,12 @@ function refusal(p: McpPrincipal): { status: number; error: string; message: str
   return null;
 }
 
+/** The body as text, or null over MAX_BODY bytes (counted on the wire, not in characters). */
 async function readBody(c: Context<AppEnv>): Promise<string | null> {
   const len = Number(c.req.header("content-length") ?? "0");
   if (len > MAX_BODY) return null;
-  const text = await c.req.text();
-  return text.length > MAX_BODY ? null : text;
+  const buf = await c.req.arrayBuffer();
+  return buf.byteLength > MAX_BODY ? null : new TextDecoder().decode(buf);
 }
 
 async function formOrJson(c: Context<AppEnv>): Promise<Record<string, string>> {
@@ -128,12 +130,18 @@ export function redirectAllowed(u: string): boolean {
   return url.protocol === "http:" && (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]");
 }
 
-/** The access + refresh pair for a (new or rotated) OAuth connection. */
-async function issuePair(db: D1Database, orgId: string, t: { userId: number; connectionId: string; name: string; scopes: McpScope[]; clientId: string }) {
+/**
+ * The access + refresh pair for an OAuth connection. A new connection (`cap`) is refused (null) when the salon already
+ * has MAX_CONNECTIONS; a rotation reuses its connection and passes no cap.
+ */
+async function issuePair(db: D1Database, orgId: string, t: { userId: number; connectionId: string; name: string; scopes: McpScope[]; clientId: string }, cap?: number) {
   const repo = mcpRepo(db, orgId);
   const now = Date.now();
-  const access = await repo.issue({ ...t, kind: "access", expiresAt: now + ACCESS_TTL_MS });
+  const access = await repo.issue({ ...t, kind: "access", expiresAt: now + ACCESS_TTL_MS }, cap);
+  if (!access) return null;
   const refresh = await repo.issue({ ...t, kind: "refresh", expiresAt: now + REFRESH_TTL_MS });
+  if (!refresh) return null;
+  await mcpClientTouch(db, t.clientId, now);
   return { access_token: access.secret, token_type: "Bearer", expires_in: ACCESS_TTL_MS / 1000, refresh_token: refresh.secret, scope: t.scopes.join(" ") };
 }
 
@@ -278,8 +286,11 @@ export function mcpHttp(inner: Fetcher): Hono<AppEnv> {
     if (q.response_type !== "code") return back("unsupported_response_type", "Only response_type=code");
     if (q.code_challenge_method !== "S256" || !/^[A-Za-z0-9_-]{43}$/.test(q.code_challenge ?? "")) return back("invalid_request", "PKCE with S256 is required");
     if (q.resource && q.resource.replace(/\/$/, "") !== resourceUrl(origin(c))) return back("invalid_target", "Unknown resource");
+    // State comes back to the client verbatim; one too long to keep is refused rather than silently cut.
+    if (q.state && q.state.length > MAX_STATE) return json(c, { error: "invalid_request", error_description: `state is limited to ${MAX_STATE} characters` }, 400);
+    await mcpClientTouch(c.env.DB, client.id);
     const scopes = parseScopes(q.scope ?? "read write").join(" ");
-    const id = await mcpRepo(c.env.DB, org.id).createRequest({ client_id: client.id, redirect_uri: q.redirect_uri, state: q.state?.slice(0, 500) ?? null, code_challenge: q.code_challenge!, scopes }, REQUEST_TTL_MS);
+    const id = await mcpRepo(c.env.DB, org.id).createRequest({ client_id: client.id, redirect_uri: q.redirect_uri, state: q.state ?? null, code_challenge: q.code_challenge!, scopes }, REQUEST_TTL_MS);
     return c.redirect(`/connect/authorize/?req=${encodeURIComponent(id)}`, 302);
   });
 
@@ -299,26 +310,33 @@ export function mcpHttp(inner: Fetcher): Hono<AppEnv> {
       if (!(await pkceOk(b.code_verifier, req.code_challenge))) return grant("PKCE verification failed");
       const client = await mcpClientById(c.env.DB, req.client_id);
       const scopes = parseScopes(req.scopes);
-      return json(c, await issuePair(c.env.DB, org.id, { userId: req.user_id, connectionId: `cn_${randomToken(12)}`, name: client?.name ?? "AI app", scopes, clientId: req.client_id }));
+      const pair = await issuePair(c.env.DB, org.id, { userId: req.user_id, connectionId: `cn_${randomToken(12)}`, name: client?.name ?? "AI app", scopes, clientId: req.client_id }, MAX_CONNECTIONS);
+      if (!pair) return grant(`This salon already has ${MAX_CONNECTIONS} AI connections. Revoke one on the AI connect page, then connect again.`);
+      return json(c, pair);
     }
 
     if (b.grant_type === "refresh_token") {
+      if (!b.client_id) return json(c, { error: "invalid_request", error_description: "client_id is required" }, 400);
       if (!b.refresh_token || !TOKEN_RE.test(b.refresh_token)) return grant("Unknown refresh token");
       const p = await repo.principal(b.refresh_token, ["refresh"]);
       if (!p) {
+        const dead = await repo.deadRefresh(b.refresh_token);
         // A rotated (already used) refresh token came back: it leaked or was replayed, so the whole connection goes.
-        const leaked = await repo.rotatedRefresh(b.refresh_token);
-        if (leaked) await repo.revokeConnection(leaked);
-        return grant(leaked ? "This refresh token was already used; the connection was revoked. Connect again." : "Unknown or expired refresh token");
+        if (dead?.why === "rotated") {
+          await repo.revokeConnection(dead.connection_id);
+          return grant("This refresh token was already used; the connection was revoked. Connect again.");
+        }
+        return grant(dead ? "This connection was revoked. Connect again." : "Unknown or expired refresh token");
       }
-      if (b.client_id && p.client_id !== b.client_id) return grant("The refresh token was issued to another client");
+      if (p.client_id !== b.client_id) return grant("The refresh token was issued to another client");
       const no = refusal(p);
       if (no) return json(c, { error: "invalid_grant", error_description: no.message }, 400);
       if (!(await repo.consumeRefresh(p.token_id))) {
         await repo.revokeConnection(p.connection_id);
         return grant("This refresh token was already used; the connection was revoked. Connect again.");
       }
-      return json(c, await issuePair(c.env.DB, org.id, { userId: p.user_id, connectionId: p.connection_id, name: p.name, scopes: p.scopes, clientId: p.client_id ?? "" }));
+      const pair = await issuePair(c.env.DB, org.id, { userId: p.user_id, connectionId: p.connection_id, name: p.name, scopes: p.scopes, clientId: p.client_id ?? "" });
+      return pair ? json(c, pair) : grant("This connection's user can no longer use AI connect");
     }
 
     return json(c, { error: "unsupported_grant_type", error_description: "authorization_code or refresh_token" }, 400);
