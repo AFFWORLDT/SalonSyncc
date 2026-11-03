@@ -130,27 +130,35 @@ export function AuthSplit({ children, scene, quote }: AuthSplitProps) {
   return (
     <div className="relative min-h-full w-full overflow-hidden md:grid md:grid-cols-2">
       <style>{`input[type="password"]::-ms-reveal,input[type="password"]::-ms-clear{display:none}`}</style>
-      <div aria-hidden className="pointer-events-none absolute inset-0 md:left-1/2" style={{ background: `linear-gradient(135deg, ${mesh[0]}, ${mesh[2]})` }}>
+      <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `linear-gradient(135deg, ${mesh[0]}, ${mesh[2]})` }}>
         {scene && (
           <MeshGradient className="h-full w-full" colors={mesh} speed={reduce ? 0 : 0.25} distortion={0.8} swirl={0.15} grainOverlay={0.05} maxPixelCount={1280 * 900} />
         )}
         <div className="absolute inset-0 bg-black/10" />
       </div>
       <div className="relative z-10 flex min-h-full items-center justify-center p-6 md:order-2 md:py-12">
-        <div className="glass w-full max-w-[420px] rounded-2xl p-6 shadow-2xl [background-color:color-mix(in_oklab,var(--background)_80%,transparent)] sm:p-8">{children}</div>
+        <div className="w-full max-w-[460px] rounded-[2rem] border border-white/25 bg-white/10 p-2 shadow-[0_40px_90px_-25px_rgba(0,0,0,0.6)] backdrop-blur-md transition-transform duration-500 md:-translate-y-2">
+          <div className="relative overflow-hidden rounded-[1.6rem] border border-white/45 p-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_12px_30px_-12px_rgba(0,0,0,0.35)] backdrop-blur-2xl backdrop-saturate-150 [background-color:color-mix(in_oklab,var(--background)_58%,transparent)] sm:p-9">
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-40" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0))" }} />
+            <div className="relative">{children}</div>
+          </div>
+        </div>
       </div>
-      <div className="relative hidden overflow-hidden md:order-1 md:block" style={{ background: mesh[0] }}>
+      <div className="relative hidden overflow-hidden md:order-1 md:block">
         {scene && (
           <div
             key={scene.src}
             className="absolute inset-0 animate-in fade-in bg-cover bg-center duration-700"
-            style={{ backgroundImage: `url(${scene.src})` }}
+            style={{
+              backgroundImage: `url(${scene.src})`,
+              maskImage: "linear-gradient(to right, #000 55%, transparent 100%)",
+              WebkitMaskImage: "linear-gradient(to right, #000 55%, transparent 100%)",
+            }}
             role="img"
             aria-label={scene.alt}
           />
         )}
-        <div className="absolute inset-y-0 right-0 w-1/3" style={{ background: `linear-gradient(to left, ${mesh[1]}, transparent)` }} />
-        <div className="absolute inset-x-0 bottom-0 h-48" style={{ background: `linear-gradient(to top, ${mesh[0]}e6, transparent)` }} />
+        <div className="absolute inset-x-0 bottom-0 h-48" style={{ background: `linear-gradient(to top, ${mesh[0]}e6, transparent)`, maskImage: "linear-gradient(to right, #000 55%, transparent 100%)", WebkitMaskImage: "linear-gradient(to right, #000 55%, transparent 100%)" }} />
         <div className="relative z-10 flex h-full flex-col items-center justify-end p-6 pb-10">
           <blockquote className="space-y-2 text-center text-white">
             <p className="text-lg font-medium drop-shadow">
