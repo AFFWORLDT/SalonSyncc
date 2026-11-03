@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bot,
   BookOpen,
   CalendarDays,
   Contact,
@@ -62,6 +63,7 @@ const ADMIN: NavGroup[] = [
       { href: "/services", label: "Services", icon: ListChecks },
       { href: "/customers", label: "Customers", icon: Contact, feature: "customers_crm" },
       { href: "/announcements", label: "Announcements", icon: Megaphone, feature: "announcements" },
+      { href: "/ai-connect", label: "AI connect", icon: Bot, feature: "mcp_api" },
       { href: "/settings", label: "Settings", icon: Settings },
       { href: "/plan", label: "Plan", icon: Crown },
       { href: "/account", label: "My account", icon: UserRound },

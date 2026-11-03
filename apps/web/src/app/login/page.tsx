@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthSplit, PasswordInput } from "@/components/ui/auth-ui";
 import { LOGIN_SCENES, pickScene, type LoginScene } from "@/lib/login-scenes";
+import { nextPath } from "@/lib/next-path";
 
 const TAGLINE = "Sales, bills and reports for your salon.";
 const QUOTES = ["Every chair, every bill, one place.", "Welcome back. Your salon is ready.", "Less paperwork, more fresh cuts."];
@@ -30,7 +31,7 @@ export default function LoginPage() {
   // A sign-in link in the address bar is checked first; a cached session must not skip past its outcome.
   const [handingOff, setHandingOff] = useState(() => typeof window !== "undefined" && (new URLSearchParams(window.location.search).has("handoff") || new URLSearchParams(window.location.search).has("support")));
   useEffect(() => {
-    if (!authLoading && user && !handingOff) router.replace("/");
+    if (!authLoading && user && !handingOff) router.replace(nextPath(window.location.search));
   }, [authLoading, user, router, handingOff]);
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export default function LoginPage() {
       const org = q.get("org") ?? undefined;
       api(handoff ? "/api/auth/handoff" : "/api/auth/support", { body: handoff ? { token: handoff, org } : { code: support, org }, redirectOn401: false })
         .then(() => refresh())
-        .then(() => router.replace("/"))
+        .then(() => router.replace(nextPath(window.location.search)))
         .catch(async (e) => {
           // The link is spent or expired: whatever session this browser cached is not trustworthy now.
           clearSessionCaches();
@@ -73,7 +74,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(needOrg ? org : undefined, username.trim(), password);
-      router.replace("/");
+      router.replace(nextPath(window.location.search));
     } catch (err) {
       setError(errorMessage(err));
     } finally {
