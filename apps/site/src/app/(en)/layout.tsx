@@ -3,7 +3,7 @@ import { appFontClassName } from "@/lib/fonts";
 import { BRAND_NAME } from "@/lib/brand";
 import { Analytics } from "@/components/analytics";
 import { GSC_VERIFICATION, SEO_DESCRIPTION, SEO_KEYWORDS, SEO_TITLE, SITE_URL, structuredData } from "@/lib/seo";
-import "./globals.css";
+import "../globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

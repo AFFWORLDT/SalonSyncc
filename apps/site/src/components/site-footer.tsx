@@ -21,7 +21,7 @@ const COLUMNS: FooterColumn[] = [
   },
   {
     title: "Help",
-    links: [...(SUPPORT_EMAIL ? [{ label: "Email us", href: `mailto:${SUPPORT_EMAIL}` }] : []), { label: "Questions", href: "/#faq" }, { label: "Pricing", href: "/pricing/" }],
+    links: [...(SUPPORT_EMAIL ? [{ label: "Email us", href: `mailto:${SUPPORT_EMAIL}` }] : []), { label: "Questions", href: "/#faq" }, { label: "العربية", href: "/ar/" }, { label: "Pricing", href: "/pricing/" }],
   },
   { title: "Company", links: [{ label: COMPANY }] },
 ];

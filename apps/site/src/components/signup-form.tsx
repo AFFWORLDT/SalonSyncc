@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { ROOT_DOMAIN } from "@/lib/brand";
 import { SLUG_RE, normalizeSlug, suggestSlug } from "@/lib/slug";
 import { TURNSTILE_SITE_KEY, mountTurnstile } from "@/lib/turnstile";
+import { track } from "@/lib/track";
 
 type SlugState = { state: "idle" | "checking" | "ok" | "bad"; message?: string };
 const REASON: Record<string, string> = { invalid: "3-30 letters, numbers or dashes", reserved: "That salon ID can't be used", taken: "That salon ID is taken" };
@@ -96,6 +97,8 @@ export function SignupForm() {
       const r = await fetch("/api/public/signup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const d = (await r.json().catch(() => ({}))) as { handoff_url?: string; error?: string };
       if (!r.ok || !d.handoff_url) throw new Error(d.error ?? `Signup failed (${r.status})`);
+      // GA4 key event: a salon finished signing up (sent before leaving for the salon's own address).
+      await track("sign_up", { method: "website" });
       window.location.assign(d.handoff_url);
     } catch (err) {
       setError((err as Error).message);
