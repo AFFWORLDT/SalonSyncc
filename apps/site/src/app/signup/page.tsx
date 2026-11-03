@@ -1,9 +1,15 @@
 import type { Metadata } from "next";
+import { pageOpenGraph } from "@/lib/seo";
 import { SiteNav } from "@/components/nav";
 import { SignupForm } from "@/components/signup-form";
 import { ShaderBackdrop } from "@/components/ui/shader-backdrop";
 
-export const metadata: Metadata = { title: "Start your free trial" };
+export const metadata: Metadata = {
+  title: "Start your free trial",
+  description: "Set up your salon on SalonKit in a few minutes: your own web address, your price list and staff. 7 days of Pro Max free, no card needed.",
+  alternates: { canonical: "/signup/" },
+  openGraph: pageOpenGraph("/signup/", "Start your free trial", "Set up your salon on SalonKit in a few minutes: your own web address, your price list and staff. 7 days of Pro Max free, no card needed."),
+};
 
 export default function SignupPage() {
   return (

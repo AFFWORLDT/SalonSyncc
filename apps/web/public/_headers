@@ -1,6 +1,7 @@
 # Security headers for every page and file of the web app (Cloudflare static assets read this file).
 # - No other site may show the app in a frame (clickjacking).
 # - Links to other sites send only our origin, never the page address (receipt/rating links carry a token).
+# - Salon apps, sign-in pages and receipts are private: search engines must not index them (the public site is salonkit.online).
 # - The browser must not guess file types; no camera/mic/location/payment access is ever needed.
 /*
   X-Frame-Options: DENY
@@ -8,3 +9,4 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  X-Robots-Tag: noindex, nofollow
