@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Check, CreditCard, Lock } from "lucide-react";
 import { toast } from "sonner";
-import { FEATURE_KEYS, PLAN_DEFAULTS, type PlanId } from "@ss/features";
+import { FEATURE_KEYS, OVERRIDE_ONLY, PLAN_DEFAULTS, type PlanId } from "@ss/features";
 import { useAuth } from "@/lib/auth-context";
 import { useApi } from "@/hooks/use-api";
 import { api, errorMessage } from "@/lib/api";
@@ -95,6 +95,7 @@ export default function PlanPage() {
               <li key={f} className={`flex items-center gap-2 text-sm ${on ? "" : "text-muted-foreground"}`}>
                 {on ? <Check className="size-4 text-success" /> : <Lock className="size-4" />}
                 {FEATURE_LABELS[f]}
+                {!on && OVERRIDE_ONLY.includes(f) ? <span className="text-xs">(on request)</span> : null}
               </li>
             );
           })}

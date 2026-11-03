@@ -23,7 +23,7 @@ it("infra.ts (rate_hits) is global; its only tenant-table SQL is the sanctioned 
   // The cron's retention deletes (R5) are the one sanctioned unscoped tenant SQL: exactly these literals, each a bare
   // "DELETE FROM <table> WHERE <time column> < ?" (no reads, no other conditions). Anything else in infra.ts is flagged.
   expect(tenantStatements(infraSrc)).toEqual([...GLOBAL_RETENTION_SQL]);
-  for (const sql of GLOBAL_RETENTION_SQL) expect(sql).toMatch(/^DELETE FROM (login_failures|job_runs) WHERE (at|created_at) < \?$/);
+  for (const sql of GLOBAL_RETENTION_SQL) expect(sql).toMatch(/^DELETE FROM (login_failures|job_runs|mcp_calls|mcp_auth_requests|mcp_tokens) WHERE (at|created_at|expires_at|revoked_at) < \?$/);
 });
 
 it("every tenant table has a checked statement somewhere", () => {

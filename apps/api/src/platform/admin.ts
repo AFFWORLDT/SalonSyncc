@@ -1,5 +1,6 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
-import { FEATURE_KEYS, isFeatureKey } from "@ss/features";
+import { FEATURE_KEYS, OVERRIDE_ONLY, isFeatureKey, type FeatureKey } from "@ss/features";
+import { mcpRepo } from "../data/tenant/mcp";
 import type { AppEnv } from "../env";
 import { HttpError } from "../core/errors";
 import { checkPassword, hashPassword, randomToken } from "../core/crypto";
@@ -257,6 +258,21 @@ platformApi.put("/orgs/:id/features/:key", async (c) => {
   return c.json({ ok: true });
 });
 
+// AI connect (feature mcp_api, switched on with the override above): live connections, recent calls, revoke all.
+platformApi.get("/orgs/:id/mcp", async (c) => {
+  const row = await loadOrg(c);
+  const repo = mcpRepo(c.env.DB, row.id);
+  const [summary, connections, calls] = await Promise.all([repo.summary(), repo.connections(), repo.calls(20)]);
+  return c.json({ ...summary, connections, calls });
+});
+
+platformApi.post("/orgs/:id/mcp/revoke-all", async (c) => {
+  const row = await loadOrg(c);
+  const n = await mcpRepo(c.env.DB, row.id).revokeAll();
+  await adminRepo(c.env.DB).audit(auditOf(c, "mcp_revoke_all", row.id, undefined, { revoked: n })).run();
+  return c.json({ ok: true, revoked: n });
+});
+
 platformApi.put("/orgs/:id/limits", async (c) => {
   const row = await loadOrg(c);
   const b = await body(c);
@@ -326,6 +342,7 @@ platformApi.put("/plans/:id", async (c) => {
   if (!(max === null || (Number.isInteger(max) && (max as number) >= 1 && (max as number) <= 1000))) throw bad("Staff limit must be 1 to 1000 or unlimited");
   const features = Array.isArray(b.features) ? [...new Set(b.features.filter((f): f is string => typeof f === "string" && isFeatureKey(f)))] : null;
   if (!features) throw bad("features must be a list");
+  if (features.some((f) => OVERRIDE_ONLY.includes(f as FeatureKey))) throw bad("AI connect is switched on per salon, not per plan");
   if (!features.includes("core_sales")) features.unshift("core_sales");
   const repo = adminRepo(c.env.DB);
   const before = (await repo.plans()).find((p) => p.id === id);

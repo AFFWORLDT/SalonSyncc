@@ -15,6 +15,7 @@ import { ErrorState } from "@/components/admin/states";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { SimpleSelect } from "@/components/app/simple-select";
 import { PLAN_LABEL } from "@/components/platform/org-table";
+import { McpCard } from "@/components/platform/mcp-card";
 import { usePlatformMe } from "@/components/platform/shell";
 import { errorMessage } from "@/lib/api";
 import { ROOT_DOMAIN } from "@/lib/brand";
@@ -258,6 +259,8 @@ function Detail({ id }: { id: string }) {
           })}
         </ul>
       </Card>
+
+      <McpCard orgId={o.id} on={data.features.includes("mcp_api")} owner={owner} />
 
       <Card className="flex-row flex-wrap items-end gap-3 p-4">
         <div className="min-w-0 flex-1">

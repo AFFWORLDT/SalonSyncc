@@ -242,3 +242,45 @@ CASES.push({
     messages: (await env.DB.prepare("SELECT * FROM wa_messages WHERE org_id = ? AND campaign_id = ?").bind(orgId, id).all()).results,
   }),
 });
+
+// ---- AI connect (MCP): connections and OAuth approvals have text ids; the harness's numeric id maps to them ----
+const mcpIds = new Map<number, string>();
+let mcpN = 0;
+/** Every org in the harness gets AI connect, so org B's owner reaches the route (and must get 404, not 403). */
+const mcpOnForAll = () =>
+  env.DB.prepare("INSERT OR IGNORE INTO org_feature_overrides(org_id,feature_key,enabled,set_at) SELECT id,'mcp_api',1,0 FROM orgs").run();
+const seedMcpConnection = async (orgId: string): Promise<number> => {
+  await mcpOnForAll();
+  const user = await env.DB.prepare("SELECT id FROM users WHERE org_id = ? LIMIT 1").bind(orgId).first<{ id: number }>();
+  const conn = `cn_${randomToken(9)}`;
+  await env.DB.prepare("INSERT INTO mcp_tokens(id,org_id,user_id,user_sv,kind,connection_id,name,token_hash,last4,scopes,created_at) VALUES(?,?,?,0,'key',?,?,?,?,'read',?)")
+    .bind(`mt_${randomToken(9)}`, orgId, user!.id, conn, "Key", randomToken(24), "abcd", Date.now()).run();
+  mcpIds.set(++mcpN, conn);
+  return mcpN;
+};
+const readMcpConnection = (orgId: string, n: number) =>
+  env.DB.prepare("SELECT scopes, name, revoked_at FROM mcp_tokens WHERE org_id = ? AND connection_id = ?").bind(orgId, mcpIds.get(n)).first();
+const seedMcpRequest = async (orgId: string): Promise<number> => {
+  await mcpOnForAll();
+  const id = `ar_${randomToken(12)}`;
+  await env.DB.prepare("INSERT INTO mcp_auth_requests(id,org_id,client_id,redirect_uri,code_challenge,scopes,expires_at,created_at) VALUES(?,?,?,?,?,?,?,?)")
+    .bind(id, orgId, "mc_x", "https://claude.ai/api/mcp/auth_callback", "c".repeat(43), "read write", Date.now() + 600_000, Date.now()).run();
+  mcpIds.set(++mcpN, id);
+  return mcpN;
+};
+const readMcpRequest = (orgId: string, n: number) =>
+  env.DB.prepare("SELECT user_id, code_hash, scopes FROM mcp_auth_requests WHERE org_id = ? AND id = ?").bind(orgId, mcpIds.get(n)).first();
+const mcpCase = (method: string, pattern: string, kind: "conn" | "req", body?: unknown): CrossOrgCase => ({
+  name: `${method} ${pattern}`,
+  method,
+  path: (n) => pattern.replace(":id", mcpIds.get(n)!),
+  body,
+  seed: kind === "conn" ? seedMcpConnection : seedMcpRequest,
+  read: kind === "conn" ? readMcpConnection : readMcpRequest,
+});
+CASES.push(
+  mcpCase("PUT", "/api/mcp/connections/:id", "conn", { scope: "write", name: "Pwned" }),
+  mcpCase("DELETE", "/api/mcp/connections/:id", "conn"),
+  mcpCase("GET", "/api/mcp/requests/:id", "req"),
+  mcpCase("POST", "/api/mcp/requests/:id", "req", { approve: true, write: true }),
+);
