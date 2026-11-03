@@ -27,6 +27,8 @@ import { campaigns } from "./tenant/campaigns/routes";
 import { waWebhook } from "./integrations/wa-webhook";
 import { stripeWebhook } from "./integrations/stripe-webhook";
 import { billing } from "./tenant/billing/routes";
+import { mcp } from "./tenant/mcp/routes";
+import { mcpHttp } from "./mcp/http";
 import { hourly } from "./jobs/hourly";
 import type { Env } from "./env";
 
@@ -51,6 +53,9 @@ app.route("/api/public", publicApi);
 app.route("/api/wa/webhook", waWebhook);
 // Stripe's webhook: no session (signature-checked), before the tenant router.
 app.route("/api/stripe/webhook", stripeWebhook);
+// AI connect (MCP + OAuth) on the salon host, outside /api: bearer tokens, no session. Its tools call the tenant routes
+// below in-process through app.fetch, as the token's user.
+app.route("/", mcpHttp(async (req, env, ctx) => app.fetch(req, env, ctx)));
 
 // Tenant routes. FAIL-CLOSED: the router-level guard runs tenantAuth whenever a real (non-middleware) handler
 // matched this request, so a route added here without its own auth is still protected. Paths that match no
@@ -106,6 +111,8 @@ tenantApi.route("/", ratings);
 tenantApi.route("/", whatsapp);
 // /wa/templates, /wa/test, /wa/audience, /wa/campaigns(/:id/next), /wa/media; gated per route (feature whatsapp_campaigns, admin, WA-ready).
 tenantApi.route("/", campaigns);
+// /mcp, /mcp/keys, /mcp/connections/:id, /mcp/requests/:id (AI connect page and OAuth consent; admin, feature mcp_api).
+tenantApi.route("/", mcp);
 app.route("/api", tenantApi);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
@@ -125,7 +132,8 @@ app.onError((err, c) => {
  */
 async function fetchWithHeaders(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const res = await app.fetch(req, env, ctx);
-  if (!new URL(req.url).pathname.startsWith("/api/")) return res;
+  const path = new URL(req.url).pathname;
+  if (!path.startsWith("/api/") && path !== "/mcp" && !path.startsWith("/oauth/") && !path.startsWith("/.well-known/")) return res;
   const out = new Response(res.body, res);
   const h = out.headers;
   if (!h.has("Cache-Control")) h.set("Cache-Control", "no-store");

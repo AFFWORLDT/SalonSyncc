@@ -69,10 +69,12 @@ export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!org || org.status === "deactivated" || org.status === "deleted") throw new HttpError(401, "Please sign in");
 
   const repo = tenantRepo(c.env.DB, org.id);
-  const user = await repo.userById(session.uid);
-  if (!user || user.org_id !== org.id || !user.active || user.session_version !== session.v) {
+  const row = await repo.userById(session.uid);
+  if (!row || row.org_id !== org.id || !row.active || row.session_version !== session.v) {
     throw new HttpError(401, "Please sign in");
   }
+  // AI connect's in-process calls (mcp/server.ts): the audit actor reads "<name> via AI connect (<connection>)".
+  const user = c.env.MCP_VIA ? { ...row, name: `${row.name} via ${c.env.MCP_VIA}`.slice(0, 160) } : row;
 
   // Support mode ends the moment the platform user is removed or changes their password.
   if (session.sp !== undefined) {

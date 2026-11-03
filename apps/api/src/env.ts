@@ -35,6 +35,11 @@ export interface Env {
   ASSETS?: Fetcher;
   /** Local dev only (.dev.vars), comma-separated origins allowed to write cross-origin, e.g. http://localhost:3000. Never in wrangler vars. */
   DEV_ALLOWED_ORIGINS?: string;
+  /**
+   * Internal only: set by the AI connect tool runner (mcp/server.ts) on the env copy it passes to its in-process route
+   * call, never a wrangler var or secret. tenantAuth appends " via <MCP_VIA>" to the user's name so audit rows show it.
+   */
+  MCP_VIA?: string;
 }
 
 export interface TenantContext {
