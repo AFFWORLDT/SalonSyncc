@@ -13,7 +13,6 @@ export const LOGIN_SCENES: LoginScene[] = [
   { src: "/login/salon-1.jpg", alt: "Salon chairs between glowing arched mirrors", mesh: ["#1f1912", "#4d3a26", "#9c7a4e", "#d8bf92", "#33261a"] },
   { src: "/login/salon-2.jpg", alt: "A bright salon with lit mirrors and black chairs", mesh: ["#1a1815", "#3d3730", "#8a7a5e", "#e2d6bd", "#2a2622"] },
   { src: "/login/salon-3.jpg", alt: "A dark wood salon with a round lit mirror", mesh: ["#100e0c", "#2e241c", "#6b4f38", "#b08a5c", "#221c17"] },
-  { src: "/login/salon-4.jpg", alt: "A white marble salon under a round ceiling light", mesh: ["#1f1b16", "#5a4a36", "#a88f66", "#ece2cf", "#3a3024"] },
   { src: "/login/salon-5.jpg", alt: "Olive green chairs and copper wash stations", mesh: ["#141c16", "#2e3a2c", "#5f6b45", "#c08a5b", "#1f2a22"] },
   { src: "/login/salon-6.jpg", alt: "Gold arched mirrors and gold chairs on marble", mesh: ["#1c1610", "#5e4a2a", "#b38c4c", "#eadbb8", "#3a2d1c"] },
 ];
