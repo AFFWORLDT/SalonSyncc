@@ -1,7 +1,10 @@
 # FM Salon cutover (spec P1b)
 
-FM Salon moves from its own Worker (`fm-salon`, database `fm-salon-db`) to SalonKit as the salon **fm**:
-https://fm.salonkit.online. Plan: `docs/superpowers/plans/2026-11-05-plan-8-fm-import.md`.
+FM Salon moves from its own Worker (`fm-salon`, database `fm-salon-db`) to SalonKit as the salon **fmsalon**:
+https://fmsalon.salonkit.online. Plan: `docs/superpowers/plans/2026-11-05-plan-8-fm-import.md`.
+
+**Done 2026-11-03 09:17 Dubai:** 63/63 totals matched. The planned address `fm` was too short (salon IDs need
+3+ characters), so the salon was renamed to `fmsalon` within minutes and the redirect re-pointed.
 
 ## What carries over
 Staff (same usernames and passwords, photos), customers, services, every sale with its bill number and receipt link,
@@ -28,17 +31,17 @@ cd apps/api && FM_OWNER_EMAIL=owner@example.com scripts/fm-cutover.sh /tmp/fm-cu
 It redirects FM's old URL (so no new sales go into the old database), exports `fm-salon-db`, imports it into
 `salonkit-db`, and compares the totals (counts, sales, commission, VAT, takings per day, every ledger balance).
 `FM_OWNER_EMAIL` is where account emails go (optional; without it the owner gets none).
-It first checks that `fm` is free and that no ids already sit at the import offset (it refuses a second run).
+It first checks that `fmsalon` is free and that no ids already sit at the import offset (it refuses a second run).
 It ends with `totals match` or stops and prints the rollback. Delete the folder afterwards.
 Rehearsed end to end on a throwaway remote D1 (2026-11-05): preflight ok, 45 statements, 63/63 totals, purge clean;
 the redirect Worker answered 302 for links and passed the webhook through.
 
 ## After
 1. Straight away (until then WhatsApp replies such as STOP and delivery receipts are dropped), the owner signs in
-   at https://fm.salonkit.online → Settings → WhatsApp and connects:
+   at https://fmsalon.salonkit.online → Settings → WhatsApp and connects:
    phone number ID `1349313824939474`, WABA ID `1154099460522173`, and the permanent token.
    Bill messages, rating requests and visit reminders resume with FM's own approved templates.
-2. Staff open https://fm.salonkit.online (the old link redirects too), sign in, turn notifications back on,
+2. Staff open https://fmsalon.salonkit.online (the old link redirects too), sign in, turn notifications back on,
    and re-add the app to their home screen from the new address.
 3. Meta's webhook can stay on the old URL: the redirect Worker passes it through to SalonKit.
 4. **Keep the redirect Worker forever.** FM's approved rating templates have the old address built into their

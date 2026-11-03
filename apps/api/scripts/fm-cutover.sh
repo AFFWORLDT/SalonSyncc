@@ -16,7 +16,7 @@ rollback() {
 trap 'echo "FAILED at line $LINENO"; rollback' ERR
 
 echo "0/4 preflight: slug free, ids below the offset"
-(cd "$API" && node --experimental-strip-types --no-warnings -e "import('./scripts/fm-import/build.ts').then(m => process.stdout.write(m.preflightSql('org_fm', 'fm')))" >"$WORK/preflight.sql")
+(cd "$API" && node --experimental-strip-types --no-warnings -e "import('./scripts/fm-import/build.ts').then(m => process.stdout.write(m.preflightSql('org_fm', 'fmsalon')))" >"$WORK/preflight.sql")
 (cd "$API" && npx wrangler d1 execute salonkit-db --remote --json --command "$(cat "$WORK/preflight.sql")" >"$WORK/pre.json")
 (cd "$API" && node --experimental-strip-types --no-warnings scripts/fm-import.ts --preflight "$WORK/pre.json")
 echo "1/4 redirecting FM's old URL"
@@ -30,4 +30,4 @@ echo "3/4 importing into salonkit-db"
 echo "4/4 comparing totals"
 (cd "$API" && npx wrangler d1 execute salonkit-db --remote --json --command "$(cat "$WORK/out/totals-ss.sql")" >"$WORK/totals-ss.json")
 (cd "$API" && node --experimental-strip-types --no-warnings scripts/fm-import.ts --compare "$WORK/out/totals-fm.json" "$WORK/totals-ss.json")
-echo "Done: FM Salon is live at https://fm.salonkit.online"
+echo "Done: FM Salon is live at https://fmsalon.salonkit.online"

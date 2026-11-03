@@ -14,7 +14,7 @@ import { join, resolve } from "node:path";
 import { buildFmImport, purgeSql, totalsSql, compareTotals, preflightSql, preflightProblems, type FmSource, type Row } from "./fm-import/build.ts";
 
 const ORG_ID = "org_fm";
-const SLUG = "fm";
+const SLUG = "fmsalon"; // slugs need 3+ characters (core/tenant.ts SLUG_RE), so not "fm"
 const TABLES = [
   "settings", "users", "customers", "services", "sales", "sale_items", "expenses", "company_expenses", "barber_payouts",
   "money_transfers", "ledger_entries", "audit_log", "notifications", "announcements", "ratings", "wa_campaigns", "wa_messages", "counters",
