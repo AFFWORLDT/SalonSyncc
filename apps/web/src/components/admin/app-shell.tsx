@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth, PUBLIC_PATHS as AUTH_FREE } from "@/lib/auth-context";
 import { AppSidebar } from "@/components/admin/app-sidebar";
 import { BottomBar } from "@/components/admin/bottom-bar";
+import { PromoBar, usePromo } from "@/components/app/promo-bar";
 import { TopBar } from "@/components/admin/top-bar";
 import { SaleSheetProvider } from "@/components/app/sale-sheet";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -137,9 +138,9 @@ function Frame({ children }: { children: React.ReactNode }) {
           )}
 
           <div className="flex h-full min-w-0 flex-1 flex-col">
-            <TopBar onOpenMobileNav={() => setMobileOpen(true)} onToggleCollapsed={toggleCollapsed} />
+            <PromoAndTopBar onOpenMobileNav={() => setMobileOpen(true)} onToggleCollapsed={toggleCollapsed} />
             <SupportBanner />
-            <SubscriptionBanner />
+            {!isAdmin && <SubscriptionBanner />}
             {!me?.support && <ProductTour />}
             <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
               <PullToRefresh scrollRef={mainRef} />
@@ -152,5 +153,16 @@ function Frame({ children }: { children: React.ReactNode }) {
         </div>
       </SaleSheetProvider>
     </TooltipProvider>
+  );
+}
+
+/** The subscribe bar (owners and admins, until the salon subscribes) sits above the header and takes the notch padding. */
+function PromoAndTopBar({ onOpenMobileNav, onToggleCollapsed }: { onOpenMobileNav: () => void; onToggleCollapsed: () => void }) {
+  const { promo, dismiss, subscribe, busy } = usePromo();
+  return (
+    <>
+      {promo && <PromoBar promo={promo} onDismiss={dismiss} onSubscribe={() => void subscribe()} busy={busy} />}
+      <TopBar onOpenMobileNav={onOpenMobileNav} onToggleCollapsed={onToggleCollapsed} safeTop={!promo} />
+    </>
   );
 }

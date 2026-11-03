@@ -245,3 +245,12 @@ input:-webkit-autofill:focus {
 }
 .driver-popover.ss-tour .driver-popover-close-btn { color: var(--muted-foreground); }
 .driver-popover.ss-tour .driver-popover-arrow { border-color: transparent; }
+
+/* The subscribe bar's slow light sweep. */
+@keyframes promo-sheen {
+  0%, 55% { transform: translateX(0); }
+  100% { transform: translateX(450%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-testid="promo-bar"] > div[aria-hidden] { animation: none; display: none; }
+}
