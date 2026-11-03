@@ -45,7 +45,7 @@ describe("AI connect: menu and sign-in return", () => {
   });
   it("after sign-in only paths on this site are followed", () => {
     expect(nextPath("?next=%2Fconnect%2Fauthorize%2F%3Freq%3Dar_1")).toBe("/connect/authorize/?req=ar_1");
-    for (const bad of ["?next=https://evil.example", "?next=//evil.example", "?next=/\\evil.example", "?next=/login/", ""]) expect(nextPath(bad)).toBe("/");
+    for (const bad of ["?next=https://evil.example", "?next=//evil.example", "?next=/\\evil.example", "?next=/%09/evil.example", "?next=/%0A/evil.example", "?next=/login/", ""]) expect(nextPath(bad)).toBe("/");
   });
 });
 

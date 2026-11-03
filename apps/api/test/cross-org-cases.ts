@@ -253,7 +253,7 @@ const seedMcpConnection = async (orgId: string): Promise<number> => {
   await mcpOnForAll();
   const user = await env.DB.prepare("SELECT id FROM users WHERE org_id = ? LIMIT 1").bind(orgId).first<{ id: number }>();
   const conn = `cn_${randomToken(9)}`;
-  await env.DB.prepare("INSERT INTO mcp_tokens(id,org_id,user_id,kind,connection_id,name,token_hash,last4,scopes,created_at) VALUES(?,?,?,'key',?,?,?,?,'read',?)")
+  await env.DB.prepare("INSERT INTO mcp_tokens(id,org_id,user_id,user_sv,kind,connection_id,name,token_hash,last4,scopes,created_at) VALUES(?,?,?,0,'key',?,?,?,?,'read',?)")
     .bind(`mt_${randomToken(9)}`, orgId, user!.id, conn, "Key", randomToken(24), "abcd", Date.now()).run();
   mcpIds.set(++mcpN, conn);
   return mcpN;

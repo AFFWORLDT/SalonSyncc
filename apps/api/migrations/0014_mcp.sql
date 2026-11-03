@@ -27,6 +27,8 @@ CREATE TABLE mcp_tokens (
   id TEXT PRIMARY KEY,
   org_id TEXT NOT NULL REFERENCES orgs(id),
   user_id INTEGER NOT NULL,
+  -- The user's session_version at issue: a password change or sign-out-everywhere ends their AI credentials too.
+  user_sv INTEGER NOT NULL,
   kind TEXT NOT NULL CHECK (kind IN ('key', 'access', 'refresh')),
   connection_id TEXT NOT NULL,
   name TEXT NOT NULL,

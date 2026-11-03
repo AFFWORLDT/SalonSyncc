@@ -87,8 +87,8 @@ export function mcpRepo(db: D1Database, orgId: string) {
     async issueStmt(id: string, secret: string, t: { userId: number; kind: McpKind; connectionId: string; name: string; scopes: McpScope[]; clientId?: string | null; expiresAt: number | null }): Promise<D1PreparedStatement> {
       return db
         .prepare(
-          `INSERT INTO mcp_tokens (id, org_id, user_id, kind, connection_id, name, token_hash, last4, scopes, client_id, expires_at, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO mcp_tokens (id, org_id, user_id, user_sv, kind, connection_id, name, token_hash, last4, scopes, client_id, expires_at, created_at)
+           SELECT ?1, ?2, ?3, u.session_version, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12 FROM users u WHERE u.org_id = ?2 AND u.id = ?3`,
         )
         .bind(id, orgId, t.userId, t.kind, t.connectionId, t.name, await sha256(secret), secret.slice(-4), t.scopes.join(" "), t.clientId ?? null, t.expiresAt, Date.now());
     },
@@ -101,12 +101,24 @@ export function mcpRepo(db: D1Database, orgId: string) {
                   u.role, u.active, u.session_version, u.name AS user_name,
                   (SELECT enabled FROM org_feature_overrides WHERE org_id = t.org_id AND feature_key = 'mcp_api') AS feature_on
              FROM mcp_tokens t JOIN users u ON u.id = t.user_id AND u.org_id = t.org_id
-            WHERE t.org_id = ? AND t.token_hash = ? AND t.revoked_at IS NULL AND COALESCE(t.expires_at, 9e15) > ?`,
+            WHERE t.org_id = ? AND t.token_hash = ? AND t.revoked_at IS NULL AND COALESCE(t.expires_at, 9e15) > ? AND u.session_version = t.user_sv`,
         )
         .bind(orgId, await sha256(secret), now)
         .first<Omit<McpPrincipal, "scopes"> & { scopes: string }>();
       if (!r || !kinds.includes(r.kind)) return null;
       return { ...r, scopes: parseScopes(r.scopes) };
+    },
+
+    /** True when this secret was ever issued here (live or not): an expired or revoked token is not a guess. */
+    async known(secret: string): Promise<boolean> {
+      const r = await db.prepare("SELECT 1 AS x FROM mcp_tokens WHERE org_id = ? AND token_hash = ?").bind(orgId, await sha256(secret)).first();
+      return !!r;
+    },
+
+    /** The super admin's mcp_api override, straight from D1. */
+    async featureOn(): Promise<boolean> {
+      const r = await db.prepare("SELECT enabled FROM org_feature_overrides WHERE org_id = ? AND feature_key = 'mcp_api'").bind(orgId).first<{ enabled: number }>();
+      return r?.enabled === 1;
     },
 
     /** last_used_at / last_ip, at most once a minute per credential. */

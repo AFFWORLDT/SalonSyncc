@@ -28,6 +28,7 @@ export const AUTH_FAILS_BEFORE_BLOCK = 20;
 const FAIL_WINDOW_MS = 10 * 60_000;
 const BLOCK_MS = 60 * 60_000;
 const REGISTER_PER_HOUR = 10;
+const AUTHORIZE_PER_MIN = 20;
 const TOKEN_PER_MIN = 30;
 
 const ip = (c: Context<AppEnv>) => c.req.header("CF-Connecting-IP") ?? "unknown";
@@ -54,20 +55,22 @@ const guardError = (c: Context<AppEnv>, status: number, error: string, message: 
     ...(extra.www ? { "WWW-Authenticate": `Bearer resource_metadata="${metadataUrl(origin(c))}"` } : {}),
   });
 
-// ---------- IP block (rate_hits: mcp-fail:<ip> counts in 10-minute windows, mcp-block:<ip> stores the minute it ends) ----------
+// ---------- IP block, per salon (Claude's connectors share egress IPs, so one salon's noise must never block another) ----------
+// rate_hits rows are in minute units so the cron prune (data/infra.ts) keeps the live ones: mcp-fail:<org>:<ip> counts
+// unknown tokens in a 10-minute bucket (window = the bucket's first minute); mcp-block:<org>:<ip> stores the minute it ends.
 
-async function blockedFor(db: D1Database, addr: string, now: number): Promise<number> {
-  const r = await db.prepare("SELECT window FROM rate_hits WHERE key = ?").bind(`mcp-block:${addr}`).first<{ window: number }>();
+async function blockedFor(db: D1Database, orgId: string, addr: string, now: number): Promise<number> {
+  const r = await db.prepare("SELECT window FROM rate_hits WHERE key = ?").bind(`mcp-block:${orgId}:${addr}`).first<{ window: number }>();
   const left = r ? (r.window - minuteWindow(now)) * 60 : 0;
   return left > 0 ? left : 0;
 }
 
-async function authFailed(db: D1Database, addr: string, now: number): Promise<void> {
-  const n = await rateHit(db, `mcp-fail:${addr}`, Math.floor(now / FAIL_WINDOW_MS));
+async function authFailed(db: D1Database, orgId: string, addr: string, now: number): Promise<void> {
+  const n = await rateHit(db, `mcp-fail:${orgId}:${addr}`, Math.floor(now / FAIL_WINDOW_MS) * (FAIL_WINDOW_MS / 60_000));
   if (n >= AUTH_FAILS_BEFORE_BLOCK) {
     await db
       .prepare("INSERT INTO rate_hits (key, window, n) VALUES (?, ?, 1) ON CONFLICT(key) DO UPDATE SET window = excluded.window, n = 1")
-      .bind(`mcp-block:${addr}`, minuteWindow(now + BLOCK_MS))
+      .bind(`mcp-block:${orgId}:${addr}`, minuteWindow(now + BLOCK_MS))
       .run();
   }
 }
@@ -181,15 +184,15 @@ export function mcpHttp(inner: Fetcher): Hono<AppEnv> {
     if (!org) return json(c, { error: "not_found", message: "No salon at this address" }, 404);
 
     const addr = ip(c);
-    const blocked = await blockedFor(db, addr, now);
-    if (blocked) return guardError(c, 429, "blocked", "Too many failed sign-ins from this network. Try again later.", { retry_after: blocked });
-
     const secret = bearer(c);
     if (!secret) return guardError(c, 401, "invalid", "Connect with an API key or sign in with OAuth", { www: true });
     const repo = mcpRepo(db, org.id);
+    // A live token always gets through; the block only stops guessing (unknown tokens) from this IP on this salon.
     const principal = TOKEN_RE.test(secret) ? await repo.principal(secret, ["key", "access"], now) : null;
     if (!principal) {
-      await authFailed(db, addr, now);
+      const blocked = await blockedFor(db, org.id, addr, now);
+      if (blocked) return guardError(c, 429, "blocked", "Too many failed sign-ins from this network. Try again later.", { retry_after: blocked });
+      if (!TOKEN_RE.test(secret) || !(await repo.known(secret))) await authFailed(db, org.id, addr, now);
       return guardError(c, 401, "invalid", "This key or token is not valid for this salon (wrong salon, expired or revoked)", { www: true });
     }
     const no = refusal(principal);
@@ -238,7 +241,7 @@ export function mcpHttp(inner: Fetcher): Hono<AppEnv> {
   // ---------- OAuth 2.1 ----------
   r.post("/oauth/register", async (c) => {
     if (!(await hostOrg(c))) return json(c, { error: "Not found" }, 404);
-    if ((await rateHit(c.env.DB, `mcp-reg:${ip(c)}`, hourWindow(Date.now()))) > REGISTER_PER_HOUR) return json(c, { error: "rate_limited", error_description: "Too many registrations" }, 429);
+    if ((await rateHit(c.env.DB, `mcp-reg:${ip(c)}`, hourWindow(Date.now()) * 60)) > REGISTER_PER_HOUR) return json(c, { error: "rate_limited", error_description: "Too many registrations" }, 429);
     const text = await readBody(c);
     let b: Record<string, unknown> = {};
     try {
@@ -258,6 +261,7 @@ export function mcpHttp(inner: Fetcher): Hono<AppEnv> {
   r.get("/oauth/authorize", async (c) => {
     const org = await hostOrg(c);
     if (!org) return json(c, { error: "Not found" }, 404);
+    if ((await rateHit(c.env.DB, `mcp-auth:${ip(c)}`, minuteWindow(Date.now()))) > AUTHORIZE_PER_MIN) return json(c, { error: "rate_limited", error_description: "Too many requests" }, 429, { "Retry-After": "60" });
     const q = c.req.query();
     const client = q.client_id ? await mcpClientById(c.env.DB, q.client_id) : null;
     // Unknown client or redirect URI: never redirect (RFC 6749 4.1.2.1).
@@ -270,6 +274,7 @@ export function mcpHttp(inner: Fetcher): Hono<AppEnv> {
       if (q.state) u.searchParams.set("state", q.state);
       return c.redirect(u.toString(), 302);
     };
+    if (!(await mcpRepo(c.env.DB, org.id).featureOn())) return back("access_denied", "AI connect isn't switched on for this salon. Ask SalonKit support.");
     if (q.response_type !== "code") return back("unsupported_response_type", "Only response_type=code");
     if (q.code_challenge_method !== "S256" || !/^[A-Za-z0-9_-]{43}$/.test(q.code_challenge ?? "")) return back("invalid_request", "PKCE with S256 is required");
     if (q.resource && q.resource.replace(/\/$/, "") !== resourceUrl(origin(c))) return back("invalid_target", "Unknown resource");

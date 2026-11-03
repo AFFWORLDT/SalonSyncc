@@ -210,7 +210,7 @@ describe("AI connect: API keys and the /mcp endpoint", () => {
     const ip = freshIp();
     const fake = `skt_${"a".repeat(40)}`;
     for (let i = 0; i < AUTH_FAILS_BEFORE_BLOCK; i++) expect((await rpc("mcp-limit", fake, "tools/list", undefined, ip)).status).toBe(401);
-    const blocked = await rpc("mcp-limit", k.secret, "tools/list", undefined, ip);
+    const blocked = await rpc("mcp-limit", fake, "tools/list", undefined, ip);
     expect(blocked.status).toBe(429);
     expect((await j(blocked)).error).toBe("blocked");
 
@@ -228,6 +228,53 @@ describe("AI connect: API keys and the /mcp endpoint", () => {
     const r = await callTool("mcp-iso-a", k.secret, "list_expenses");
     expect(JSON.stringify(r.body)).toContain("A own rent");
     expect(JSON.stringify(r.body)).not.toContain("B secret rent");
+  });
+});
+
+describe("AI connect: review fixes", () => {
+  it("bad tokens block that IP for one salon only, valid tokens still work, and expired tokens don't count", async () => {
+    const a = await salon("mcp-blk-a");
+    await salon("mcp-blk-b");
+    const ka = await newKey("mcp-blk-a", a.ck, "read");
+    const b = await loginAs("mcp-blk-b", "own", "pass1234", "mcp-blk-b.salonkit.online");
+    const kb = await newKey("mcp-blk-b", b, "read");
+    const ip = freshIp();
+    // An expired (known) token is not a guess: it never counts toward the block.
+    const old = await newKey("mcp-blk-a", a.ck, "read");
+    await env.DB.prepare("UPDATE mcp_tokens SET expires_at = 1 WHERE org_id = ? AND connection_id = ?").bind(a.org.id, old.connection_id).run();
+    for (let i = 0; i < AUTH_FAILS_BEFORE_BLOCK + 2; i++) expect((await rpc("mcp-blk-a", old.secret, "tools/list", undefined, ip)).status).toBe(401);
+    expect((await rpc("mcp-blk-a", `skt_${"q".repeat(40)}`, "tools/list", undefined, ip)).status).toBe(401);
+    for (let i = 0; i < AUTH_FAILS_BEFORE_BLOCK; i++) await rpc("mcp-blk-a", `skt_${"z".repeat(40)}`, "tools/list", undefined, ip);
+    expect((await j(await rpc("mcp-blk-a", `skt_${"z".repeat(40)}`, "tools/list", undefined, ip))).error).toBe("blocked");
+    expect((await rpc("mcp-blk-a", ka.secret, "tools/list", undefined, ip)).status).toBe(200);
+    expect((await rpc("mcp-blk-b", kb.secret, "tools/list", undefined, ip)).status).toBe(200);
+    expect((await rpc("mcp-blk-b", `skt_${"z".repeat(40)}`, "tools/list", undefined, ip)).status).toBe(401);
+  });
+
+  it("JSON-RPC batches are refused", async () => {
+    const s = await salon("mcp-batch");
+    const k = await newKey("mcp-batch", s.ck, "write");
+    const one = { jsonrpc: "2.0", method: "tools/call", params: { name: "add_expense", arguments: { amount: 1, note: "x" } } };
+    const r = await go(`${host("mcp-batch")}/mcp`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${k.secret}` }, body: JSON.stringify([{ ...one, id: 1 }, { ...one, id: 2 }]) });
+    expect((await j(r)).error.code).toBe(-32600);
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM company_expenses WHERE org_id = ?").bind(s.org.id).first<any>()).n).toBe(0);
+  });
+
+  it("a password change or sign-out-everywhere ends the user's AI credentials", async () => {
+    const s = await salon("mcp-sv");
+    const k = await newKey("mcp-sv", s.ck, "read");
+    expect((await rpc("mcp-sv", k.secret, "tools/list")).status).toBe(200);
+    await env.DB.prepare("UPDATE users SET session_version = session_version + 1 WHERE org_id = ? AND id = ?").bind(s.org.id, s.own.id).run();
+    expect((await rpc("mcp-sv", k.secret, "tools/list")).status).toBe(401);
+  });
+
+  it("/oauth/authorize refuses when the feature is off", async () => {
+    const s = await salon("mcp-az", { on: false });
+    const o = host("mcp-az");
+    const reg = await j(await go(`${o}/oauth/register`, { method: "POST", headers: { "content-type": "application/json", "cf-connecting-ip": freshIp() }, body: JSON.stringify({ client_name: "X", redirect_uris: ["https://claude.ai/cb"] }) }));
+    const r = await go(`${o}/oauth/authorize?${new URLSearchParams({ response_type: "code", client_id: reg.client_id, redirect_uri: "https://claude.ai/cb", code_challenge: "c".repeat(43), code_challenge_method: "S256" })}`, { redirect: "manual" });
+    expect(new URL(r.headers.get("location")!).searchParams.get("error")).toBe("access_denied");
+    expect((await env.DB.prepare("SELECT COUNT(*) AS n FROM mcp_auth_requests WHERE org_id = ?").bind(s.org.id).first<any>()).n).toBe(0);
   });
 });
 

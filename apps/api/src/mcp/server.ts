@@ -48,13 +48,11 @@ export const toolError = (error: string, message: string, extra: Record<string, 
   isError: true,
 });
 
-/** Handles one parsed body (a message or a batch). Null when nothing needs answering (notifications only): HTTP 202. */
+/** Handles one parsed message. Null when nothing needs answering (notifications only): HTTP 202. */
 export async function handleRpc(body: unknown, ctx: RpcContext): Promise<unknown | null> {
-  if (Array.isArray(body)) {
-    if (body.length === 0) return rpcError(null, -32600, "Empty batch");
-    const out = (await Promise.all(body.slice(0, 20).map((m) => handleOne(m, ctx)))).filter((r) => r !== null);
-    return out.length ? out : null;
-  }
+  // JSON-RPC batches are refused (removed from MCP in 2025-06-18): one call per request keeps the rate limit and the
+  // Workers free plan's 50 D1 statements per invocation meaningful.
+  if (Array.isArray(body)) return rpcError(null, -32600, "Batching is not supported: send one message per request");
   return handleOne(body, ctx);
 }
 
