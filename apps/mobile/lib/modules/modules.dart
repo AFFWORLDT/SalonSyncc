@@ -1,6 +1,7 @@
 import '../core/features/feature_module.dart';
 import 'account/account_module.dart';
 import 'announcements/announcements_module.dart';
+import 'audit/audit_module.dart';
 import 'bills/bills_module.dart';
 import 'customers/customers_module.dart';
 import 'dashboard/dashboard_module.dart';
@@ -27,6 +28,8 @@ final appModules = <FeatureModule>[
   servicesModule,
   customersModule,
   sendAnnouncementsModule,
+  ratingsModule,
+  auditModule,
   expensesModule,
   billsModule,
   historyModule,
