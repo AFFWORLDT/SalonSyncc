@@ -117,7 +117,7 @@ class _SalonScreenState extends State<SalonScreen> {
                               const SizedBox(height: 12),
                               Text(f.brand.name!, style: t.titleLarge?.copyWith(fontWeight: FontWeight.w600), textAlign: TextAlign.center),
                               const SizedBox(height: 20),
-                              FilledButton(onPressed: () => _continue(f), child: const Text('Continue')),
+                              FilledButton(style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)), onPressed: () => _continue(f), child: const Text('Continue')),
                             ]),
                           )
                         : _error != null

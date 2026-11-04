@@ -42,7 +42,8 @@ ThemeData buildTheme(SkPalette p, Brightness b) {
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(50),
+        // Not full width: buttons sit in rows too. Screens that want a wide button stretch it or say so.
+        minimumSize: const Size(64, 50),
         shape: const StadiumBorder(),
         textStyle: const TextStyle(fontFamily: kTextFont, fontWeight: FontWeight.w600, fontSize: 16),
       ),
