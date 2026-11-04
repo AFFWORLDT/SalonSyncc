@@ -12,6 +12,7 @@ import '../../core/ui/states.dart';
 import '../../data/admin_reports_api.dart';
 import '../../models/daily_sheet.dart';
 import '../../models/me.dart';
+import '../../shell/nav.dart';
 import '../history/history_screen.dart' show prevMonth, nextMonth;
 
 typedef ShareFile = Future<void> Function(Uint8List bytes, String name);
@@ -39,7 +40,7 @@ class SheetScreen extends StatefulWidget {
 
 class _SheetScreenState extends State<SheetScreen> {
   late final String _current = widget.me.today.substring(0, 7);
-  late String _month = _current;
+  late String _month;
   DailySheet? _d;
   Object? _error;
   bool _showExp = false, _exporting = false;
@@ -48,7 +49,24 @@ class _SheetScreenState extends State<SheetScreen> {
   @override
   void initState() {
     super.initState();
+    _month = sheetMonthRequest.value ?? _current; // read before clearing the request
+    sheetMonthRequest.value = null;
+    sheetMonthRequest.addListener(_asked);
     _load();
+  }
+
+  @override
+  void dispose() {
+    sheetMonthRequest.removeListener(_asked);
+    super.dispose();
+  }
+
+  /// Opened again from Monthly for one month.
+  void _asked() {
+    final m = sheetMonthRequest.value;
+    if (m == null) return;
+    sheetMonthRequest.value = null;
+    _go(m);
   }
 
   Future<void> _load() async {

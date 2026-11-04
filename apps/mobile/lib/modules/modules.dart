@@ -1,11 +1,18 @@
 import '../core/features/feature_module.dart';
 import 'account/account_module.dart';
 import 'announcements/announcements_module.dart';
+import 'audit/audit_module.dart';
 import 'bills/bills_module.dart';
+import 'customers/customers_module.dart';
 import 'dashboard/dashboard_module.dart';
 import 'expenses/expenses_module.dart';
 import 'history/history_module.dart';
+import 'ledger/ledger_module.dart';
+import 'monthly/monthly_module.dart';
+import 'plan/plan_module.dart';
 import 'sales/sales_module.dart';
+import 'services/services_module.dart';
+import 'settings/settings_module.dart';
 import 'sheet/sheet_module.dart';
 import 'staff/staff_module.dart';
 import 'home/home_module.dart';
@@ -18,6 +25,15 @@ final appModules = <FeatureModule>[
   adminBillsModule,
   sheetModule,
   staffModule,
+  monthlyModule,
+  ledgerModule,
+  servicesModule,
+  customersModule,
+  sendAnnouncementsModule,
+  ratingsModule,
+  auditModule,
+  settingsModule,
+  planModule,
   expensesModule,
   billsModule,
   historyModule,

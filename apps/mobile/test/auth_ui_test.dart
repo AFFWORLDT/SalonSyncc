@@ -32,6 +32,31 @@ Future<void> typeSalon(WidgetTester t, String id) async {
 void main() {
   tearDown(Get.reset);
 
+  testWidgets('signing out from a screen opened on top goes back to sign-in (nothing left above it)', (t) async {
+    final a = putAuth(salonApi());
+    await t.runAsync(() async {
+      await a.chooseSalon(const SavedSalonForTest().salon);
+      await a.signIn('ali', 'pass1234');
+      await a.boot();
+    });
+    await t.pumpWidget(const SalonKitApp());
+    // The signed-in home keeps loading skeletons pulsing, so step time instead of waiting to settle.
+    Future<void> step() async {
+      for (var i = 0; i < 10; i++) {
+        await t.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    await step();
+    Get.to<void>(() => const Scaffold(body: Text('PUSHED PAGE')));
+    await step();
+    expect(find.text('PUSHED PAGE'), findsOneWidget);
+    await t.runAsync(a.signOut);
+    await step();
+    expect(find.text('PUSHED PAGE'), findsNothing);
+    expect(find.text('Sign in to Super Salon'), findsOneWidget);
+  });
+
   testWidgets('typing an ID shows the salon after debounce', (t) async {
     await start(t);
     expect(find.text('Enter your salon ID'), findsOneWidget);

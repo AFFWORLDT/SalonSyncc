@@ -9,6 +9,11 @@ const h=c.pbkdf2Sync("pass1234",salt,10000,32,"sha256");
 const b=(x)=>x.toString("base64url");console.log(`pbkdf2$10000$${b(salt)}$${b(h)}`);')
 NOW=$(($(date +%s) * 1000))
 SQL="
+DELETE FROM ratings WHERE org_id='org_e2e';
+DELETE FROM money_transfers WHERE org_id='org_e2e';
+DELETE FROM barber_payouts WHERE org_id='org_e2e';
+DELETE FROM wa_messages WHERE org_id='org_e2e';
+DELETE FROM org_whatsapp WHERE org_id='org_e2e';
 DELETE FROM sale_items WHERE org_id='org_e2e';
 DELETE FROM sales WHERE org_id='org_e2e';
 DELETE FROM customers WHERE org_id='org_e2e';
@@ -26,7 +31,7 @@ DELETE FROM mobile_sessions WHERE org_id='org_e2e';
 DELETE FROM users WHERE org_id='org_e2e';
 DELETE FROM org_settings WHERE org_id='org_e2e';
 DELETE FROM orgs WHERE id='org_e2e';
-INSERT INTO orgs(id,slug,name,status,plan_id,created_at) VALUES('org_e2e','e2esalon','E2E Salon','active','pro',$NOW);
+INSERT INTO orgs(id,slug,name,status,plan_id,created_at) VALUES('org_e2e','e2esalon','E2E Salon','active','pro_max',$NOW);
 INSERT INTO org_settings(org_id,display_name,currency,currency_minor,locale,timezone,phone_country,bill_prefix) VALUES('org_e2e','E2E Salon','AED',100,'en-AE','Asia/Dubai','971','E2E');
 INSERT INTO users(org_id,username,name,role,password_hash,created_at) VALUES('org_e2e','owner','Owner','owner','$HASH',$NOW);
 INSERT INTO users(org_id,username,name,role,password_hash,created_at) VALUES('org_e2e','barber','Barber Ali','barber','$HASH',$NOW);

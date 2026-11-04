@@ -68,8 +68,16 @@ class MeOrg {
 }
 
 class Subscription {
-  const Subscription({required this.status, required this.planId});
+  const Subscription({required this.status, required this.planId, this.trialEndsAt, this.graceEndsAt});
   final String status, planId;
 
-  factory Subscription.fromJson(Map<String, dynamic> j) => Subscription(status: str(j, 'status'), planId: str(j, 'planId'));
+  /// When the free trial / the grace period after it ends (ms), for the Plan screen's banner.
+  final int? trialEndsAt, graceEndsAt;
+
+  factory Subscription.fromJson(Map<String, dynamic> j) => Subscription(
+        status: str(j, 'status'),
+        planId: str(j, 'planId'),
+        trialEndsAt: j['trialEndsAt'] is int ? j['trialEndsAt'] as int : null,
+        graceEndsAt: j['graceEndsAt'] is int ? j['graceEndsAt'] as int : null,
+      );
 }
