@@ -60,6 +60,15 @@ export interface AdminOrg {
   last_sale_at: number | null;
 }
 
+/** GET /api/platform/bundles: a named set of feature switches (true = on, false = off; missing = leave as is). */
+export interface AdminBundle {
+  id: number;
+  name: string;
+  description: string | null;
+  features: Record<string, boolean>;
+  updated_at: number;
+}
+
 export interface AdminPlan {
   id: string;
   name: string;
@@ -144,6 +153,12 @@ const ACTIONS: Record<string, string> = {
   user_create: "added a platform user",
   user_delete: "removed a platform user",
   password_change: "changed their password",
+  role_feature: "changed a role switch",
+  app_config: "changed the app versions",
+  bundle_create: "created a bundle",
+  bundle_update: "edited a bundle",
+  bundle_delete: "deleted a bundle",
+  bundle_apply: "applied a bundle",
 };
 export const actionLabel = (a: string) => ACTIONS[a] ?? a.replace(/_/g, " ");
 
@@ -155,4 +170,10 @@ export function signupSeries(byDay: Record<string, number>, n = 30, now = Date.n
     out.push({ day, count: byDay[day] ?? 0 });
   }
   return out;
+}
+
+/** Where a salon's feature setting comes from: its plan, a hand-made override, or a bundle (applied as overrides). */
+export function featureSource(override: { reason: string | null } | undefined): string {
+  if (!override) return "Plan";
+  return override.reason?.startsWith("Bundle: ") ? override.reason : "Override";
 }

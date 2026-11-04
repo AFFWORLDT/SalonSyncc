@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Building2, ClipboardList, Hourglass, LayoutDashboard, LogOut, Menu, ShieldCheck, Users } from "lucide-react";
+import { Boxes, Building2, ClipboardList, Hourglass, LayoutDashboard, LogOut, Menu, ShieldCheck, Smartphone, Users } from "lucide-react";
 import { LogoMark } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,11 +17,19 @@ const NAV = [
   { href: "/platform/salons/", label: "Salons", icon: Building2 },
   { href: "/platform/expired/", label: "Expired queue", icon: Hourglass },
   { href: "/platform/plans/", label: "Plans", icon: ClipboardList },
+  { href: "/platform/bundles/", label: "Bundles", icon: Boxes },
+  { href: "/platform/app/", label: "App", icon: Smartphone },
   { href: "/platform/users/", label: "Team", icon: Users },
   { href: "/platform/audit/", label: "Audit", icon: ShieldCheck },
 ];
 
 const MeContext = createContext<PlatformMe | null>(null);
+/** Whether the signed-in super admin can change things (owner); true outside the shell (tests). The server enforces it. */
+export function useCanEdit(): boolean {
+  const me = useContext(MeContext);
+  return !me || me.role === "owner";
+}
+
 /** The signed-in super admin (inside the panel shell). */
 export function usePlatformMe(): PlatformMe {
   const me = useContext(MeContext);
@@ -45,7 +53,7 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
     papi<PlatformMe>("/me").then(setMe).catch(() => {});
   }, [bare]);
   useEffect(() => {
-    document.title = "Admin · SalonKit";
+    document.title = "Atlantic Portal";
   }, []);
   if (bare) return <div className="h-full overflow-y-auto">{children}</div>;
   if (!me)
@@ -82,7 +90,7 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
           <div className="flex h-14 items-center gap-3 border-b border-border px-4">
             <LogoMark size={30} />
             <div>
-              <p className="text-base leading-tight font-semibold">{me.brand}</p>
+              <p className="text-base leading-tight font-semibold">Atlantic Portal</p>
               <p className="font-mono text-[10px] tracking-[0.16em] text-muted-foreground uppercase">Super admin</p>
             </div>
           </div>
@@ -94,7 +102,7 @@ export function PlatformShell({ children }: { children: React.ReactNode }) {
             <div className="absolute inset-y-0 left-0 w-64 bg-card shadow-xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex h-14 items-center gap-3 border-b border-border px-4">
                 <LogoMark size={28} />
-                <p className="font-semibold">Super admin</p>
+                <p className="font-semibold">Atlantic Portal</p>
               </div>
               {nav}
             </div>

@@ -22,7 +22,7 @@ export default function PlatformLogin() {
         <div className="flex items-center gap-3">
           <LogoMark size={36} />
           <div>
-            <h1 className="text-xl leading-tight font-semibold">SalonKit admin</h1>
+            <h1 className="text-xl leading-tight font-semibold">Atlantic Portal</h1>
             <p className="text-sm text-muted-foreground">For the SalonKit team only.</p>
           </div>
         </div>
