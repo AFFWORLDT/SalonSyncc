@@ -8,6 +8,7 @@ import 'history/history_module.dart';
 import 'ledger/ledger_module.dart';
 import 'monthly/monthly_module.dart';
 import 'sales/sales_module.dart';
+import 'services/services_module.dart';
 import 'sheet/sheet_module.dart';
 import 'staff/staff_module.dart';
 import 'home/home_module.dart';
@@ -22,6 +23,7 @@ final appModules = <FeatureModule>[
   staffModule,
   monthlyModule,
   ledgerModule,
+  servicesModule,
   expensesModule,
   billsModule,
   historyModule,
