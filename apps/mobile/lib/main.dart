@@ -19,6 +19,8 @@ import 'core/config.dart';
 import 'core/connectivity/connectivity_controller.dart';
 import 'core/connectivity/offline_bar.dart';
 import 'core/theme/theme_controller.dart';
+import 'core/version/update_gate.dart';
+import 'core/version/version_check.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,10 +45,12 @@ Future<void> main() async {
   appWrappers.add((context, child) => OfflineBar(child: child));
   final lock = Get.put(LockController(LocalAuthBiometrics()));
   appWrappers.add((context, child) => LockGate(child: child));
+  final update = Get.put(UpdateController(api: ApiClient(configBase(), userAgent: ua), platform: device.platform, currentVersion: device.appVersion));
+  appWrappers.add((context, child) => UpdateGate(child: child));
   registerLockToggle();
   postSignInSteps.add(offerBiometricLock);
   await Future.wait([theme.load(), lock.load()]);
   runApp(const SalonKitApp());
-  // The splash stays at least 400 ms so it never flashes.
-  await auth.boot(hold: Future<void>.delayed(const Duration(milliseconds: 400)));
+  // The splash stays until the version check is back, and at least 400 ms so it never flashes.
+  await auth.boot(hold: Future.wait([update.check(), Future<void>.delayed(const Duration(milliseconds: 400))]));
 }
