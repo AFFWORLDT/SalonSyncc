@@ -1,7 +1,9 @@
 import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../env";
 import { HttpError } from "./errors";
-import { readSession } from "./session";
+import { getCookie } from "hono/cookie";
+import { COOKIE, readSession } from "./session";
+import { readMobileSession } from "./mobile-session";
 import { slugFromHost } from "./tenant";
 import { platformRepo } from "../data/platform";
 import { featuresFor } from "./features-cache";
@@ -54,7 +56,17 @@ export const TENANT_AUTH_STMTS = 7;
  * Never reads the org from a query string, header or body.
  */
 export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const session = await readSession(c);
+  // Phone app: "Authorization: Bearer skm_…" instead of the cookie. Never both (a browser can't add the header, so a
+  // request carrying both is not one of ours).
+  const bearer = c.req.header("authorization")?.match(/^Bearer (skm_\S+)$/)?.[1];
+  let mobileSessionId: string | null = null;
+  let session: Awaited<ReturnType<typeof readSession>>;
+  if (bearer) {
+    if (getCookie(c, COOKIE)) throw new HttpError(401, "Please sign in", "mixed_auth");
+    const m = await readMobileSession(c.env.DB, bearer);
+    session = m ? { uid: m.uid, orgId: m.orgId, v: m.v, exp: Number.MAX_SAFE_INTEGER } : null;
+    mobileSessionId = m?.id ?? null;
+  } else session = await readSession(c);
   if (!session) throw new HttpError(401, "Please sign in");
 
   const platform = platformRepo(c.env.DB);
@@ -83,7 +95,7 @@ export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   }
 
   const { features, limits } = await featuresFor(c.env.DB, org);
-  c.set("tenant", { org, user, repo, features, limits, supportBy: session.sp ?? null });
+  c.set("tenant", { org, user, repo, features, limits, supportBy: session.sp ?? null, mobileSessionId });
   await next();
 };
 

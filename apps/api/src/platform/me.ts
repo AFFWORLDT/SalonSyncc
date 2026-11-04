@@ -58,9 +58,12 @@ export function registerMe(tenantApi: App): void {
       throw new HttpError(400, "Current password is wrong");
     }
     await repo.clearLoginFailures([perDevice!.key]);
-    // A new password signs out every other device (a stolen session stops working); this one gets a fresh cookie.
+    // A new password signs out every other device (a stolen session stops working); this one stays signed in:
+    // a fresh cookie on the web, the new version on this phone's session row.
     const v = await repo.setPassword(user.id, await hashPassword(b.next), Date.now());
-    await issueSession(c, { uid: user.id, orgId: org.id, v });
+    const phone = c.var.tenant.mobileSessionId;
+    if (phone) await c.env.DB.prepare("UPDATE mobile_sessions SET session_version = ? WHERE id = ?").bind(v, phone).run();
+    else await issueSession(c, { uid: user.id, orgId: org.id, v });
     return c.json({ ok: true });
   });
 }

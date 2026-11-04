@@ -111,3 +111,107 @@ describe("POST /api/mobile/session", () => {
     expect(await r.json()).toEqual({ error: FAIL });
   });
 });
+
+const call = (url: string, init: RequestInit = {}) => app.fetch(new Request(url, init), e, ctx);
+async function phone(slug: string, username: string, role: "owner" | "barber" = "barber", dev = device()) {
+  const org = await makeOrg({ slug });
+  const user = await makeUser(org.id, { username, role });
+  const { token } = (await (await signIn(slug, username, "pass1234", dev)).json()) as { token: string };
+  return { org, user, token, auth: { authorization: `Bearer ${token}` } };
+}
+
+describe("phone tokens on tenant routes", () => {
+  it("bearer reaches /api/me", async () => {
+    const p = await phone("tok-me", "sam");
+    const r = await call(`https://tok-me.${ROOT}/api/me`, { headers: p.auth });
+    expect(r.status).toBe(200);
+    expect(((await r.json()) as { user: { username: string } }).user.username).toBe("sam");
+  });
+
+  it("token for org A on host B → 401 wrong_org", async () => {
+    const p = await phone("tok-a", "sam");
+    await makeOrg({ slug: "tok-b" });
+    const r = await call(`https://tok-b.${ROOT}/api/me`, { headers: p.auth });
+    expect(r.status).toBe(401);
+    expect(((await r.json()) as { code?: string }).code).toBe("wrong_org");
+  });
+
+  it("revoked by session_version", async () => {
+    const p = await phone("tok-pw", "sam");
+    const { token: t2 } = (await (await signIn("tok-pw", "sam", "pass1234", device("device-0002"))).json()) as { token: string };
+    const other = { authorization: `Bearer ${t2}` };
+    const r = await call(`https://tok-pw.${ROOT}/api/me/password`, {
+      method: "PUT",
+      headers: { ...p.auth, "content-type": "application/json" },
+      body: JSON.stringify({ current: "pass1234", next: "newpass99" }),
+    });
+    expect(r.status).toBe(200);
+    expect(r.headers.get("set-cookie")).toBeNull();
+    // The phone that changed it stays signed in; the user's other phone is signed out.
+    expect((await call(`https://tok-pw.${ROOT}/api/me`, { headers: p.auth })).status).toBe(200);
+    expect((await call(`https://tok-pw.${ROOT}/api/me`, { headers: other })).status).toBe(401);
+  });
+
+  it("deactivated user → 401", async () => {
+    const p = await phone("tok-off", "sam");
+    await env.DB.prepare("UPDATE users SET active = 0 WHERE id = ?").bind(p.user.id).run();
+    expect((await call(`https://tok-off.${ROOT}/api/me`, { headers: p.auth })).status).toBe(401);
+  });
+
+  it("cookie + bearer → 401 mixed_auth", async () => {
+    const p = await phone("tok-mix", "sam");
+    const r = await call(`https://tok-mix.${ROOT}/api/me`, { headers: { ...p.auth, cookie: "ss_session=x" } });
+    expect(r.status).toBe(401);
+    expect(((await r.json()) as { code?: string }).code).toBe("mixed_auth");
+  });
+
+  it("expired → 401", async () => {
+    const p = await phone("tok-exp", "sam");
+    await env.DB.prepare("UPDATE mobile_sessions SET expires_at = ? WHERE user_id = ?").bind(Date.now() - 1, p.user.id).run();
+    expect((await call(`https://tok-exp.${ROOT}/api/me`, { headers: p.auth })).status).toBe(401);
+  });
+
+  it("sliding touch at most hourly", async () => {
+    const p = await phone("tok-slide", "sam");
+    const row = () => env.DB.prepare("SELECT last_used_at, expires_at FROM mobile_sessions WHERE user_id = ?").bind(p.user.id).first<{ last_used_at: number; expires_at: number }>();
+    const back = Date.now() - 10 * 60_000;
+    await env.DB.prepare("UPDATE mobile_sessions SET last_used_at = ?, expires_at = ? WHERE user_id = ?").bind(back, back + 30 * DAY, p.user.id).run();
+    await call(`https://tok-slide.${ROOT}/api/me`, { headers: p.auth });
+    expect((await row())!.last_used_at).toBe(back);
+    const old = Date.now() - 61 * 60_000;
+    await env.DB.prepare("UPDATE mobile_sessions SET last_used_at = ?, expires_at = ? WHERE user_id = ?").bind(old, old + 30 * DAY, p.user.id).run();
+    await call(`https://tok-slide.${ROOT}/api/me`, { headers: p.auth });
+    const r = (await row())!;
+    expect(r.last_used_at).toBeGreaterThan(old);
+    expect(r.expires_at).toBeGreaterThan(old + 30 * DAY);
+  });
+
+  it("DELETE /api/mobile/session then /api/me → 401", async () => {
+    const p = await phone("tok-out", "sam");
+    expect((await call(`https://tok-out.${ROOT}/api/mobile/session`, { method: "DELETE", headers: p.auth })).status).toBe(200);
+    expect((await call(`https://tok-out.${ROOT}/api/me`, { headers: p.auth })).status).toBe(401);
+  });
+
+  it("admin lists and signs out a barber's phone; barber 403; other org's session 404", async () => {
+    const owner = await phone("tok-adm", "boss", "owner", device("device-boss1"));
+    const barber = await makeUser(owner.org.id, { username: "ali", role: "barber" });
+    const { token } = (await (await signIn("tok-adm", "ali", "pass1234", device("device-ali01"))).json()) as { token: string };
+    const list = await call(`https://tok-adm.${ROOT}/api/users/${barber.id}/devices`, { headers: owner.auth });
+    expect(list.status).toBe(200);
+    const devices = (await list.json()) as { id: string; device_name: string; platform: string }[];
+    expect(devices).toHaveLength(1);
+    expect(devices[0]).toMatchObject({ device_name: "Sam's iPhone", platform: "ios" });
+    expect((await call(`https://tok-adm.${ROOT}/api/users/${barber.id}/devices`, { headers: { authorization: `Bearer ${token}` } })).status).toBe(403);
+    const other = await phone("tok-other", "zed");
+    const otherId = (await env.DB.prepare("SELECT id FROM mobile_sessions WHERE user_id = ? AND org_id = ?").bind(other.user.id, other.org.id).first<{ id: string }>())!.id;
+    expect((await call(`https://tok-adm.${ROOT}/api/users/${barber.id}/devices/${otherId}`, { method: "DELETE", headers: owner.auth })).status).toBe(404);
+    expect((await call(`https://tok-adm.${ROOT}/api/users/${barber.id}/devices/${devices[0]!.id}`, { method: "DELETE", headers: owner.auth })).status).toBe(200);
+    expect((await call(`https://tok-adm.${ROOT}/api/me`, { headers: { authorization: `Bearer ${token}` } })).status).toBe(401);
+  });
+
+  it("bearer POST without Origin passes originGuard", async () => {
+    const p = await phone("tok-post", "sam");
+    const r = await call(`https://tok-post.${ROOT}/api/_probe/write`, { method: "POST", headers: p.auth });
+    expect(r.status).toBe(200);
+  });
+});

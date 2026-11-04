@@ -42,6 +42,21 @@ CASES.push(
   staffCase("POST", "/api/users/:id/reset-password", { password: "hacked1" }),
   staffCase("PUT", "/api/users/:id/avatar", undefined),
   staffCase("DELETE", "/api/users/:id/avatar"),
+  staffCase("GET", "/api/users/:id/devices"),
+  {
+    // A phone session of org A's barber, id derived from the user id so the path can name it.
+    name: "DELETE /api/users/:id/devices/:sid",
+    method: "DELETE",
+    path: (id) => `/api/users/${id}/devices/ms_seed_${id}`,
+    seed: async (orgId) => {
+      const id = await seedStaff(orgId);
+      await env.DB.prepare(
+        "INSERT INTO mobile_sessions(id,org_id,user_id,token_hash,device_id,device_name,platform,session_version,created_at,last_used_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+      ).bind(`ms_seed_${id}`, orgId, id, `h_${id}_${randomToken(6)}`, "device-seed", "Phone", "android", 1, 1, 1, Date.now() + 86_400_000).run();
+      return id;
+    },
+    read: (orgId, id) => env.DB.prepare("SELECT * FROM mobile_sessions WHERE org_id = ? AND id = ?").bind(orgId, `ms_seed_${id}`).first(),
+  },
 );
 
 // ---- Task 5: services ----

@@ -5,7 +5,7 @@ import { HttpError } from "./core/errors";
 import { tenantAuth, writeGuard, requireFeature, originGuard, WRITE_METHODS } from "./core/pipeline";
 import { registerMe } from "./platform/me";
 import { auth } from "./platform/auth";
-import { mobile } from "./platform/mobile";
+import { mobile, mobileTenant } from "./platform/mobile";
 import { publicApi } from "./core/public";
 // Registers /api/public/slug, /api/public/signup and /api/auth/handoff (before the routers are mounted below).
 import "./platform/signup";
@@ -117,6 +117,8 @@ tenantApi.route("/", whatsapp);
 tenantApi.route("/", campaigns);
 // /mcp, /mcp/keys, /mcp/connections/:id, /mcp/requests/:id (AI connect page and OAuth consent; admin, feature mcp_api).
 tenantApi.route("/", mcp);
+// /mobile/session (phone sign-out), /users/:id/devices (admin: staff phone sessions).
+tenantApi.route("/", mobileTenant);
 app.route("/api", tenantApi);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

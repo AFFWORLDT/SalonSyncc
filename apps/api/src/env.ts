@@ -50,6 +50,8 @@ export interface TenantContext {
   limits: { max_staff: number | null };
   /** Support mode: the platform user signed in as this salon's owner (null for a normal session). */
   supportBy: number | null;
+  /** The phone-app session this request came in on (bearer token), or null for the web cookie. */
+  mobileSessionId: string | null;
 }
 
 export type AppEnv = { Bindings: Env; Variables: { tenant: TenantContext; platform: PlatformUser } };
