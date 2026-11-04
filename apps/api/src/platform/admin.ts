@@ -283,6 +283,116 @@ platformApi.put("/orgs/:id/role-features/:role/:key", async (c) => {
   return c.json({ ok: true });
 });
 
+// Feature bundles: named recipes of switches, applied to a salon as ordinary overrides (reason "Bundle: {name}").
+type BundleRow = { id: number; name: string; description: string | null; features: string; updated_at: number };
+const bundleOut = (r: BundleRow) => ({ id: r.id, name: r.name, description: r.description, features: JSON.parse(r.features) as Record<string, boolean>, updated_at: r.updated_at });
+
+function bundleInput(b: Record<string, unknown>): { name: string; description: string | null; features: Record<string, boolean> } {
+  const name = typeof b.name === "string" ? b.name.trim() : "";
+  if (!name) throw bad("Give the bundle a name", "name");
+  if (name.length > 60) throw bad("The name is too long (max 60 characters)", "name");
+  const description = typeof b.description === "string" && b.description.trim() ? b.description.trim().slice(0, 200) : null;
+  const f = b.features;
+  if (!f || typeof f !== "object" || Array.isArray(f)) throw bad("Pick at least one feature");
+  const features: Record<string, boolean> = {};
+  for (const [k, v] of Object.entries(f as Record<string, unknown>)) {
+    if (!isFeatureKey(k)) throw bad("Unknown feature");
+    if (k === "core_sales") throw bad("Sales are always on");
+    if (typeof v !== "boolean") throw bad("Each feature must be on or off");
+    features[k] = v;
+  }
+  if (!Object.keys(features).length) throw bad("Pick at least one feature");
+  return { name, description, features };
+}
+
+async function loadBundle(c: PC, id = c.req.param("bid") ?? c.req.param("id")): Promise<BundleRow> {
+  const n = Number(id);
+  const row = Number.isInteger(n) ? await c.env.DB.prepare("SELECT id, name, description, features, updated_at FROM feature_bundles WHERE id = ?").bind(n).first<BundleRow>() : null;
+  if (!row) throw new HttpError(404, "No such bundle");
+  return row;
+}
+
+const isUnique = (e: unknown) => String((e as Error)?.message ?? e).includes("UNIQUE");
+
+platformApi.get("/bundles", async (c) => {
+  const { results } = await c.env.DB.prepare("SELECT id, name, description, features, updated_at FROM feature_bundles ORDER BY name").all<BundleRow>();
+  return c.json(results.map(bundleOut));
+});
+
+platformApi.post("/bundles", async (c) => {
+  const v = bundleInput(await body(c));
+  const at = Date.now();
+  try {
+    const [row] = await c.env.DB.batch([
+      c.env.DB.prepare("INSERT INTO feature_bundles(name, description, features, created_at, updated_at) VALUES(?,?,?,?,?) RETURNING id, name, description, features, updated_at")
+        .bind(v.name, v.description, JSON.stringify(v.features), at, at),
+      c.env.DB.prepare("INSERT INTO platform_audit(who, action, org_id, before_json, after_json, at) VALUES(?,?,?,?,?,?)").bind(c.var.platform.email, "bundle_create", null, null, JSON.stringify(v), at),
+    ]);
+    return c.json(bundleOut((row!.results as BundleRow[])[0]!), 201);
+  } catch (e) {
+    if (isUnique(e)) throw new HttpError(409, "A bundle with that name exists", "name");
+    throw e;
+  }
+});
+
+platformApi.put("/bundles/:id", async (c) => {
+  const old = await loadBundle(c, c.req.param("id"));
+  const v = bundleInput(await body(c));
+  const at = Date.now();
+  try {
+    const [row] = await c.env.DB.batch([
+      c.env.DB.prepare("UPDATE feature_bundles SET name = ?, description = ?, features = ?, updated_at = ? WHERE id = ? RETURNING id, name, description, features, updated_at")
+        .bind(v.name, v.description, JSON.stringify(v.features), at, old.id),
+      c.env.DB.prepare("INSERT INTO platform_audit(who, action, org_id, before_json, after_json, at) VALUES(?,?,?,?,?,?)")
+        .bind(c.var.platform.email, "bundle_update", null, JSON.stringify(bundleOut(old)), JSON.stringify(v), at),
+    ]);
+    return c.json(bundleOut((row!.results as BundleRow[])[0]!));
+  } catch (e) {
+    if (isUnique(e)) throw new HttpError(409, "A bundle with that name exists", "name");
+    throw e;
+  }
+});
+
+platformApi.delete("/bundles/:id", async (c) => {
+  const old = await loadBundle(c, c.req.param("id"));
+  // Salons it was applied to keep their overrides (still labelled with the name): the bundle is only the recipe.
+  await c.env.DB.batch([
+    c.env.DB.prepare("DELETE FROM feature_bundles WHERE id = ?").bind(old.id),
+    c.env.DB.prepare("INSERT INTO platform_audit(who, action, org_id, before_json, after_json, at) VALUES(?,?,?,?,?,?)")
+      .bind(c.var.platform.email, "bundle_delete", null, JSON.stringify(bundleOut(old)), null, Date.now()),
+  ]);
+  return c.json({ ok: true });
+});
+
+/** What applying the bundle would change on this salon: keys whose effective value differs, in feature order. */
+async function bundleChanges(c: PC): Promise<{ row: AdminOrgRow; bundle: BundleRow; changes: { key: FeatureKey; from: boolean; to: boolean }[] }> {
+  const row = await loadOrg(c);
+  const bundle = await loadBundle(c);
+  const repo = adminRepo(c.env.DB);
+  const platform = platformRepo(c.env.DB);
+  const [extras, planFeatures, planLimits] = await Promise.all([repo.orgExtras(row.id), platform.planFeatures(row.plan_id), platform.planLimits(row.plan_id)]);
+  const org = (await platform.orgById(row.id))!;
+  const now = computeFeatures(org, planFeatures, planLimits, extras.overrides).features as string[];
+  const want = bundleOut(bundle).features;
+  const changes = FEATURE_KEYS.filter((k) => k in want && now.includes(k) !== want[k]).map((k) => ({ key: k, from: now.includes(k), to: want[k]! }));
+  return { row, bundle, changes };
+}
+
+platformApi.get("/orgs/:id/bundles/:bid/preview", async (c) => c.json({ changes: (await bundleChanges(c)).changes }));
+
+platformApi.post("/orgs/:id/bundles/:bid/apply", async (c) => {
+  const { row, bundle, changes } = await bundleChanges(c);
+  await adminRepo(c.env.DB).applyBundle(
+    row.id,
+    changes,
+    `Bundle: ${bundle.name}`,
+    c.var.platform.id,
+    auditOf(c, "bundle_apply", row.id, undefined, { bundle: bundle.name, changes }),
+  );
+  invalidateFeatures(row.id);
+  return c.json({ ok: true, changed: changes.length });
+});
+
 // The phone app's versions: below min the app blocks with "Update SalonKit"; below latest it suggests updating.
 platformApi.get("/app-config", async (c) => {
   const [cfg, dev] = await Promise.all([
