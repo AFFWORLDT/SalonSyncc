@@ -14,8 +14,9 @@ class Offline extends ApiError {
   const Offline() : super("You're offline");
 }
 
+/// 401. Carries the server's words, e.g. "Wrong salon ID, username or password" at sign-in.
 class Unauthorized extends ApiError {
-  const Unauthorized() : super('Please sign in');
+  const Unauthorized([super.message = 'Please sign in']);
 }
 
 class FeatureDisabled extends ApiError {
@@ -55,7 +56,7 @@ ApiError mapError(Object e) {
   final error = data is Map && data['error'] is String ? data['error'] as String : null;
   final code = data is Map ? data['code'] : null;
   if (status == null) return const ServerError();
-  if (status == 401) return const Unauthorized();
+  if (status == 401) return Unauthorized(error ?? 'Please sign in');
   if (status == 403 && code == 'feature_disabled') return const FeatureDisabled();
   if (status == 429) return Throttled(error ?? kGeneric);
   if (status == 402) return const Paused();
