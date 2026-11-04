@@ -32,14 +32,18 @@ class ApiClient {
   Future<T> put<T>(String path, Object? body, T Function(Object? json) parse) => _send('PUT', path, body, parse, null);
   Future<T> delete<T>(String path, T Function(Object? json) parse, {Object? body}) => _send('DELETE', path, body, parse, null);
 
-  Future<T> _send<T>(String method, String path, Object? body, T Function(Object? json) parse, Map<String, Object?>? query) async {
+  /// A raw body (an image upload) with its content type, e.g. "image/jpeg".
+  Future<T> putBytes<T>(String path, List<int> bytes, String contentType, T Function(Object? json) parse) =>
+      _send('PUT', path, bytes, parse, null, contentType: contentType);
+
+  Future<T> _send<T>(String method, String path, Object? body, T Function(Object? json) parse, Map<String, Object?>? query, {String? contentType}) async {
     final t = _token?.call();
     try {
       final r = await _dio.request<Object?>(
         path,
         data: body,
         queryParameters: query,
-        options: Options(method: method, headers: {if (t != null) 'Authorization': 'Bearer $t'}),
+        options: Options(method: method, contentType: contentType, headers: {if (t != null) 'Authorization': 'Bearer $t'}),
       );
       return parse(r.data);
     } catch (e) {
