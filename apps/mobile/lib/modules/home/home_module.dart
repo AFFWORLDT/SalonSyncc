@@ -12,14 +12,15 @@ import '../sale/sale_sheet.dart';
 import '../sale/share_buttons.dart';
 import '../today/today_screen.dart';
 
-/// A barber's home: "Today" (totals, add a bill). Admins get the dashboard instead.
+/// "Today": my own sales, commission and expense, and New sale. A barber's home; admins who also cut hair get it as a
+/// tab next to the dashboard.
 final homeModule = FeatureModule(
   id: 'home',
-  roles: {Role.barber},
+  roles: {Role.barber, Role.admin},
   title: 'Today',
   icon: Icons.today_outlined,
   tab: true,
-  order: 0,
+  order: 1,
   builder: (_) => const BarberHome(),
 );
 
