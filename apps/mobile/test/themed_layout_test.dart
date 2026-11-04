@@ -9,6 +9,10 @@ import 'package:salonkit/core/format/fmt.dart';
 import 'package:salonkit/core/theme/app_theme.dart';
 import 'package:salonkit/core/theme/tokens.dart';
 import 'package:salonkit/data/expenses_api.dart';
+import 'package:salonkit/data/ledger_api.dart';
+import 'package:salonkit/data/monthly_api.dart';
+import 'package:salonkit/modules/ledger/ledger_screen.dart';
+import 'package:salonkit/modules/monthly/monthly_screen.dart';
 import 'package:salonkit/data/sales_api.dart';
 import 'package:salonkit/data/staff_api.dart';
 import 'package:salonkit/models/me.dart';
@@ -26,9 +30,14 @@ void main() {
     'GET /api/sales': (o) => raw('sales_admin_page.json'),
     'GET /api/users': (o) => raw('users.json'),
     'GET /api/expenses': (o) => raw('expenses.json'),
+    'GET /api/reports/monthly': (o) => raw('monthly.json'),
+    'GET /api/ledger/balances': (o) => raw('balances.json'),
+    'GET /api/ledger/shop': (o) => raw('ledger_shop.json'),
   });
   final c = ApiClient(Uri.parse('https://e2esalon.salonkit.online'), token: () => 't', adapter: a);
   final screens = <String, Widget>{
+    'monthly': MonthlyScreen(me: owner, api: MonthlyApi(c), onMonth: (_) {}),
+    'ledger': LedgerScreen(me: owner, api: LedgerApi(c)),
     'sales': SalesScreen(me: owner, sales: SalesApi(c, owner.fmt), staff: StaffApi(c), onOpen: (_) async {}, onNewSale: () async {}),
     'expenses': ExpensesScreen(me: owner, api: ExpensesApi(c), staff: StaffApi(c)),
     'staff': StaffScreen(me: owner, api: StaffApi(c)),
