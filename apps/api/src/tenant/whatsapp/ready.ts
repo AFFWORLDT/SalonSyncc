@@ -15,7 +15,7 @@ export async function waSetup(x: Env | Context<AppEnv>, org: Org, known?: readon
   const env: Env = isCtx ? (x as Context<AppEnv>).env : (x as Env);
   const tenant = isCtx ? (x as Context<AppEnv>).get("tenant") : undefined;
   // `known`: the caller already has this org's features (the cron's org loader), so this costs exactly 1 statement.
-  const features = known ?? (tenant && tenant.org.id === org.id ? tenant.features : (await featuresFor(env.DB, org)).features);
+  const features = known ?? (tenant && tenant.org.id === org.id ? tenant.orgFeatures : (await featuresFor(env.DB, org)).features);
   if (!features.includes("whatsapp")) return null;
   return waConfigRepo(env.DB, org.id, env.SECRETS_KEY).get();
 }

@@ -120,7 +120,9 @@ class AuthController extends GetxController {
     state.value = AuthState.needSalon;
   }
 
-  void onUnauthorized() => _forget();
+  /// The server ended this session (expired, password changed, signed out by an admin): back to sign-in, and the
+  /// same clean-up as signing out (push resets so the next person on this phone registers their own token).
+  void onUnauthorized() => _forget().then((_) => afterSignOut?.call());
 
   Future<void> _forget() async {
     _token = null;

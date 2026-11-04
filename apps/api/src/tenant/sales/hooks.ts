@@ -13,7 +13,7 @@ import type { WaConfig } from "../../core/services";
 
 export { moneyText };
 
-const hasFeature = (c: Context<AppEnv>, key: string) => (c.var.tenant.features as readonly string[]).includes(key);
+const hasFeature = (c: Context<AppEnv>, key: string) => (c.var.tenant.orgFeatures as readonly string[]).includes(key);
 
 /**
  * What afterSale's steps share (I4): the route's settings, the WA config loaded at most once (the session's features,

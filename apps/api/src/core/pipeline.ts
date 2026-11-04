@@ -98,7 +98,7 @@ export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   const of = await featuresFor(c.env.DB, org);
   const features = roleFeatures(of.features, isAdmin(user) ? "admin" : "barber", of.roleRows);
   const limits = of.limits;
-  c.set("tenant", { org, user, repo, features, limits, supportBy: session.sp ?? null, mobileSessionId });
+  c.set("tenant", { org, user, repo, features, orgFeatures: of.features, limits, supportBy: session.sp ?? null, mobileSessionId });
   await next();
 };
 

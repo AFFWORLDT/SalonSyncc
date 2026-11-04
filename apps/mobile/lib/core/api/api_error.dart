@@ -1,5 +1,6 @@
-import 'package:dio/dio.dart';
+import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 const kGeneric = 'Something went wrong. Try again.';
@@ -54,7 +55,8 @@ ApiError mapError(Object e) {
     case DioExceptionType.sendTimeout:
       return const Offline();
     default:
-      break;
+      // A reset after connecting (dio reports it as `unknown`, carrying the socket/HTTP error) is a lost connection too.
+      if (e.response == null && (e.error is SocketException || e.error is HttpException)) return const Offline();
   }
   final status = e.response?.statusCode;
   final data = e.response?.data;
