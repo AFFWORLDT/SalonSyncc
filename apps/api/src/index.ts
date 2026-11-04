@@ -5,6 +5,8 @@ import { HttpError } from "./core/errors";
 import { tenantAuth, writeGuard, requireFeature, originGuard, WRITE_METHODS } from "./core/pipeline";
 import { registerMe } from "./platform/me";
 import { auth } from "./platform/auth";
+import { mobile, mobileTenant } from "./platform/mobile";
+import { appConfigPublic } from "./platform/app-config";
 import { publicApi } from "./core/public";
 // Registers /api/public/slug, /api/public/signup and /api/auth/handoff (before the routers are mounted below).
 import "./platform/signup";
@@ -39,6 +41,8 @@ export const app = new Hono<AppEnv>();
 app.get("/api/health", (c) => c.json({ ok: true, brand: c.env.BRAND_NAME }));
 
 app.route("/api/auth", auth);
+// The phone app's sign-in (bearer tokens, no cookie). Before the tenant router.
+app.route("/api/mobile", mobile);
 // The super admin panel's API (admin.<domain> only; its own ss_platform session). Before the tenant router.
 app.route("/api/platform", platformApi);
 
@@ -47,6 +51,7 @@ publicApi.route("/avatar", avatarPublic);
 publicApi.route("/services", servicesPublic);
 publicApi.route("/logo", logoPublic);
 publicApi.route("/brand", brandPublic);
+publicApi.route("/app-config", appConfigPublic);
 app.route("/api/public", publicApi);
 
 // Meta's WhatsApp webhook: no session (signature-checked), not behind the public rate limiter; the org comes from each
@@ -114,6 +119,8 @@ tenantApi.route("/", whatsapp);
 tenantApi.route("/", campaigns);
 // /mcp, /mcp/keys, /mcp/connections/:id, /mcp/requests/:id (AI connect page and OAuth consent; admin, feature mcp_api).
 tenantApi.route("/", mcp);
+// /mobile/session (phone sign-out), /users/:id/devices (admin: staff phone sessions).
+tenantApi.route("/", mobileTenant);
 app.route("/api", tenantApi);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

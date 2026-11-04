@@ -107,6 +107,19 @@ export function effectiveFeatures(
   return FEATURE_KEYS.filter((key) => enabledFeatures.has(key));
 }
 
+/**
+ * A user's features: the salon's features minus any the super admin switched off for the user's role (owner and admin
+ * are "admin"). A role row never adds a feature the salon doesn't have, and core_sales is never removed.
+ */
+export function roleFeatures(
+  features: readonly FeatureKey[],
+  role: "barber" | "admin",
+  rows: { role: string; feature_key: string; enabled: 0 | 1 }[]
+): FeatureKey[] {
+  const off = new Set(rows.filter((r) => r.role === role && r.enabled === 0).map((r) => r.feature_key));
+  return features.filter((k) => k === "core_sales" || !off.has(k));
+}
+
 export function isFeatureKey(s: string): s is FeatureKey {
   return FEATURE_KEYS.includes(s as FeatureKey);
 }

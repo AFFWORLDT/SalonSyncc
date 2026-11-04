@@ -1,5 +1,6 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { FEATURE_KEYS, OVERRIDE_ONLY, isFeatureKey, type FeatureKey } from "@ss/features";
+import { VERSION_RE, compareVersions, isPlatform } from "./app-config";
 import { mcpRepo } from "../data/tenant/mcp";
 import type { AppEnv } from "../env";
 import { HttpError } from "../core/errors";
@@ -255,6 +256,56 @@ platformApi.put("/orgs/:id/features/:key", async (c) => {
   if (enabled !== null && !reason) throw bad("Say why (the salon's audit trail keeps it)", "reason");
   await adminRepo(c.env.DB).setOverride(row.id, key, enabled, reason || null, c.var.platform.id, auditOf(c, "feature_override", row.id, undefined, { feature: key, enabled, reason: reason || null }));
   invalidateFeatures(row.id);
+  return c.json({ ok: true });
+});
+
+// Per-role switches: hide a salon feature from its barbers or its admins (owner + admin). Off rows only; on = no row.
+const ROLES = ["barber", "admin"] as const;
+platformApi.get("/orgs/:id/role-features", async (c) => {
+  const row = await loadOrg(c);
+  const { results } = await c.env.DB.prepare("SELECT role, feature_key FROM org_role_features WHERE org_id = ? AND enabled = 0").bind(row.id).all<{ role: string; feature_key: string }>();
+  const grid = (role: string) => Object.fromEntries(FEATURE_KEYS.map((k) => [k, !results.some((r) => r.role === role && r.feature_key === k)]));
+  return c.json({ barber: grid("barber"), admin: grid("admin") });
+});
+
+platformApi.put("/orgs/:id/role-features/:role/:key", async (c) => {
+  const row = await loadOrg(c);
+  const role = c.req.param("role");
+  const key = c.req.param("key");
+  if (!ROLES.includes(role as (typeof ROLES)[number])) throw bad("Role must be barber or admin");
+  if (!isFeatureKey(key)) throw bad("Unknown feature");
+  if (key === "core_sales") throw bad("Sales are always on");
+  const b = await body(c);
+  if (typeof b.enabled !== "boolean") throw bad("enabled must be true or false");
+  const a = auditOf(c, "role_feature", row.id, undefined, { role, feature: key, enabled: b.enabled });
+  await adminRepo(c.env.DB).setRoleFeature(row.id, role, key, b.enabled, a);
+  invalidateFeatures(row.id);
+  return c.json({ ok: true });
+});
+
+// The phone app's versions: below min the app blocks with "Update SalonKit"; below latest it suggests updating.
+platformApi.get("/app-config", async (c) => {
+  const [cfg, dev] = await Promise.all([
+    c.env.DB.prepare("SELECT platform, min_version, latest_version, store_url, updated_at FROM app_config ORDER BY platform").all(),
+    c.env.DB.prepare("SELECT platform, COALESCE(app_version, 'unknown') AS v, COUNT(*) AS n FROM mobile_sessions WHERE expires_at >= ? GROUP BY platform, v").bind(Date.now()).all<{ platform: string; v: string; n: number }>(),
+  ]);
+  const devices: Record<string, Record<string, number>> = { ios: {}, android: {} };
+  for (const r of dev.results) (devices[r.platform] ??= {})[r.v] = r.n;
+  return c.json({ platforms: cfg.results, devices });
+});
+
+platformApi.put("/app-config/:platform", async (c) => {
+  const platform = c.req.param("platform");
+  if (!isPlatform(platform)) throw bad("platform must be ios or android");
+  const b = await body(c);
+  const min = typeof b.min_version === "string" ? b.min_version.trim() : "";
+  const latest = typeof b.latest_version === "string" ? b.latest_version.trim() : "";
+  const url = typeof b.store_url === "string" ? b.store_url.trim() : "";
+  if (!VERSION_RE.test(min) || !VERSION_RE.test(latest)) throw bad("Versions look like 1.2.3");
+  if (compareVersions(min, latest) > 0) throw bad("The minimum version can't be above the latest");
+  if (!/^https:\/\/\S+$/.test(url) || url.length > 300) throw bad("Store link must start with https://");
+  const before = await c.env.DB.prepare("SELECT min_version, latest_version, store_url FROM app_config WHERE platform = ?").bind(platform).first();
+  await adminRepo(c.env.DB).setAppConfig(platform, min, latest, url, auditOf(c, "app_config", null, before, { platform, min_version: min, latest_version: latest, store_url: url }));
   return c.json({ ok: true });
 });
 

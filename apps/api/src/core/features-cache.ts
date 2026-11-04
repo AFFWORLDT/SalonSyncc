@@ -2,9 +2,12 @@ import { PLAN_DEFAULTS, TRIAL_EXCLUDED, TRIAL_PLAN, effectiveFeatures, type Feat
 import { platformRepo, type Org } from "../data/platform";
 
 export type Limits = { max_staff: number | null };
+export type RoleRow = { role: string; feature_key: string; enabled: 0 | 1 };
 export interface OrgFeatures {
   features: FeatureKey[];
   limits: Limits;
+  /** The super admin's per-role switches (org_role_features); tenantAuth narrows `features` with them per user. */
+  roleRows: RoleRow[];
 }
 
 const TTL_MS = 60_000;
@@ -23,7 +26,7 @@ export function invalidateAllFeatures(): void {
  * Pure: trial orgs get the trial plan's set (minus TRIAL_EXCLUDED); others their plan's. Then the org's overrides. The cron
  * (jobs/hourly.ts) calls it on its org-loader row and passes the result down, so it never touches the cache.
  */
-export function computeFeatures(org: Org, planFeatures: string[], planLimits: Limits, overrides: { feature_key: string; enabled: 0 | 1 }[]): OrgFeatures {
+export function computeFeatures(org: Org, planFeatures: string[], planLimits: Limits, overrides: { feature_key: string; enabled: 0 | 1 }[], roleRows: RoleRow[] = []): OrgFeatures {
   let features = planFeatures;
   let limits = planLimits;
   if (org.status === "trial") {
@@ -36,6 +39,7 @@ export function computeFeatures(org: Org, planFeatures: string[], planLimits: Li
   return {
     features: Object.freeze(effectiveFeatures(features, overrides)) as FeatureKey[],
     limits: Object.freeze(limits),
+    roleRows,
   };
 }
 
@@ -47,7 +51,11 @@ export async function featuresFor(db: D1Database, org: Org): Promise<OrgFeatures
   let planFeatures: string[] = [];
   let limits: Limits = { max_staff: 0 };
   if (org.status !== "trial") [planFeatures, limits] = await Promise.all([platform.planFeatures(org.planId), platform.planLimits(org.planId)]);
-  return prime(org, computeFeatures(org, planFeatures, limits, await platform.overrides(org.id)));
+  const [overrides, roles] = await Promise.all([
+    platform.overrides(org.id),
+    db.prepare("SELECT role, feature_key, enabled FROM org_role_features WHERE org_id = ?").bind(org.id).all<RoleRow>(),
+  ]);
+  return prime(org, computeFeatures(org, planFeatures, limits, overrides, roles.results));
 }
 
 function prime(org: Org, value: OrgFeatures): OrgFeatures {

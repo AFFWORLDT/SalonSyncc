@@ -434,6 +434,27 @@ describe("fix round 1", () => {
   });
 });
 
+describe("FCM message for the phone app", () => {
+  it("carries a native notification and the screen path, alongside the web push", async () => {
+    const { pem } = await testKey();
+    const sa = JSON.stringify({ project_id: "p", client_email: "fx@p.iam.gserviceaccount.com", private_key: pem });
+    const bodies: any[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.startsWith("https://oauth2.googleapis.com/")) return Response.json({ access_token: "at", expires_in: 3600 });
+      bodies.push(JSON.parse(String(init?.body)).message);
+      return new Response("{}", { status: 200 });
+    });
+    await fcmPush.send({ ...env, FCM_SERVICE_ACCOUNT: sa }, ["t1"], { title: "New bill", body: "AED 25", path: "/sales/", link: "https://s.test/sales/", tag: "sale-1" });
+    const m = bodies[0];
+    expect(m.notification).toEqual({ title: "New bill", body: "AED 25" });
+    expect(m.data).toEqual({ path: "/sales/", link: "https://s.test/sales/" });
+    expect(m.android).toMatchObject({ priority: "high", notification: { tag: "sale-1" } });
+    expect(m.apns.payload.aps).toMatchObject({ sound: "default", "thread-id": "sale-1" });
+    expect(m.webpush.fcm_options.link).toBe("https://s.test/sales/");
+  });
+});
+
 describe("FCM assertion (JWT RS256)", () => {
   it("builds a JWT signed with the service account key", async () => {
     const pair = (await crypto.subtle.generateKey(

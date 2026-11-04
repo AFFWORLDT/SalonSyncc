@@ -1,13 +1,16 @@
 import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../env";
 import { HttpError } from "./errors";
-import { readSession } from "./session";
+import { getCookie } from "hono/cookie";
+import { COOKIE, readSession } from "./session";
+import { readMobileSession } from "./mobile-session";
 import { slugFromHost } from "./tenant";
 import { platformRepo } from "../data/platform";
 import { featuresFor } from "./features-cache";
 import { tenantRepo } from "../data/tenant";
 import type { OrgStatus } from "../data/platform";
-import type { FeatureKey } from "@ss/features";
+import { roleFeatures, type FeatureKey } from "@ss/features";
+import { isAdmin } from "./roles";
 
 /**
  * Cross-site write protection. Sibling salon subdomains are same-site, so SameSite=Lax alone does not stop them.
@@ -54,7 +57,17 @@ export const TENANT_AUTH_STMTS = 7;
  * Never reads the org from a query string, header or body.
  */
 export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const session = await readSession(c);
+  // Phone app: "Authorization: Bearer skm_…" instead of the cookie. Never both (a browser can't add the header, so a
+  // request carrying both is not one of ours).
+  const bearer = c.req.header("authorization")?.match(/^Bearer (skm_\S+)$/)?.[1];
+  let mobileSessionId: string | null = null;
+  let session: Awaited<ReturnType<typeof readSession>>;
+  if (bearer) {
+    if (getCookie(c, COOKIE)) throw new HttpError(401, "Please sign in", "mixed_auth");
+    const m = await readMobileSession(c.env.DB, bearer);
+    session = m ? { uid: m.uid, orgId: m.orgId, v: m.v, exp: Number.MAX_SAFE_INTEGER } : null;
+    mobileSessionId = m?.id ?? null;
+  } else session = await readSession(c);
   if (!session) throw new HttpError(401, "Please sign in");
 
   const platform = platformRepo(c.env.DB);
@@ -82,8 +95,10 @@ export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     if (!pu || pu.session_version !== session.spv) throw new HttpError(401, "Please sign in");
   }
 
-  const { features, limits } = await featuresFor(c.env.DB, org);
-  c.set("tenant", { org, user, repo, features, limits, supportBy: session.sp ?? null });
+  const of = await featuresFor(c.env.DB, org);
+  const features = roleFeatures(of.features, isAdmin(user) ? "admin" : "barber", of.roleRows);
+  const limits = of.limits;
+  c.set("tenant", { org, user, repo, features, orgFeatures: of.features, limits, supportBy: session.sp ?? null, mobileSessionId });
   await next();
 };
 
@@ -100,7 +115,7 @@ export const requireFeature =
 export const WRITE_OK: OrgStatus[] = ["trial", "active", "grace", "past_due"];
 
 export const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const WRITE_ALLOW_PREFIXES = ["/api/auth/", "/api/billing/"];
+const WRITE_ALLOW_PREFIXES = ["/api/auth/", "/api/mobile/", "/api/billing/"];
 /**
  * Exact method + path writes a lapsed org may still make: a device signing out of pushes, and marking the bell read.
  * Both are session- and org-scoped and touch no business data.

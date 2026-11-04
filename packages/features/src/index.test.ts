@@ -3,6 +3,8 @@ import {
   FEATURE_KEYS,
   PLAN_DEFAULTS,
   effectiveFeatures,
+  roleFeatures,
+  type FeatureKey,
 } from "./index";
 
 describe("features", () => {
@@ -23,7 +25,8 @@ describe("features", () => {
       "push",
       "announcements",
     ]);
-    expect(PLAN_DEFAULTS.pro_max.features).toEqual([...FEATURE_KEYS]);
+    // Every feature except the override-only ones (mcp_api), which no plan can grant.
+    expect(PLAN_DEFAULTS.pro_max.features).toEqual(FEATURE_KEYS.filter((k) => k !== "mcp_api"));
     expect([
       PLAN_DEFAULTS.free.priceMonthly,
       PLAN_DEFAULTS.pro.priceMonthly,
@@ -52,5 +55,20 @@ describe("features", () => {
         { feature_key: "core_sales", enabled: 0 },
       ])
     ).toEqual(["core_sales"]);
+  });
+});
+
+describe("roleFeatures", () => {
+  const all = ["core_sales", "expenses", "ledger"] as FeatureKey[];
+  it("roleFeatures drops only for that role", () => {
+    const rows = [{ role: "barber", feature_key: "expenses", enabled: 0 as const }];
+    expect(roleFeatures(all, "barber", rows)).toEqual(["core_sales", "ledger"]);
+    expect(roleFeatures(all, "admin", rows)).toEqual(all);
+  });
+  it("never adds", () => {
+    expect(roleFeatures(["core_sales"], "barber", [{ role: "barber", feature_key: "ledger", enabled: 1 }])).toEqual(["core_sales"]);
+  });
+  it("keeps core_sales", () => {
+    expect(roleFeatures(all, "barber", [{ role: "barber", feature_key: "core_sales", enabled: 0 }])).toContain("core_sales");
   });
 });

@@ -95,6 +95,11 @@ export const fcmPush: PushClient = {
             body: JSON.stringify({
               message: {
                 token,
+                // The phone app shows the native notification and opens `path` when tapped; browsers use webpush.
+                notification: { title: push.title, body: push.body },
+                data: { path: push.path ?? new URL(link).pathname, link },
+                android: { priority: "high", notification: push.tag ? { tag: push.tag } : {} },
+                apns: { payload: { aps: { sound: "default", ...(push.tag ? { "thread-id": push.tag } : {}) } } },
                 webpush: {
                   notification: { title: push.title, body: push.body, icon: "/icon-192.png", badge: "/icon-192.png", tag: push.tag },
                   fcm_options: { link },
