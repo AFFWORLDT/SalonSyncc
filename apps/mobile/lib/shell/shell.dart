@@ -66,6 +66,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       final index = ids.indexOf(current);
       final body = current == '_more' ? _MoreList(registry: widget.registry, modules: more) : tabs[index].builder(context);
       return Scaffold(
+        backgroundColor: Colors.transparent,
         body: SafeArea(
           bottom: false,
           child: PageTransitionSwitcher(

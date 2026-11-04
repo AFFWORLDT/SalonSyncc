@@ -35,27 +35,27 @@ class AuthController extends GetxController {
   /// Public calls before sign-in; on a dev host the salon is named with ?org=.
   Map<String, Object?>? _orgQuery(String slug) => isDevHost ? {'org': slug} : null;
 
-  Future<void> boot() async {
+  /// Reads the remembered salon and token. [hold] (the splash's minimum time) delays only the final state change.
+  Future<void> boot({Future<void>? hold}) async {
     salon.value = await store.salon();
     _token = await store.token();
     _api = null;
+    var next = AuthState.signedIn;
     if (salon.value == null) {
-      state.value = AuthState.needSalon;
-      return;
+      next = AuthState.needSalon;
+    } else if (_token == null) {
+      next = AuthState.needLogin;
+    } else {
+      try {
+        await refreshMe();
+      } on Unauthorized {
+        next = salon.value == null ? AuthState.needSalon : AuthState.needLogin;
+      } on ApiError {
+        // Offline or server trouble at launch: stay signed in; screens show the offline state and retry.
+      }
     }
-    if (_token == null) {
-      state.value = AuthState.needLogin;
-      return;
-    }
-    try {
-      await refreshMe();
-      state.value = AuthState.signedIn;
-    } on Unauthorized {
-      // onUnauthorized already moved to needLogin
-    } on ApiError {
-      // Offline or server trouble at launch: stay signed in; screens show the offline state and retry.
-      state.value = AuthState.signedIn;
-    }
+    if (hold != null) await hold;
+    state.value = next;
   }
 
   Future<Brand> checkSalon(String typed) async {

@@ -1,19 +1,29 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
-import 'core/theme/app_theme.dart';
-import 'core/theme/tokens.dart';
+import 'app.dart';
+import 'core/api/api_client.dart';
+import 'core/auth/auth_controller.dart';
+import 'core/auth/device_info.dart';
+import 'core/auth/secure_store.dart';
+import 'core/auth/session_store.dart';
+import 'core/theme/theme_controller.dart';
 
-void main() => runApp(const SalonKitApp());
-
-class SalonKitApp extends StatelessWidget {
-  const SalonKitApp({super.key});
-
-  @override
-  Widget build(BuildContext context) => MaterialApp(
-        title: 'SalonKit',
-        debugShowCheckedModeBanner: false,
-        theme: buildTheme(SkTokens.light, Brightness.light),
-        darkTheme: buildTheme(SkTokens.dark, Brightness.dark),
-        home: const Scaffold(body: Center(child: Text('SalonKit'))),
-      );
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final theme = Get.put(ThemeController());
+  final device = await DeviceInfo.current();
+  final ua = 'SalonKit/${device.appVersion} (${device.platform})';
+  final auth = Get.put(AuthController(
+    store: SessionStore(const FlutterSecureStore()),
+    device: device,
+    clientFor: (base, {token, onUnauthorized, onFeatureDisabled}) =>
+        ApiClient(base, token: token, onUnauthorized: onUnauthorized, onFeatureDisabled: onFeatureDisabled, userAgent: ua),
+  ));
+  await theme.load();
+  runApp(const SalonKitApp());
+  // The splash stays at least 400 ms so it never flashes.
+  await auth.boot(hold: Future<void>.delayed(const Duration(milliseconds: 400)));
 }
