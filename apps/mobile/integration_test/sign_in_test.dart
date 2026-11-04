@@ -12,6 +12,14 @@ Future<void> settle(WidgetTester t, [int seconds = 2]) async {
   }
 }
 
+Future<void> waitGone(WidgetTester t, Finder f, {int seconds = 10}) async {
+  for (var i = 0; i < seconds * 10; i++) {
+    if (f.evaluate().isEmpty) return;
+    await t.pump(const Duration(milliseconds: 100));
+  }
+  expect(f, findsNothing);
+}
+
 Future<void> waitFor(WidgetTester t, Finder f, {int seconds = 15}) async {
   for (var i = 0; i < seconds * 10; i++) {
     if (f.evaluate().isNotEmpty) return;
@@ -23,7 +31,7 @@ Future<void> waitFor(WidgetTester t, Finder f, {int seconds = 15}) async {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('barber signs in to e2esalon, sees only barber screens, signs out keeping the salon', (t) async {
+  testWidgets('barber signs in to e2esalon, adds a bill, sees only barber screens, signs out keeping the salon', (t) async {
     await app.main();
     await waitFor(t, find.text('Enter your salon ID'));
 
@@ -39,10 +47,38 @@ void main() {
 
     await t.enterText(find.widgetWithText(TextField, 'Password'), 'pass1234');
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
-    await waitFor(t, find.text('Hi Barber Ali'));
+    await waitFor(t, find.text('Hi Barber Ali 👋'));
     await settle(t);
 
-    // Barber: Today and More (with My account); nothing admin-only.
+    // A new bill: a service, Cash, saved; it shows in Today and in My bills.
+    await t.tap(find.text('New sale'));
+    await waitFor(t, find.widgetWithText(ActionChip, 'Haircut'));
+    await t.tap(find.widgetWithText(ActionChip, 'Haircut'));
+    await settle(t, 1);
+    await t.tap(find.byKey(const ValueKey('next')));
+    await waitFor(t, find.text('Cash'));
+    await t.tap(find.text('Cash'));
+    await t.tap(find.byKey(const ValueKey('save')));
+    await waitFor(t, find.text('Congrats! Bill generated'));
+    expect(find.text('AED 40'), findsWidgets);
+    await t.tap(find.text('Done'));
+    await waitGone(t, find.text('Congrats! Bill generated'));
+    await waitFor(t, find.textContaining('Haircut'));
+    expect(find.text('Customer 1'), findsOneWidget);
+
+    await t.tap(find.text('My bills'));
+    await waitFor(t, find.textContaining('E2E-'));
+    await settle(t, 1); // the tab switch fades the old tab out
+    await t.tap(find.text('Customer 1').last);
+    await waitFor(t, find.text('Share link'));
+    expect(find.text('Edit'), findsOneWidget);
+    await t.pageBack();
+    await waitGone(t, find.text('Share link'));
+
+    await t.tap(find.text('My history'));
+    await waitFor(t, find.text('My commission'));
+
+    // Barber: More holds Announcements and My account; nothing admin-only.
     await t.tap(find.text('More'));
     await waitFor(t, find.text('My account'));
     expect(find.text('Audit log'), findsNothing);

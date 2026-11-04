@@ -1,4 +1,5 @@
 import 'package:animations/animations.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -37,6 +38,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _watch = ever<Me?>(auth.me, _onMe);
     _route = ever<String?>(pendingRoute, _open);
+    pushArrived.addListener(_refreshBadges);
+    _refreshBadges();
     if (pendingRoute.value != null) WidgetsBinding.instance.addPostFrameCallback((_) => _open(pendingRoute.value));
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       for (final step in postSignInSteps) {
@@ -50,13 +53,26 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   void dispose() {
     _watch.dispose();
     _route.dispose();
+    pushArrived.removeListener(_refreshBadges);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.resumed) auth.refreshMe().then((_) {}, onError: (Object e) => e is ApiError ? null : throw e);
+    if (s == AppLifecycleState.resumed) {
+      auth.refreshMe().then((_) {}, onError: (Object e) => e is ApiError ? null : throw e);
+      _refreshBadges();
+    }
+  }
+
+  /// Re-reads every visible module's badge (unread counts); a failure just keeps the old count.
+  void _refreshBadges() {
+    final me = auth.me.value;
+    if (me == null) return;
+    for (final m in widget.registry.visibleFor(me)) {
+      m.onRefresh?.call().then((_) {}, onError: (_) {});
+    }
   }
 
   void _onMe(Me? me) {
@@ -107,8 +123,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                 selectedIndex: index,
                 onDestinationSelected: (i) => setState(() => _tab = ids[i]),
                 destinations: [
-                  for (final m in tabs) NavigationDestination(icon: Icon(m.icon), label: m.title),
-                  if (more.isNotEmpty) const NavigationDestination(icon: Icon(Icons.menu), label: 'More'),
+                  for (final m in tabs) NavigationDestination(icon: _Badged(icon: m.icon, counts: [?m.badge]), label: m.title),
+                  if (more.isNotEmpty) NavigationDestination(icon: _Badged(icon: Icons.menu, counts: [for (final m in more) ?m.badge]), label: 'More'),
                 ],
               ),
       );
@@ -128,11 +144,30 @@ class _MoreList extends StatelessWidget {
           Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 12), child: Text('More', style: Theme.of(context).textTheme.headlineSmall)),
           for (final m in modules)
             ListTile(
-              leading: Icon(m.icon),
+              leading: _Badged(icon: m.icon, counts: [?m.badge]),
               title: Text(m.title),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => FeatureGate(registry: registry, id: m.id))),
             ),
         ],
       );
+}
+
+/// An icon with a count bubble: the sum of [counts], hidden at 0.
+class _Badged extends StatelessWidget {
+  const _Badged({required this.icon, required this.counts});
+  final IconData icon;
+  final List<ValueListenable<int>> counts;
+
+  @override
+  Widget build(BuildContext context) {
+    if (counts.isEmpty) return Icon(icon);
+    return ListenableBuilder(
+      listenable: Listenable.merge(counts),
+      builder: (context, _) {
+        final n = counts.fold<int>(0, (s, c) => s + c.value);
+        return Badge(isLabelVisible: n > 0, label: Text(n > 99 ? '99+' : '$n'), child: Icon(icon));
+      },
+    );
+  }
 }

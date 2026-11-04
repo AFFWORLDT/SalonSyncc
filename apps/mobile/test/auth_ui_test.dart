@@ -74,7 +74,7 @@ void main() {
     await t.enterText(find.widgetWithText(TextField, 'Password'), 'pass1234');
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await t.pumpAndSettle();
-    expect(find.text('Hi ali'), findsOneWidget);
+    expect(find.text('Hi ali 👋'), findsOneWidget);
   });
 
   testWidgets('Not your salon? goes back to the ID screen', (t) async {

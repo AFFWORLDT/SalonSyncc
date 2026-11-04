@@ -30,6 +30,7 @@ Future<PushService> setUpPush(AuthController auth, FeatureRegistry registry) asy
   const channel = AndroidNotificationDetails('salon', 'Salon updates', importance: Importance.high, priority: Priority.high);
 
   FirebaseMessaging.onMessage.listen((m) {
+    pushArrived.value++;
     final n = m.notification;
     if (n == null) return;
     local.show(m.hashCode, n.title, n.body, const NotificationDetails(android: channel, iOS: DarwinNotificationDetails()),

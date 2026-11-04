@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../models/me.dart';
@@ -15,6 +16,8 @@ class FeatureModule {
     this.tab = false,
     this.order = 100,
     this.visibleWhen,
+    this.badge,
+    this.onRefresh,
     required this.builder,
   });
 
@@ -33,6 +36,12 @@ class FeatureModule {
   /// An extra rule on top of the switch, e.g. barbers see Expenses only when allowed to add them.
   final bool Function(Me me)? visibleWhen;
   final WidgetBuilder builder;
+
+  /// A count shown on the module's tab or "More" row (e.g. unread announcements); 0 hides it.
+  final ValueListenable<int>? badge;
+
+  /// Re-reads what [badge] counts. The shell calls it on open, on return to the app and when a push arrives.
+  final Future<void> Function()? onRefresh;
 
   bool visibleFor(Me me) =>
       (featureKey == null || me.features.contains(featureKey)) && roles.contains(me.role) && (visibleWhen?.call(me) ?? true);

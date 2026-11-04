@@ -5,9 +5,12 @@ import '../../core/auth/auth_controller.dart';
 import '../../core/auth/lock_controller.dart';
 import '../../core/features/feature_module.dart';
 import '../../core/theme/theme_controller.dart';
+import '../../core/ui/salon_logo.dart';
+import '../../data/account_api.dart';
+import 'change_password.dart';
 import '../../models/role.dart';
 
-/// My account: appearance, sign out, switch salon. (Stage 1 Task 14 adds the biometric lock toggle.)
+/// My account: who is signed in, change password, appearance, the biometric lock, sign out, switch salon.
 final accountModule = FeatureModule(
   id: 'account',
   roles: {Role.admin, Role.barber},
@@ -47,8 +50,26 @@ class AccountScreen extends StatelessWidget {
     final theme = Get.find<ThemeController>();
     final me = auth.me.value!;
     return ListView(padding: const EdgeInsets.symmetric(vertical: 12), children: [
-      ListTile(title: Text(me.user.name), subtitle: Text('${me.user.username} · ${me.salonName}')),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+        child: Row(children: [
+          SalonLogo(slug: me.org.slug, name: me.user.name, logoUrl: me.user.avatarUrl, size: 56),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(me.user.name, style: Theme.of(context).textTheme.titleLarge),
+              Text('@${me.user.username} · ${me.role == Role.barber ? 'Barber' : 'Admin'} · ${me.salonName}', style: Theme.of(context).textTheme.bodySmall),
+            ]),
+          ),
+        ]),
+      ),
       const Divider(),
+      ListTile(
+        leading: const Icon(Icons.lock_reset_rounded),
+        title: const Text('Change password'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => showChangePassword(context, AccountApi(auth.api)),
+      ),
       Obx(() => ListTile(
             leading: const Icon(Icons.brightness_6_outlined),
             title: const Text('Appearance'),

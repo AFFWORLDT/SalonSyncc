@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../models/me.dart';
@@ -13,3 +14,6 @@ String routeForPush(Map<String, dynamic> data, FeatureRegistry r, Me me) {
 
 /// A module the shell should open (set by a tapped notification); the shell clears it once opened.
 final pendingRoute = RxnString();
+
+/// Bumped when a push arrives while the app is open, so badges (unread announcements) refresh.
+final pushArrived = ValueNotifier<int>(0);

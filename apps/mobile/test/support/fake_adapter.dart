@@ -6,7 +6,7 @@ import 'package:dio/dio.dart';
 typedef Handler = Object? Function(RequestOptions o);
 
 /// Answers requests from a route table: "METHOD /path" → handler. A handler returns a [FakeReply], a JSON-able value
-/// (200), or throws a [DioException] (e.g. to simulate no connection). Every request is recorded in [calls].
+/// (200), a Future of either (to hold a screen in its loading state), or throws a [DioException] (e.g. to simulate no connection). Every request is recorded in [calls].
 class FakeAdapter implements HttpClientAdapter {
   FakeAdapter(this.routes);
 
@@ -18,7 +18,8 @@ class FakeAdapter implements HttpClientAdapter {
     calls.add(o);
     final h = routes['${o.method} ${o.uri.path}'];
     if (h == null) return _json(404, {'error': 'Not found'});
-    final out = h(o);
+    var out = h(o);
+    if (out is Future) out = await out;
     if (out is FakeReply) return _json(out.status, out.body);
     return _json(200, out);
   }
