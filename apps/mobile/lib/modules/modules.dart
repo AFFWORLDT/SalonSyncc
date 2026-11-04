@@ -3,6 +3,7 @@ import 'account/account_module.dart';
 import 'announcements/announcements_module.dart';
 import 'bills/bills_module.dart';
 import 'dashboard/dashboard_module.dart';
+import 'expenses/expenses_module.dart';
 import 'history/history_module.dart';
 import 'sales/sales_module.dart';
 import 'home/home_module.dart';
@@ -13,6 +14,7 @@ final appModules = <FeatureModule>[
   dashboardModule,
   salesModule,
   adminBillsModule,
+  expensesModule,
   billsModule,
   historyModule,
   announcementsModule,
