@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>SalonKit uses Face ID to keep your salon's data private.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>SalonKit uses your photos only when you choose the salon logo.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
