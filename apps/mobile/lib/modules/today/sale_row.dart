@@ -7,7 +7,8 @@ import '../../models/sale.dart';
 /// "Haircut, Hair oil ×2", or the note for an amount-only bill.
 String saleWhat(Sale s) => s.items.isEmpty ? (s.note ?? '') : s.items.map((i) => i.qty > 1 ? '${i.name} ×${i.qty}' : i.name).join(', ');
 
-/// One bill in a list: cash/card icon, customer, time · phone · what, and the amount.
+/// One bill in a list: cash/card icon, customer, time · phone · what, and the amount. With [showDay] (My bills) the
+/// line starts with the bill no. and the day, as the web's bills list does.
 class SaleRow extends StatelessWidget {
   const SaleRow({super.key, required this.sale, required this.fmt, required this.onTap, this.showDay = false});
   final Sale sale;
@@ -19,6 +20,7 @@ class SaleRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final sub = [
+      if (showDay) sale.billNo,
       showDay ? '${fmt.dayLabel(sale.day)} ${fmt.time(sale.createdAt)}' : fmt.time(sale.createdAt),
       if (sale.customerPhone != null) fmt.phone(sale.customerPhone!),
       saleWhat(sale),

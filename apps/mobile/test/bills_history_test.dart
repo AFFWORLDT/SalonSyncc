@@ -26,6 +26,7 @@ void main() {
       await t.pumpWidget(host(a));
       await t.pumpAndSettle();
       expect(find.text('Omar'), findsOneWidget);
+      expect(find.textContaining('E2E-20261104-001 · '), findsOneWidget);
       expect(a.calls.single.queryParameters, {'page_size': 50});
       await t.enterText(find.byKey(const ValueKey('bill-search')), 'om');
       await t.pump(const Duration(milliseconds: 100));

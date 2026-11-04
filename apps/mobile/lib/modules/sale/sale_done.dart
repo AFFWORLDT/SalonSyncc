@@ -43,11 +43,20 @@ class SaleDone extends StatelessWidget {
             ]),
           ),
           if (actions != null) ...[const SizedBox(height: 16), actions!],
-          const SizedBox(height: 24),
-          FilledButton(style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)), onPressed: onDone, child: const Text('Done')),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)), onPressed: onNew, icon: const Icon(Icons.add_rounded), label: const Text('New sale')),
         ]),
+      ),
+      // Always on screen, however tall the bill and sharing get.
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+          child: Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)), onPressed: onNew, icon: const Icon(Icons.add_rounded), label: const Text('New sale')),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: FilledButton(style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)), onPressed: onDone, child: const Text('Done'))),
+          ]),
+        ),
       ),
     );
   }
