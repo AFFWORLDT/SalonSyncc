@@ -7,6 +7,7 @@ import '../core/auth/auth_controller.dart';
 import '../core/features/feature_gate.dart';
 import '../core/features/feature_module.dart';
 import '../core/features/registry.dart';
+import '../core/push/deep_link.dart';
 import '../models/me.dart';
 
 const kSwitchedOff = 'That feature was switched off for your salon';
@@ -28,12 +29,15 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   final auth = Get.find<AuthController>();
   String _tab = '';
   late final Worker _watch;
+  late final Worker _route;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _watch = ever<Me?>(auth.me, _onMe);
+    _route = ever<String?>(pendingRoute, _open);
+    if (pendingRoute.value != null) WidgetsBinding.instance.addPostFrameCallback((_) => _open(pendingRoute.value));
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       for (final step in postSignInSteps) {
         if (!mounted) return;
@@ -45,6 +49,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   @override
   void dispose() {
     _watch.dispose();
+    _route.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -60,6 +65,18 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       setState(() => _tab = '');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text(kSwitchedOff)));
+    }
+  }
+
+  /// Opens a module named by a tapped notification: its tab, or its screen from "More".
+  void _open(String? id) {
+    final me = auth.me.value;
+    if (id == null || me == null || !mounted) return;
+    pendingRoute.value = null;
+    if (widget.registry.tabsFor(me).any((m) => m.id == id)) {
+      setState(() => _tab = id);
+    } else if (widget.registry.isVisible(id, me)) {
+      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => FeatureGate(registry: widget.registry, id: id)));
     }
   }
 

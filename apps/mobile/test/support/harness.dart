@@ -20,3 +20,9 @@ AuthController putAuth(FakeAdapter a, {MemorySecureStore? secure, Map<String, Ob
         ApiClient(b, token: token, onUnauthorized: onUnauthorized, onFeatureDisabled: onFeatureDisabled, adapter: a),
   ));
 }
+
+/// A salon to choose before calls that need one.
+class SavedSalonForTest {
+  const SavedSalonForTest();
+  SavedSalon get salon => const SavedSalon(slug: 'supersalon', name: 'Super Salon');
+}

@@ -28,6 +28,10 @@ class AuthController extends GetxController {
   String? _token;
   ApiClient? _api;
 
+  /// Set by the push service: this phone's push token (dropped on the server at sign-out) and its own clean-up.
+  String? Function()? pushToken;
+  Future<void> Function()? afterSignOut;
+
   /// The signed-in salon's API (token attached). Only valid once a salon is chosen.
   ApiClient get api => _api ??= clientFor(salonBase(salon.value!.slug),
       token: () => _token, onUnauthorized: onUnauthorized, onFeatureDisabled: () => refreshMe().then((_) {}, onError: (_) {}));
@@ -98,13 +102,15 @@ class AuthController extends GetxController {
 
   /// Best effort on the server (offline is fine), then forget the token. The salon stays.
   Future<void> signOut({String? pushToken}) async {
+    final push = pushToken ?? this.pushToken?.call();
     if (_token != null && salon.value != null) {
-      if (pushToken != null) {
-        await api.delete('/api/push/tokens', (_) => null, body: {'token': pushToken}).then((_) {}, onError: (_) {});
+      if (push != null) {
+        await api.delete('/api/push/tokens', (_) => null, body: {'token': push}).then((_) {}, onError: (_) {});
       }
       await api.delete('/api/mobile/session', (_) => null).then((_) {}, onError: (_) {});
     }
     await _forget();
+    await afterSignOut?.call();
   }
 
   Future<void> switchSalon({String? pushToken}) async {

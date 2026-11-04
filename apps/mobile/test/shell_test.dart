@@ -9,6 +9,7 @@ import 'package:salonkit/core/auth/session_store.dart';
 import 'package:salonkit/core/features/feature_gate.dart';
 import 'package:salonkit/core/features/feature_module.dart';
 import 'package:salonkit/core/features/registry.dart';
+import 'package:salonkit/core/push/deep_link.dart';
 import 'package:salonkit/models/role.dart';
 import 'package:salonkit/shell/shell.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -66,5 +67,17 @@ void main() {
     await t.pumpWidget(GetMaterialApp(home: FeatureGate(registry: registry, id: 'audit')));
     expect(find.text("This feature isn't on for your salon"), findsOneWidget);
     expect(find.text('AUDIT BODY'), findsNothing);
+  });
+
+  testWidgets('a tapped notification opens its tab or its More screen', (t) async {
+    auth().me.value = meWith(features: ['core_sales', 'ledger', 'audit_log']);
+    await t.pumpWidget(app());
+    pendingRoute.value = 'ledger';
+    await t.pumpAndSettle();
+    expect(find.text('LEDGER BODY'), findsOneWidget);
+    expect(pendingRoute.value, isNull);
+    pendingRoute.value = 'audit';
+    await t.pumpAndSettle();
+    expect(find.text('AUDIT BODY'), findsOneWidget);
   });
 }
