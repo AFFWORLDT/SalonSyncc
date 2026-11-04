@@ -160,6 +160,17 @@ export function adminRepo(db: D1Database) {
         audit(a),
       ]);
     },
+    /** Per-role switch: off writes a row, on deletes it. With its audit row, atomically. */
+    async setRoleFeature(orgId: string, role: string, key: string, enabled: boolean, a: AuditInput): Promise<void> {
+      await db.batch([
+        enabled
+          ? db.prepare("DELETE FROM org_role_features WHERE org_id = ? AND role = ? AND feature_key = ?").bind(orgId, role, key)
+          : db
+              .prepare("INSERT INTO org_role_features(org_id,role,feature_key,enabled,updated_at) VALUES(?1,?2,?3,0,?4) ON CONFLICT(org_id,role,feature_key) DO UPDATE SET enabled = 0, updated_at = ?4")
+              .bind(orgId, role, key, a.at),
+        audit(a),
+      ]);
+    },
     /** A single-use support code (sha-256 stored) for "Log in as salon". */
     async createSupport(codeHash: string, pid: number, orgId: string, expiresAt: number, a: AuditInput): Promise<void> {
       await db.batch([

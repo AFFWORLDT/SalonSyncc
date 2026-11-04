@@ -258,6 +258,30 @@ platformApi.put("/orgs/:id/features/:key", async (c) => {
   return c.json({ ok: true });
 });
 
+// Per-role switches: hide a salon feature from its barbers or its admins (owner + admin). Off rows only; on = no row.
+const ROLES = ["barber", "admin"] as const;
+platformApi.get("/orgs/:id/role-features", async (c) => {
+  const row = await loadOrg(c);
+  const { results } = await c.env.DB.prepare("SELECT role, feature_key FROM org_role_features WHERE org_id = ? AND enabled = 0").bind(row.id).all<{ role: string; feature_key: string }>();
+  const grid = (role: string) => Object.fromEntries(FEATURE_KEYS.map((k) => [k, !results.some((r) => r.role === role && r.feature_key === k)]));
+  return c.json({ barber: grid("barber"), admin: grid("admin") });
+});
+
+platformApi.put("/orgs/:id/role-features/:role/:key", async (c) => {
+  const row = await loadOrg(c);
+  const role = c.req.param("role");
+  const key = c.req.param("key");
+  if (!ROLES.includes(role as (typeof ROLES)[number])) throw bad("Role must be barber or admin");
+  if (!isFeatureKey(key)) throw bad("Unknown feature");
+  if (key === "core_sales") throw bad("Sales are always on");
+  const b = await body(c);
+  if (typeof b.enabled !== "boolean") throw bad("enabled must be true or false");
+  const a = auditOf(c, "role_feature", row.id, undefined, { role, feature: key, enabled: b.enabled });
+  await adminRepo(c.env.DB).setRoleFeature(row.id, role, key, b.enabled, a);
+  invalidateFeatures(row.id);
+  return c.json({ ok: true });
+});
+
 // AI connect (feature mcp_api, switched on with the override above): live connections, recent calls, revoke all.
 platformApi.get("/orgs/:id/mcp", async (c) => {
   const row = await loadOrg(c);

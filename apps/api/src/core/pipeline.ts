@@ -9,7 +9,8 @@ import { platformRepo } from "../data/platform";
 import { featuresFor } from "./features-cache";
 import { tenantRepo } from "../data/tenant";
 import type { OrgStatus } from "../data/platform";
-import type { FeatureKey } from "@ss/features";
+import { roleFeatures, type FeatureKey } from "@ss/features";
+import { isAdmin } from "./roles";
 
 /**
  * Cross-site write protection. Sibling salon subdomains are same-site, so SameSite=Lax alone does not stop them.
@@ -94,7 +95,9 @@ export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     if (!pu || pu.session_version !== session.spv) throw new HttpError(401, "Please sign in");
   }
 
-  const { features, limits } = await featuresFor(c.env.DB, org);
+  const of = await featuresFor(c.env.DB, org);
+  const features = roleFeatures(of.features, isAdmin(user) ? "admin" : "barber", of.roleRows);
+  const limits = of.limits;
   c.set("tenant", { org, user, repo, features, limits, supportBy: session.sp ?? null, mobileSessionId });
   await next();
 };
