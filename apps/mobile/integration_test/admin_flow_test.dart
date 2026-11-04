@@ -67,7 +67,7 @@ void main() {
 
     await t.tap(find.text('Daily sheet').last);
     await waitFor(t, find.text('Total sale'));
-    expect(find.text('Barber Ali'), findsWidgets);
+    await waitFor(t, find.text('Barber Ali')); // the table arrives after the tiles' labels
 
     await t.tap(find.text('More'));
     await waitFor(t, find.text('Staff'));

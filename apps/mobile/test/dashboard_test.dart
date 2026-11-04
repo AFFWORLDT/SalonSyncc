@@ -57,6 +57,19 @@ void main() {
     expect(find.text('Kareem'), findsOneWidget);
   });
 
+  testWidgets('no blur layers (smooth on low-end phones)', (t) async {
+    await pump(t, owner());
+    expect(find.byType(BackdropFilter), findsNothing);
+  });
+
+  testWidgets('a 320 dp phone still shows barber names', (t) async {
+    await pump(t, owner());
+    t.view.physicalSize = const Size(320, 3200);
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
+    expect(t.getSize(find.text('Barber Sam')).width, greaterThanOrEqualTo(70));
+  });
+
   testWidgets('range presets: only 1D without reports_advanced', (t) async {
     await pump(t, owner(features: ['core_sales', 'expenses', 'daily_sheet']));
     expect(find.text('1D'), findsOneWidget);

@@ -189,11 +189,13 @@ class _SaleSheetState extends State<SaleSheet> {
     }
   }
 
-  /// One of my bills from today with this total and payment, made since [since] (a minute's grace for clock skew).
+  /// A bill for this barber and day (an admin's choice, else mine today) with this total and payment, made since
+  /// [since] (a minute's grace for clock skew).
   Future<Sale?> _landed(SaleDraft d, int since) async {
-    final today = await widget.sales.today(widget.me.today);
-    for (final s in today.items) {
-      if (s.barberId == widget.me.user.id && s.amount == d.total && s.payment == d.payment && s.createdAt >= since - 60000) return s;
+    final barber = d.barberId ?? widget.me.user.id;
+    final list = await widget.sales.search(day: d.day ?? widget.me.today, barberId: d.barberId, pageSize: 200);
+    for (final s in list.items) {
+      if (s.barberId == barber && s.amount == d.total && s.payment == d.payment && s.createdAt >= since - 60000) return s;
     }
     return null;
   }

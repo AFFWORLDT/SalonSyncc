@@ -59,6 +59,11 @@ void main() {
     expect(shared, ['day:${owner.today}']);
   });
 
+  testWidgets('no blur layers over the big table', (t) async {
+    await pump(t);
+    expect(find.byType(BackdropFilter), findsNothing);
+  });
+
   testWidgets('expense columns follow the switch', (t) async {
     await pump(t);
     expect(find.text('Exp.'), findsOneWidget);

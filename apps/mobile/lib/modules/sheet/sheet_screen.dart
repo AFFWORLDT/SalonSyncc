@@ -93,7 +93,7 @@ class _SheetScreenState extends State<SheetScreen> {
   Widget build(BuildContext context) {
     final me = widget.me, fmt = me.fmt, t = Theme.of(context).textTheme, cs = Theme.of(context).colorScheme;
     final d = _d;
-    Widget tile(String label, int? v, {String? hint, Color? color}) => SkGlass(
+    Widget tile(String label, int? v, {String? hint, Color? color}) => SkGlass(blur: false, 
           padding: const EdgeInsets.all(14),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(label, style: t.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
@@ -148,7 +148,7 @@ class _SheetScreenState extends State<SheetScreen> {
           if (d == null)
             const SkSkeleton(height: 240, radius: 24)
           else
-            SkGlass(padding: const EdgeInsets.symmetric(vertical: 8), child: _Table(d: d, me: me, showExp: _showExp, onDay: widget.onDay)),
+            SkGlass(blur: false, padding: const EdgeInsets.symmetric(vertical: 8), child: _Table(d: d, me: me, showExp: _showExp, onDay: widget.onDay)),
           const SizedBox(height: 10),
           Text(kSheetNote.replaceAll('{CUR}', fmt.currency), style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         ],

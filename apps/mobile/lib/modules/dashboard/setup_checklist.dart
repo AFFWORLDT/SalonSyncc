@@ -49,7 +49,7 @@ class _SetupChecklistState extends State<SetupChecklist> {
     final t = Theme.of(context).textTheme, cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: SkGlass(
+      child: SkGlass(blur: false, 
         padding: const EdgeInsets.fromLTRB(16, 10, 6, 12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [

@@ -183,7 +183,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (o == null)
             const SkSkeleton(height: 120, radius: 24)
           else
-            SkGlass(padding: const EdgeInsets.symmetric(vertical: 8), child: _BarbersTable(rows: o.perBarber, fmt: fmt, single: single)),
+            SkGlass(blur: false, padding: const EdgeInsets.symmetric(vertical: 8), child: _BarbersTable(rows: o.perBarber, fmt: fmt, single: single)),
           const SizedBox(height: 18),
           _section(context, 'Latest sales $word', 'All sales →', () => widget.onAllSales(single ? _to : null)),
           if (o == null)
@@ -191,7 +191,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           else if (o.recent.isEmpty)
             EmptyState(text: 'No sales $word.', icon: Icons.content_cut_rounded)
           else
-            SkGlass(
+            SkGlass(blur: false, 
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Column(children: [
                 for (final s in o.recent.take(8)) SaleRow(sale: s, fmt: fmt, showBarber: true, onTap: () => widget.onOpenSale(s).then((_) => _load())),
@@ -199,7 +199,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           if (o != null && o.series.length > 1) ...[
             const SizedBox(height: 18),
-            SkGlass(
+            SkGlass(blur: false, 
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(o.seriesByMonth ? 'By month' : 'By day', style: t.titleSmall),
                 Text('${fmt.money(o.totals.sales)} sales, ${fmt.money(o.totals.profit)} profit', style: t.bodySmall),
@@ -223,7 +223,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _tile(BuildContext context, String label, int? v, {String? hint, bool big = false, Color? color, Widget? action}) {
     final t = Theme.of(context).textTheme, fmt = widget.me.fmt;
-    return SkGlass(
+    return SkGlass(blur: false, 
       padding: EdgeInsets.fromLTRB(16, 14, action == null ? 16 : 4, 14),
       child: Row(children: [
         Expanded(
@@ -251,22 +251,31 @@ class _BarbersTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
-    Widget row(Widget name, List<Widget> cols) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          child: Row(children: [
-            Expanded(child: name),
-            for (final (i, c) in cols.indexed) SizedBox(width: i == 0 ? 44 : 66, child: Align(alignment: Alignment.centerRight, child: c)),
-          ]),
-        );
     final h = t.labelSmall;
     if (rows.isEmpty) return const EmptyState(text: 'No barbers yet');
-    return Column(children: [
-      row(Text('Barber', style: h), [Text('Cust.', style: h), Text('Sales', style: h), Text('Comm.', style: h), Text('Exp.', style: h)]),
-      for (final b in rows)
-        row(
-          Text(b.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-          [
-            Text('${b.count}', style: SkText.mono),
+    // Narrow phones (under ~380 dp): customers move under the name so names keep room.
+    return LayoutBuilder(builder: (context, box) {
+      final narrow = box.maxWidth < 380;
+      final colW = narrow ? 56.0 : 66.0;
+      Widget row(Widget name, List<Widget> cols) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            child: Row(children: [
+              Expanded(child: name),
+              for (final (i, c) in cols.indexed) SizedBox(width: !narrow && i == 0 ? 44 : colW, child: Align(alignment: Alignment.centerRight, child: c)),
+            ]),
+          );
+      return Column(children: [
+        row(Text('Barber', style: h), [if (!narrow) Text('Cust.', style: h), Text('Sales', style: h), Text('Comm.', style: h), Text('Exp.', style: h)]),
+        for (final b in rows)
+          row(
+            narrow
+                ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(b.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text('${b.count} cust.', style: t.bodySmall),
+                  ])
+                : Text(b.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+            [
+              if (!narrow) Text('${b.count}', style: SkText.mono),
             Text(fmt.num(b.sales), style: SkText.mono.copyWith(fontWeight: FontWeight.w600)),
             Text(fmt.num(b.commission, dash: true), style: SkText.mono),
             !b.expenseEntered
@@ -274,8 +283,9 @@ class _BarbersTable extends StatelessWidget {
                 : single && b.expense == 0
                     ? const Icon(Icons.check_rounded, size: 16)
                     : Text(fmt.num(b.expense, dash: true), style: SkText.mono),
-          ],
-        ),
-    ]);
+            ],
+          ),
+      ]);
+    });
   }
 }

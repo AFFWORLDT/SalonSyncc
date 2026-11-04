@@ -62,7 +62,9 @@ void main() {
     await t.enterText(find.byKey(const ValueKey('st-password')), 'pass1234');
     await t.tap(find.text('Save'));
     await t.pumpAndSettle();
-    expect((a.calls.singleWhere((c) => c.method == 'POST').data as Map)['username'], 'omarkhan');
+    final body = a.calls.singleWhere((c) => c.method == 'POST').data as Map;
+    expect(body['username'], 'omarkhan');
+    expect(body.containsKey('sort_order'), isFalse, reason: 'blank = the server puts them last in the sheet');
     expect(find.text('Your plan allows 10 active staff. Upgrade your plan to add more.'), findsOneWidget);
   });
 

@@ -62,90 +62,48 @@ class _LoginScreenState extends State<LoginScreen> {
               child: SkGlass(
                 padding: const EdgeInsets.all(24),
                 child: AutofillGroup(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Center(
-                        child: Hero(
-                          tag: 'salon-logo',
-                          child: SalonLogo(
-                            slug: s.slug,
-                            name: s.name,
-                            logoUrl: s.logoUrl,
-                            size: 64,
-                          ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Center(child: Hero(tag: 'salon-logo', child: SalonLogo(slug: s.slug, name: s.name, logoUrl: s.logoUrl, size: 64))),
+                    const SizedBox(height: 16),
+                    Text('Sign in to ${s.name}', textAlign: TextAlign.center, style: t.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 24),
+                    TextField(
+                      controller: _user,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      autofillHints: const [AutofillHints.username],
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(labelText: 'Username'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _pass,
+                      obscureText: !_show,
+                      autofillHints: const [AutofillHints.password],
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _submit(),
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        suffixIcon: IconButton(
+                          tooltip: _show ? 'Hide password' : 'Show password',
+                          icon: Icon(_show ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                          onPressed: () => setState(() => _show = !_show),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Sign in to ${s.name}',
-                        textAlign: TextAlign.center,
-                        style: t.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      TextField(
-                        controller: _user,
-                        autocorrect: false,
-                        enableSuggestions: false,
-                        autofillHints: const [AutofillHints.username],
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Username',
-                        ),
-                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                      onPressed: _busy ? null : _submit,
+                      child: _busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Sign in'),
+                    ),
+                    if (_error != null) ...[
                       const SizedBox(height: 12),
-                      TextField(
-                        controller: _pass,
-                        obscureText: !_show,
-                        autofillHints: const [AutofillHints.password],
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _submit(),
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          suffixIcon: IconButton(
-                            tooltip: _show ? 'Hide password' : 'Show password',
-                            icon: Icon(
-                              _show
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                            ),
-                            onPressed: () => setState(() => _show = !_show),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(50),
-                        ),
-                        onPressed: _busy ? null : _submit,
-                        child: _busy
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Sign in'),
-                      ),
-                      if (_error != null) ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          _error!,
-                          textAlign: TextAlign.center,
-                          style: t.bodyMedium?.copyWith(color: c.error),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: () => auth.switchSalon(),
-                        child: const Text('Not your salon?'),
-                      ),
+                      Text(_error!, textAlign: TextAlign.center, style: t.bodyMedium?.copyWith(color: c.error)),
                     ],
-                  ),
+                    const SizedBox(height: 8),
+                    TextButton(onPressed: () => auth.switchSalon(), child: const Text('Not your salon?')),
+                  ]),
                 ),
               ),
             ),

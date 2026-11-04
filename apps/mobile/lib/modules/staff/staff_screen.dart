@@ -203,7 +203,7 @@ class _StaffFormState extends State<_StaffForm> {
   late final _user = TextEditingController(text: s?.username ?? '');
   final _pass = TextEditingController();
   late final _pct = TextEditingController(text: s?.commissionPct == null ? '' : '${s!.commissionPct}');
-  late final _order = TextEditingController(text: '${s?.sortOrder ?? 0}');
+  late final _order = TextEditingController(text: s == null ? '' : '${s!.sortOrder}');
   late final _phone = TextEditingController(text: s?.phone ?? '');
   late String _role = s?.role ?? 'barber';
   late bool _canExpense = s?.canAddExpense ?? false;
@@ -237,7 +237,7 @@ class _StaffFormState extends State<_StaffForm> {
       phone: _phone.text,
       role: _role,
       commissionPct: _pct.text,
-      sortOrder: int.tryParse(_order.text.trim()) ?? 0,
+      sortOrder: int.tryParse(_order.text.trim()) ?? s?.sortOrder,
       canAddExpense: _role == 'barber' && _canExpense,
     );
     setState(() { _busy = true; _error = null; });
@@ -298,7 +298,7 @@ class _StaffFormState extends State<_StaffForm> {
             ),
           ],
           const SizedBox(height: 10),
-          TextField(controller: _order, keyboardType: TextInputType.number, decoration: dec('Column order', 'Position in the sheet')),
+          TextField(controller: _order, keyboardType: TextInputType.number, decoration: dec('Column order', s == null ? 'Position in the sheet (empty = last)' : 'Position in the sheet')),
           const SizedBox(height: 10),
           TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: dec('Mobile (optional)')),
           if (_role == 'barber')
