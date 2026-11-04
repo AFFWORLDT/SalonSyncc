@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/auth/auth_controller.dart';
+import '../../core/auth/lock_controller.dart';
 import '../../core/features/feature_module.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../models/role.dart';
@@ -16,8 +17,26 @@ final accountModule = FeatureModule(
   builder: (_) => const AccountScreen(),
 );
 
-/// Extra rows other parts of the app add (the biometric toggle), so this screen needn't know them.
+/// Extra rows other parts of the app add, so this screen needn't know them.
 final accountExtras = <WidgetBuilder>[];
+
+/// Adds "Unlock with Face ID / fingerprint" (shown only when the phone has biometrics). Called once at startup.
+void registerLockToggle() {
+  if (accountExtras.contains(_lockToggle)) return;
+  accountExtras.add(_lockToggle);
+}
+
+Widget _lockToggle(BuildContext context) {
+  final lock = Get.find<LockController>();
+  return Obx(() => !lock.available.value
+      ? const SizedBox.shrink()
+      : SwitchListTile(
+          secondary: const Icon(Icons.fingerprint),
+          title: const Text('Unlock with Face ID / fingerprint'),
+          value: lock.enabled.value,
+          onChanged: (on) => on ? lock.enable() : lock.disable(),
+        ));
+}
 
 class AccountScreen extends StatelessWidget {
   const AccountScreen({super.key});

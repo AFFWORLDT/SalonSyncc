@@ -11,6 +11,9 @@ import '../models/me.dart';
 
 const kSwitchedOff = 'That feature was switched off for your salon';
 
+/// One-time steps after the shell opens (biometric offer, then push permission), run in order.
+final postSignInSteps = <Future<void> Function(BuildContext context)>[];
+
 /// The signed-in app: bottom tabs and a "More" list, both built from the modules switched on for this user.
 /// Switches are re-read when the app returns to the foreground; if the open tab is switched off, back to home.
 class Shell extends StatefulWidget {
@@ -31,6 +34,12 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _watch = ever<Me?>(auth.me, _onMe);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      for (final step in postSignInSteps) {
+        if (!mounted) return;
+        await step(context);
+      }
+    });
   }
 
   @override

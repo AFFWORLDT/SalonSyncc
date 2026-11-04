@@ -50,7 +50,7 @@ class _AuthGate extends StatelessWidget {
     return Obx(() {
       final s = auth.state.value;
       final Widget screen = switch (s) {
-        AuthState.unknown || AuthState.locked => SplashScreen(salon: auth.salon.value),
+        AuthState.unknown => SplashScreen(salon: auth.salon.value),
         AuthState.needSalon => const SalonScreen(),
         AuthState.needLogin => const LoginScreen(),
         AuthState.signedIn => SkBackground(child: Shell(registry: registry)),

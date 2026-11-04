@@ -1,5 +1,6 @@
 package online.salonkit.app
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+// FlutterFragmentActivity: local_auth's biometric prompt needs a FragmentActivity.
+class MainActivity : FlutterFragmentActivity()

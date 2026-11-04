@@ -10,7 +10,7 @@ import 'session_store.dart';
 
 export 'session_store.dart' show SavedSalon;
 
-enum AuthState { unknown, needSalon, needLogin, locked, signedIn }
+enum AuthState { unknown, needSalon, needLogin, signedIn }
 
 typedef ClientFactory = ApiClient Function(Uri base, {String? Function()? token, void Function()? onUnauthorized, void Function()? onFeatureDisabled});
 

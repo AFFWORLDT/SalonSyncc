@@ -5,6 +5,11 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:get/get.dart';
 
 import 'app.dart';
+import 'auth_ui/lock_gate.dart';
+import 'core/auth/biometric_service.dart';
+import 'core/auth/lock_controller.dart';
+import 'modules/account/account_module.dart';
+import 'shell/shell.dart';
 import 'core/api/api_client.dart';
 import 'core/auth/auth_controller.dart';
 import 'core/auth/device_info.dart';
@@ -36,7 +41,11 @@ Future<void> main() async {
     },
   ));
   appWrappers.add((context, child) => OfflineBar(child: child));
-  await theme.load();
+  final lock = Get.put(LockController(LocalAuthBiometrics()));
+  appWrappers.add((context, child) => LockGate(child: child));
+  registerLockToggle();
+  postSignInSteps.add(offerBiometricLock);
+  await Future.wait([theme.load(), lock.load()]);
   runApp(const SalonKitApp());
   // The splash stays at least 400 ms so it never flashes.
   await auth.boot(hold: Future<void>.delayed(const Duration(milliseconds: 400)));
