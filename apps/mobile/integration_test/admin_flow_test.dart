@@ -40,6 +40,8 @@ void main() {
     await waitFor(t, find.text('Sign in to E2E Salon'));
     await t.enterText(find.widgetWithText(TextField, 'Username'), 'owner');
     await t.enterText(find.widgetWithText(TextField, 'Password'), 'pass1234');
+    FocusManager.instance.primaryFocus?.unfocus(); // the keyboard can cover the button
+    await settle(t, 1);
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await waitFor(t, find.text('Sales today'));
     await settle(t);
@@ -76,6 +78,7 @@ void main() {
     await t.pageBack();
     await settle(t, 1);
 
+    await t.scrollUntilVisible(find.text('My account'), 200, scrollable: find.byType(Scrollable).first);
     await t.tap(find.text('My account'));
     await waitFor(t, find.text('Sign out'));
     await t.tap(find.text('Sign out'));

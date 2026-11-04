@@ -39,14 +39,38 @@ class SalonKitApp extends StatelessWidget {
   }
 }
 
-/// Picks the screen from the sign-in state, with a shared-axis transition between them.
-class _AuthGate extends StatelessWidget {
+/// Picks the screen from the sign-in state, with a shared-axis transition between them. Leaving the signed-in state
+/// (sign out, a 401, switch salon) also closes every screen opened on top, so nothing is left above sign-in.
+class _AuthGate extends StatefulWidget {
   const _AuthGate({required this.registry});
   final FeatureRegistry registry;
 
   @override
+  State<_AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<_AuthGate> {
+  final auth = Get.find<AuthController>();
+  late final Worker _leave;
+
+  @override
+  void initState() {
+    super.initState();
+    _leave = ever<AuthState>(auth.state, (s) {
+      if (s != AuthState.signedIn) Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+    });
+  }
+
+  @override
+  void dispose() {
+    _leave.dispose();
+    super.dispose();
+  }
+
+  FeatureRegistry get registry => widget.registry;
+
+  @override
   Widget build(BuildContext context) {
-    final auth = Get.find<AuthController>();
     return Obx(() {
       final s = auth.state.value;
       final Widget screen = switch (s) {
