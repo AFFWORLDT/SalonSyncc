@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salonkit/core/api/api_client.dart';
@@ -16,9 +17,9 @@ import 'support/me_fixture.dart';
 Object? raw(String n) => jsonDecode(File('test/fixtures/$n').readAsStringSync());
 final me = meWith(barber: true);
 
-Widget host(FakeAdapter a, {Sale? edit}) {
+Widget host(FakeAdapter a, {Sale? edit, int Function()? now}) {
   final c = ApiClient(Uri.parse('https://e2esalon.salonkit.online'), token: () => 'skm_t', adapter: a);
-  return MaterialApp(home: SaleSheet(me: me, sales: SalesApi(c, me.fmt), existing: edit));
+  return MaterialApp(home: SaleSheet(me: me, sales: SalesApi(c, me.fmt), existing: edit, now: now));
 }
 
 Map<String, Handler> base() => {'GET /api/services': (o) => raw('services.json'), 'GET /api/customers': (o) => raw('customers.json')};
@@ -83,7 +84,7 @@ void main() {
     expect(t.widget<FilledButton>(find.byKey(const ValueKey('next'))).onPressed, isNull);
   });
 
-  testWidgets('customer and phone go with the country code; local 0 dropped', (t) async {
+  testWidgets('customer and phone are sent as the server stores them', (t) async {
     final a = FakeAdapter({...base(), 'POST /api/sales': (o) => FakeReply(201, raw('sale.json'))});
     await t.pumpWidget(host(a));
     await t.pumpAndSettle();
@@ -102,7 +103,7 @@ void main() {
       ],
       'payment_mode': 'card',
       'customer_name': 'Omar',
-      'customer_phone': '+971501234567',
+      'customer_phone': '0501234567',
       'note': 'Regular',
     });
   });
@@ -178,6 +179,50 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text("You're offline"), findsOneWidget);
     expect(find.byKey(const ValueKey('save')), findsOneWidget);
+  });
+
+  testWidgets('a save that timed out but landed is found, not saved twice', (t) async {
+    final landed = {...raw('sale_walkin.json') as Map<String, dynamic>, 'barber_id': me.user.id};
+    final a = FakeAdapter({
+      ...base(),
+      'POST /api/sales': (o) => throw DioException(requestOptions: o, type: DioExceptionType.receiveTimeout),
+      'GET /api/sales': (o) => {'items': [landed], 'total': 1, 'page': 1, 'page_size': 200, 'sum': 2500},
+    });
+    await t.pumpWidget(host(a, now: () => landed['created_at'] as int));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('amount')), '25');
+    await t.pumpAndSettle();
+    await toCustomer(t);
+    await t.tap(find.text('Cash'));
+    await t.tap(find.byKey(const ValueKey('save')));
+    await t.pumpAndSettle();
+    expect(find.text("You're offline"), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('save')));
+    await t.pumpAndSettle();
+    expect(posts(a), hasLength(1));
+    expect(find.text('Congrats! Bill generated'), findsOneWidget);
+    expect(find.text('E2E-20261104-002'), findsOneWidget);
+  });
+
+  testWidgets('a timed-out save that did not land is saved on retry', (t) async {
+    var n = 0;
+    final a = FakeAdapter({
+      ...base(),
+      'POST /api/sales': (o) => n++ == 0 ? throw DioException(requestOptions: o, type: DioExceptionType.receiveTimeout) : FakeReply(201, raw('sale_walkin.json')),
+      'GET /api/sales': (o) => {'items': [], 'total': 0, 'page': 1, 'page_size': 200, 'sum': 0},
+    });
+    await t.pumpWidget(host(a));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('amount')), '25');
+    await t.pumpAndSettle();
+    await toCustomer(t);
+    await t.tap(find.text('Cash'));
+    await t.tap(find.byKey(const ValueKey('save')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('save')));
+    await t.pumpAndSettle();
+    expect(posts(a), hasLength(2));
+    expect(find.text('Congrats! Bill generated'), findsOneWidget);
   });
 
   group('edit', () {

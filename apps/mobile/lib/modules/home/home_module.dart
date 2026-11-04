@@ -37,7 +37,11 @@ class BarberHome extends StatelessWidget {
       me: me,
       sales: sales,
       report: ReportApi(auth.api),
-      onNewSale: () => openSaleSheet(context, me: me, sales: sales, doneActions: shareActionsFor),
+      onRefreshMe: () => auth.refreshMe().then((_) {}),
+      // A bill saved on a later business day than this screen's means the day has moved on: re-read it.
+      onNewSale: () => openSaleSheet(context, me: me, sales: sales, doneActions: shareActionsFor).then((r) async {
+            if (r?.sale != null && r!.sale!.day != me.today) await auth.refreshMe().then((_) {}, onError: (_) {});
+          }),
       onOpenSale: (s) => openBill(context, me: me, sales: sales, sale: s),
     );
   }

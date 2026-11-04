@@ -7,18 +7,43 @@ import '../../models/sale.dart';
 
 const kBadPhone = "Mobile number doesn't look right";
 
-/// The phone as the API wants it: "+" then the country code then the national number. A local "0…" number loses its 0; an empty field is null.
-/// Throws [FormatException] (kBadPhone) when it can't be a mobile number.
+/// National number length per calling code (same table as the server's apps/api/src/lib/phone.ts).
+const kNationalLengths = {'91': 10, '92': 10, '880': 10, '966': 9, '974': 8, '965': 8, '968': 8, '973': 8, '44': 10, '1': 10, '20': 10, '977': 10};
+
+/// The phone exactly as the server will store it (a port of its `canonicalPhone`, so the app's check and the
+/// server's agree): UAE numbers as 05XXXXXXXX, others as + then the code and the national number. An empty field is null.
+/// Throws [FormatException] (kBadPhone) when the server would reject it.
 String? phoneForApi(String typed, String country) {
-  final t = typed.replaceAll(RegExp(r'[\s\-()]'), '');
-  if (t.isEmpty) return null;
-  if (t.startsWith('+')) {
-    if (!RegExp(r'^\+\d{8,15}$').hasMatch(t)) throw const FormatException(kBadPhone);
-    return t;
+  final s = typed.replaceAll(RegExp(r'[\s\-().]'), '');
+  if (s.isEmpty) return null;
+  String? bad() => throw const FormatException(kBadPhone);
+  String? uaeLocal(String rest) => RegExp(r'^5\d{8}$').hasMatch(rest) || RegExp(r'^[234679]\d{7}$').hasMatch(rest) ? '0$rest' : bad();
+  final uae = country == '971';
+  String? intl;
+  if (s.startsWith('+')) {
+    intl = s.substring(1);
+  } else if (s.startsWith('00')) {
+    intl = s.substring(2);
   }
-  if (!RegExp(r'^\d{6,14}$').hasMatch(t)) throw const FormatException(kBadPhone);
-  final national = t.replaceFirst(RegExp(r'^0+'), '');
-  return country.isEmpty ? '+$national' : '+$country$national';
+  if (intl != null) {
+    if (!RegExp(uae ? r'^\d{8,15}$' : r'^\d{6,15}$').hasMatch(intl)) return bad();
+    if (uae && intl.startsWith('971')) return uaeLocal(intl.substring(3));
+    return '+$intl';
+  }
+  if (!RegExp(r'^\d+$').hasMatch(s)) return bad();
+  if (uae) {
+    if (s.startsWith('971') && s.length == 12) return uaeLocal(s.substring(3));
+    return uaeLocal(s.startsWith('0') ? s.substring(1) : s);
+  }
+  var national = s.startsWith('0') ? s.substring(1) : s;
+  final len = kNationalLengths[country];
+  if (len != null) {
+    if (national.startsWith(country) && national.length == country.length + len) national = national.substring(country.length);
+    if (national.length != len) return bad();
+  } else if (national.length < 6 || national.length > 14) {
+    return bad();
+  }
+  return '+$country$national';
 }
 
 /// Step 2: who it was for (optional, with the barber's own recent customers as suggestions), Cash or Card, and a note.
@@ -111,7 +136,7 @@ class _CustomerStepState extends State<CustomerStep> {
         key: const ValueKey('customer-phone'),
         controller: widget.phone,
         keyboardType: TextInputType.phone,
-        decoration: InputDecoration(labelText: 'Mobile', prefixText: widget.phoneCountry.isEmpty ? null : '+${widget.phoneCountry} '),
+        decoration: const InputDecoration(labelText: 'Mobile', hintText: 'Local number, or with + and country code'),
       ),
       if (_hints.isNotEmpty) ...[
         const SizedBox(height: 10),

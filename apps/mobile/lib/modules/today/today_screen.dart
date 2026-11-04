@@ -18,7 +18,7 @@ const kReadOnly = 'Your subscription has ended. Upgrade to add or change sales.'
 
 /// The barber's day: totals, today's expense, "New sale", and today's bills (tap to edit).
 class TodayScreen extends StatefulWidget {
-  const TodayScreen({super.key, required this.me, required this.sales, required this.report, required this.onNewSale, required this.onOpenSale});
+  const TodayScreen({super.key, required this.me, required this.sales, required this.report, required this.onNewSale, required this.onOpenSale, this.onRefreshMe});
   final Me me;
   final SalesApi sales;
   final ReportApi report;
@@ -26,6 +26,9 @@ class TodayScreen extends StatefulWidget {
   /// Open the new-sale sheet / a bill; each resolves when it closes, and the screen then reloads.
   final Future<void> Function() onNewSale;
   final Future<void> Function(Sale sale) onOpenSale;
+
+  /// Re-reads /api/me (the server's business day). When the day moves on, [me] changes and the screen reloads.
+  final Future<void> Function()? onRefreshMe;
 
   @override
   State<TodayScreen> createState() => TodayScreenState();
@@ -40,6 +43,23 @@ class TodayScreenState extends State<TodayScreen> {
   void initState() {
     super.initState();
     load();
+  }
+
+  @override
+  void didUpdateWidget(TodayScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.me.today != widget.me.today) {
+      setState(() {
+        _today = null;
+        _list = null;
+      });
+      load();
+    }
+  }
+
+  Future<void> _pull() async {
+    await widget.onRefreshMe?.call().then((_) {}, onError: (_) {});
+    await load();
   }
 
   Future<void> load() async {
@@ -71,7 +91,7 @@ class TodayScreenState extends State<TodayScreen> {
     final me = widget.me, fmt = me.fmt, t = Theme.of(context).textTheme;
     final loading = _error == null && _list == null;
     return RefreshIndicator(
-      onRefresh: load,
+      onRefresh: _pull,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
         Text('Hi ${me.user.name} 👋', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 2),

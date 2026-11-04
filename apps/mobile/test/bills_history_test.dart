@@ -37,14 +37,18 @@ void main() {
       expect(a.calls.last.queryParameters, {'q': 'oma', 'page_size': 50});
     });
 
-    testWidgets('Show more asks for the next 50', (t) async {
-      final page = raw('sales_page.json')..['total'] = 120;
-      final a = FakeAdapter({'GET /api/sales': (o) => page});
+    testWidgets('Show more fetches the next page and adds it (works past the 200 cap)', (t) async {
+      final first = raw('sales_page.json')..['total'] = 260;
+      final item = (first['items'] as List).first as Map<String, dynamic>;
+      final next = {...first, 'items': [{...item, 'id': 99, 'bill_no': 'E2E-20261103-009', 'customer_label': 'Zed'}], 'page': 2};
+      final a = FakeAdapter({'GET /api/sales': (o) => o.queryParameters['page'] == 2 ? next : first});
       await t.pumpWidget(host(a));
       await t.pumpAndSettle();
       await t.tap(find.text('Show more'));
       await t.pumpAndSettle();
-      expect(a.calls.last.queryParameters, {'page_size': 100});
+      expect(a.calls.last.queryParameters, {'page': 2, 'page_size': 50});
+      expect(find.text('Omar'), findsOneWidget);
+      expect(find.text('Zed'), findsOneWidget);
     });
 
     testWidgets('no results', (t) async {

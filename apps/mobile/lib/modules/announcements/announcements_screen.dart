@@ -70,6 +70,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: SkGlass(
+                blur: false,
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Padding(

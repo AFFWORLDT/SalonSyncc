@@ -16,10 +16,19 @@ import 'support/me_fixture.dart';
 
 Object? raw(String n) => jsonDecode(File('test/fixtures/$n').readAsStringSync());
 
-Widget host(FakeAdapter a, Me me, {VoidCallback? onNew}) {
+Widget host(FakeAdapter a, Me me, {VoidCallback? onNew, Future<void> Function()? onRefreshMe}) {
   final c = ApiClient(Uri.parse('https://e2esalon.salonkit.online'), token: () => 'skm_t', adapter: a);
   return MaterialApp(
-    home: Scaffold(body: TodayScreen(me: me, sales: SalesApi(c, me.fmt), report: ReportApi(c), onNewSale: () async => onNew?.call(), onOpenSale: (_) async {})),
+    home: Scaffold(
+      body: TodayScreen(
+        me: me,
+        sales: SalesApi(c, me.fmt),
+        report: ReportApi(c),
+        onNewSale: () async => onNew?.call(),
+        onOpenSale: (_) async {},
+        onRefreshMe: onRefreshMe,
+      ),
+    ),
   );
 }
 
@@ -55,6 +64,27 @@ void main() {
     expect(find.textContaining('Haircut, Hair oil ×2'), findsOneWidget);
     final sales = a.calls.firstWhere((c) => c.path == '/api/sales');
     expect(sales.queryParameters['day'], barber.today);
+  });
+
+  testWidgets('a new business day reloads Today for that day', (t) async {
+    final a = FakeAdapter(ok());
+    await t.pumpWidget(host(a, barber));
+    await t.pumpAndSettle();
+    final j = fx('me_barber.json')..['today'] = '2026-12-01';
+    await t.pumpWidget(host(a, Me.fromJson(j)));
+    await t.pumpAndSettle();
+    final days = a.calls.where((c) => c.path == '/api/sales').map((c) => c.queryParameters['day']).toList();
+    expect(days, [barber.today, '2026-12-01']);
+    expect(a.calls.where((c) => c.path == '/api/reports/me').last.queryParameters['month'], '2026-12');
+  });
+
+  testWidgets('pull to refresh also re-reads the business day', (t) async {
+    var n = 0;
+    await t.pumpWidget(host(FakeAdapter(ok()), barber, onRefreshMe: () async => n++));
+    await t.pumpAndSettle();
+    await t.fling(find.text('My sales today'), const Offset(0, 400), 1000);
+    await t.pumpAndSettle();
+    expect(n, 1);
   });
 
   testWidgets('empty day', (t) async {

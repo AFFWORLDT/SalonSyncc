@@ -52,8 +52,9 @@ class SalesApi {
 
   Future<Paged<Sale>> today(String day) => api.get('/api/sales', _page, query: {'day': day, 'page_size': 200});
 
-  Future<Paged<Sale>> search({String q = '', String? day, int pageSize = 50}) =>
-      api.get('/api/sales', _page, query: {if (q.trim().isNotEmpty) 'q': q.trim(), 'day': ?day, 'page_size': pageSize});
+  /// [page] is 1-based; the server caps [pageSize] at 200, so long lists page instead of growing the size.
+  Future<Paged<Sale>> search({String q = '', String? day, int page = 1, int pageSize = 50}) => api.get('/api/sales', _page,
+      query: {if (q.trim().isNotEmpty) 'q': q.trim(), 'day': ?day, if (page > 1) 'page': page, 'page_size': pageSize});
 
   Future<Sale> create(SaleDraft d) => api.post('/api/sales', d.toJson(fmt), _sale);
   Future<Sale> update(int id, SaleDraft d) => api.put('/api/sales/$id', d.toJson(fmt), _sale);

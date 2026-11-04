@@ -1,6 +1,7 @@
 import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/api/api_error.dart';
 import '../../core/format/fmt.dart';
 import '../../core/ui/states.dart';
 import '../../core/ui/motion.dart';
@@ -34,11 +35,14 @@ Future<SheetResult?> openSaleSheet(BuildContext context, {required Me me, requir
 
 /// New sale or edit bill, in two steps (services → customer), then the saved bill.
 class SaleSheet extends StatefulWidget {
-  const SaleSheet({super.key, required this.me, required this.sales, this.existing, this.doneActions});
+  const SaleSheet({super.key, required this.me, required this.sales, this.existing, this.doneActions, this.now});
   final Me me;
   final SalesApi sales;
   final Sale? existing;
   final DoneActions? doneActions;
+
+  /// The clock (ms), for tests.
+  final int Function()? now;
 
   @override
   State<SaleSheet> createState() => _SaleSheetState();
@@ -56,6 +60,9 @@ class _SaleSheetState extends State<SaleSheet> {
   bool _busy = false;
   String? _error;
   Sale? _saved;
+
+  /// When a new bill's save failed without an answer (offline / timeout): it may have reached the server anyway.
+  int? _unsureSince;
 
   Fmt get fmt => widget.me.fmt;
   bool get editing => widget.existing != null;
@@ -125,14 +132,34 @@ class _SaleSheetState extends State<SaleSheet> {
       note: note.isEmpty ? null : note,
     );
     setState(() { _busy = true; _error = null; });
+    final at = widget.now?.call() ?? DateTime.now().millisecondsSinceEpoch;
     try {
+      if (!editing && _unsureSince != null) {
+        // The last try may have saved: look for that bill among today's before saving it a second time.
+        final landed = await _landed(draft, _unsureSince!);
+        if (landed != null) {
+          if (mounted) setState(() { _busy = false; _saved = landed; _unsureSince = null; });
+          return;
+        }
+      }
       final s = editing ? await widget.sales.update(widget.existing!.id, draft) : await widget.sales.create(draft);
+      _unsureSince = null;
       if (!mounted) return;
       if (editing) return Navigator.of(context).pop(SheetResult.saved(s));
       setState(() { _busy = false; _saved = s; });
     } catch (e) {
+      if (!editing && e is Offline) _unsureSince ??= at;
       if (mounted) setState(() { _busy = false; _error = messageOf(e); });
     }
+  }
+
+  /// One of my bills from today with this total and payment, made since [since] (a minute's grace for clock skew).
+  Future<Sale?> _landed(SaleDraft d, int since) async {
+    final today = await widget.sales.today(widget.me.today);
+    for (final s in today.items) {
+      if (s.barberId == widget.me.user.id && s.amount == d.total && s.payment == d.payment && s.createdAt >= since - 60000) return s;
+    }
+    return null;
   }
 
   Future<void> _delete() async {

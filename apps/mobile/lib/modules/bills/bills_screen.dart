@@ -28,8 +28,9 @@ class _BillsScreenState extends State<BillsScreen> {
   final _q = TextEditingController();
   Timer? _debounce;
   String? _day;
-  int _pages = 1;
+  int _page = 1;
   Paged<Sale>? _list;
+  List<Sale> _items = const [];
   Object? _error;
   bool _more = false;
   int _seq = 0;
@@ -47,13 +48,16 @@ class _BillsScreenState extends State<BillsScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  /// Page 1 replaces the list (new search, day, refresh); later pages are added to it.
+  Future<void> _load({int page = 1}) async {
     final n = ++_seq;
     try {
-      final p = await widget.sales.search(q: _q.text, day: _day, pageSize: kBillsPage * _pages);
+      final p = await widget.sales.search(q: _q.text, day: _day, page: page, pageSize: kBillsPage);
       if (!mounted || n != _seq) return;
       setState(() {
+        _page = page;
         _list = p;
+        _items = page == 1 ? p.items : [..._items, ...p.items.where((s) => !_items.any((x) => x.id == s.id))];
         _error = null;
         _more = false;
       });
@@ -69,10 +73,7 @@ class _BillsScreenState extends State<BillsScreen> {
 
   void _typed(String _) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 250), () {
-      _pages = 1;
-      _load();
-    });
+    _debounce = Timer(const Duration(milliseconds: 250), _load);
   }
 
   Future<void> _pickDay() async {
@@ -80,7 +81,6 @@ class _BillsScreenState extends State<BillsScreen> {
     final d = await showDatePicker(context: context, firstDate: DateTime(2020), lastDate: today, initialDate: _day == null ? today : DateTime.parse(_day!));
     if (d == null) return;
     setState(() => _day = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}');
-    _pages = 1;
     _load();
   }
 
@@ -111,7 +111,6 @@ class _BillsScreenState extends State<BillsScreen> {
                 ? null
                 : () {
                     setState(() => _day = null);
-                    _pages = 1;
                     _load();
                   },
           ),
@@ -121,17 +120,17 @@ class _BillsScreenState extends State<BillsScreen> {
           ErrorState(error: _error!, onRetry: _load)
         else if (list == null)
           for (var i = 0; i < 5; i++) const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: SkSkeleton(height: 56))
-        else if (list.items.isEmpty)
+        else if (_items.isEmpty)
           const EmptyState(text: 'No bills found', icon: Icons.receipt_long_outlined)
         else ...[
           SkGlass(
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Column(children: [
-              for (final s in list.items)
+              for (final s in _items)
                 SaleRow(sale: s, fmt: fmt, showDay: true, onTap: () => widget.onOpen(s).then((_) => _load())),
             ]),
           ),
-          if (list.total > list.items.length)
+          if (list.total > _items.length && list.items.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 12),
               child: OutlinedButton(
@@ -139,8 +138,7 @@ class _BillsScreenState extends State<BillsScreen> {
                     ? null
                     : () {
                         setState(() => _more = true);
-                        _pages++;
-                        _load();
+                        _load(page: _page + 1);
                       },
                 child: const Text('Show more'),
               ),

@@ -35,6 +35,8 @@ void main() {
     expect(find.text('Shop closes at 9 tonight'), findsOneWidget);
     expect(find.text('Please finish the last bills by 8:45.'), findsOneWidget);
     expect(find.byKey(const ValueKey('unread-9')), findsOneWidget);
+    // Rows are plain cards: one blur layer per row stutters on low-end phones.
+    expect(find.byType(BackdropFilter), findsNothing);
     expect(a.calls.map((c) => '${c.method} ${c.path}'), ['GET /api/notifications', 'POST /api/notifications/read']);
     expect(unread.value, 0);
   });
