@@ -74,3 +74,21 @@ it("services uid is unique per org, not globally; price >= 0", async () => {
   await expect(ins("org_s1", "u1")).rejects.toThrow(/UNIQUE/);
   await expect(ins("org_s1", "u2", -1)).rejects.toThrow(/CHECK/);
 });
+
+it("mobile tables exist", async () => {
+  await mkOrg("org_mob", "mob-salon");
+  await mkUser("org_mob", "boss");
+  const u = await env.DB.prepare("SELECT id FROM users WHERE org_id='org_mob'").first<{ id: number }>();
+  const ins = (platform: string) =>
+    env.DB.prepare(
+      "INSERT INTO mobile_sessions(id,org_id,user_id,token_hash,device_id,device_name,platform,session_version,created_at,last_used_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+    ).bind(`ms_${platform}`, "org_mob", u!.id, `h_${platform}`, "dev12345", "Phone", platform, 1, now, now, now).run();
+  await ins("ios");
+  await expect(ins("web")).rejects.toThrow(/CHECK/);
+  const role = (r: string) =>
+    env.DB.prepare("INSERT INTO org_role_features(org_id,role,feature_key,enabled,updated_at) VALUES('org_mob',?,'expenses',0,?)").bind(r, now).run();
+  await role("barber");
+  await expect(role("owner")).rejects.toThrow(/CHECK/);
+  const cfg = await env.DB.prepare("SELECT platform FROM app_config ORDER BY platform").all();
+  expect(cfg.results.map((r) => r.platform)).toEqual(["android", "ios"]);
+});
