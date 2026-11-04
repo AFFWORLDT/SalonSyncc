@@ -19,7 +19,9 @@ import { McpCard } from "@/components/platform/mcp-card";
 import { usePlatformMe } from "@/components/platform/shell";
 import { errorMessage } from "@/lib/api";
 import { ROOT_DOMAIN } from "@/lib/brand";
-import { actionLabel, type AdminOrg, type AuditItem, papi, pDate, pDateTime, relDays, STATUS_LABEL, statusClass, usePapi } from "@/lib/platform";
+import { ApplyBundle } from "@/components/platform/apply-bundle";
+import { RoleGrid } from "@/components/platform/role-grid";
+import { actionLabel, featureSource, type AdminOrg, type AuditItem, papi, pDate, pDateTime, relDays, STATUS_LABEL, statusClass, usePapi } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
 interface Detail {
@@ -214,11 +216,14 @@ function Detail({ id }: { id: string }) {
       </div>
 
       <Card className="gap-0 p-0">
-        <div className="border-b px-4 py-3">
-          <p className="text-sm font-semibold">Features</p>
-          <p className="text-xs text-muted-foreground">
-            {o.status === "trial" ? "On trial the salon gets Pro Max (without WhatsApp). " : ""}Overrides win over the plan for this salon only.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold">Features</p>
+            <p className="text-xs text-muted-foreground">
+              {o.status === "trial" ? "On trial the salon gets Pro Max (without WhatsApp). " : ""}Overrides win over the plan for this salon only.
+            </p>
+          </div>
+          <ApplyBundle orgId={o.id} disabled={!owner} onApplied={reload} />
         </div>
         <ul className="divide-y">
           {FEATURE_KEYS.map((k) => {
@@ -230,8 +235,8 @@ function Detail({ id }: { id: string }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">{FEATURE_LABELS[k]}</p>
                   <p className="text-xs text-muted-foreground">
-                    Plan: {inPlan ? "included" : "not included"}
-                    {ov ? ` · override ${ov.enabled ? "ON" : "OFF"}${ov.reason ? ` — ${ov.reason}` : ""}` : ""}
+                    Source: {featureSource(ov)} · Plan: {inPlan ? "included" : "not included"}
+                    {ov ? ` · override ${ov.enabled ? "ON" : "OFF"}${ov.reason && !ov.reason.startsWith("Bundle: ") ? ` — ${ov.reason}` : ""}` : ""}
                   </p>
                 </div>
                 <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", on ? "bg-success/15 text-success" : "bg-muted text-muted-foreground")}>{on ? "On" : "Off"}</span>
@@ -259,6 +264,8 @@ function Detail({ id }: { id: string }) {
           })}
         </ul>
       </Card>
+
+      <RoleGrid orgId={o.id} features={data.features} canEdit={owner} />
 
       <McpCard orgId={o.id} on={data.features.includes("mcp_api")} owner={owner} />
 

@@ -171,6 +171,19 @@ export function adminRepo(db: D1Database) {
         audit(a),
       ]);
     },
+    /** Applies a bundle: one salon override per changed key (reason "Bundle: {name}") and one audit row, atomically. */
+    async applyBundle(orgId: string, changes: { key: string; to: boolean }[], reason: string, by: number, a: AuditInput): Promise<void> {
+      await db.batch([
+        ...changes.map((ch) =>
+          db
+            .prepare(
+              "INSERT INTO org_feature_overrides(org_id,feature_key,enabled,reason,set_by,set_at) VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(org_id,feature_key) DO UPDATE SET enabled = ?3, reason = ?4, set_by = ?5, set_at = ?6",
+            )
+            .bind(orgId, ch.key, ch.to ? 1 : 0, reason, by, a.at),
+        ),
+        audit(a),
+      ]);
+    },
     async setAppConfig(platform: string, min: string, latest: string, storeUrl: string, a: AuditInput): Promise<void> {
       await db.batch([
         db.prepare("UPDATE app_config SET min_version = ?, latest_version = ?, store_url = ?, updated_at = ? WHERE platform = ?").bind(min, latest, storeUrl, a.at, platform),
