@@ -6,6 +6,7 @@ import { tenantAuth, writeGuard, requireFeature, originGuard, WRITE_METHODS } fr
 import { registerMe } from "./platform/me";
 import { auth } from "./platform/auth";
 import { mobile, mobileTenant } from "./platform/mobile";
+import { appConfigPublic } from "./platform/app-config";
 import { publicApi } from "./core/public";
 // Registers /api/public/slug, /api/public/signup and /api/auth/handoff (before the routers are mounted below).
 import "./platform/signup";
@@ -50,6 +51,7 @@ publicApi.route("/avatar", avatarPublic);
 publicApi.route("/services", servicesPublic);
 publicApi.route("/logo", logoPublic);
 publicApi.route("/brand", brandPublic);
+publicApi.route("/app-config", appConfigPublic);
 app.route("/api/public", publicApi);
 
 // Meta's WhatsApp webhook: no session (signature-checked), not behind the public rate limiter; the org comes from each

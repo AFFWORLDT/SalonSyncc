@@ -171,6 +171,12 @@ export function adminRepo(db: D1Database) {
         audit(a),
       ]);
     },
+    async setAppConfig(platform: string, min: string, latest: string, storeUrl: string, a: AuditInput): Promise<void> {
+      await db.batch([
+        db.prepare("UPDATE app_config SET min_version = ?, latest_version = ?, store_url = ?, updated_at = ? WHERE platform = ?").bind(min, latest, storeUrl, a.at, platform),
+        audit(a),
+      ]);
+    },
     /** A single-use support code (sha-256 stored) for "Log in as salon". */
     async createSupport(codeHash: string, pid: number, orgId: string, expiresAt: number, a: AuditInput): Promise<void> {
       await db.batch([
