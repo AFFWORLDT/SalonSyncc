@@ -22,7 +22,8 @@ const dev = DeviceInfo(name: 'iPhone', platform: 'ios', appVersion: '1.0.0');
   final c = AuthController(
     store: SessionStore(s),
     device: dev,
-    clientFor: (base, {token, onUnauthorized}) => ApiClient(base, token: token, onUnauthorized: onUnauthorized, adapter: a),
+    clientFor: (base, {token, onUnauthorized, onFeatureDisabled}) =>
+        ApiClient(base, token: token, onUnauthorized: onUnauthorized, onFeatureDisabled: onFeatureDisabled, adapter: a),
   );
   return (c: c, a: a, s: s);
 }
@@ -122,5 +123,23 @@ void main() {
     expect(paths, containsAll(['DELETE /api/push/tokens', 'DELETE /api/mobile/session']));
     expect(t.c.state.value, AuthState.needLogin);
     expect(await SessionStore(t.s).token(), isNull);
+  });
+
+  test('403 feature_disabled re-reads the switches', () async {
+    var meCalls = 0;
+    final t = make({
+      'POST /api/mobile/session': (o) => {'token': 'skm_tok', 'expires_at': 1},
+      'GET /api/me': (o) {
+        meCalls++;
+        return fx(meCalls == 1 ? 'me_owner.json' : 'me_barber.json');
+      },
+      'GET /api/ledger': (o) => const FakeReply(403, {'error': 'x', 'code': 'feature_disabled'}),
+    });
+    await t.c.chooseSalon(salon);
+    await t.c.signIn('owner', 'pass1234');
+    await expectLater(t.c.api.get('/api/ledger', (j) => j), throwsA(anything));
+    await pumpEventQueue();
+    expect(meCalls, 2);
+    expect(t.c.me.value!.user.username, 'ali');
   });
 }

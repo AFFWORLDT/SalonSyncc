@@ -12,7 +12,7 @@ export 'session_store.dart' show SavedSalon;
 
 enum AuthState { unknown, needSalon, needLogin, locked, signedIn }
 
-typedef ClientFactory = ApiClient Function(Uri base, {String? Function()? token, void Function()? onUnauthorized});
+typedef ClientFactory = ApiClient Function(Uri base, {String? Function()? token, void Function()? onUnauthorized, void Function()? onFeatureDisabled});
 
 /// Who is signed in, to which salon. Remembers both; a 401 anywhere returns to sign-in with the salon kept.
 class AuthController extends GetxController {
@@ -29,7 +29,8 @@ class AuthController extends GetxController {
   ApiClient? _api;
 
   /// The signed-in salon's API (token attached). Only valid once a salon is chosen.
-  ApiClient get api => _api ??= clientFor(salonBase(salon.value!.slug), token: () => _token, onUnauthorized: onUnauthorized);
+  ApiClient get api => _api ??= clientFor(salonBase(salon.value!.slug),
+      token: () => _token, onUnauthorized: onUnauthorized, onFeatureDisabled: () => refreshMe().then((_) {}, onError: (_) {}));
 
   /// Public calls before sign-in; on a dev host the salon is named with ?org=.
   Map<String, Object?>? _orgQuery(String slug) => isDevHost ? {'org': slug} : null;

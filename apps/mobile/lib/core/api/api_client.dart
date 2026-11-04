@@ -5,7 +5,7 @@ import 'api_error.dart';
 /// JSON calls to one salon's API. Adds the phone token, maps every failure to an [ApiError], and reports a 401 once
 /// through [onUnauthorized] (the app then returns to sign-in). Never logs headers or bodies.
 class ApiClient {
-  ApiClient(this.base, {String? Function()? token, this.onUnauthorized, HttpClientAdapter? adapter, String userAgent = 'SalonKit'})
+  ApiClient(this.base, {String? Function()? token, this.onUnauthorized, this.onFeatureDisabled, HttpClientAdapter? adapter, String userAgent = 'SalonKit'})
       : _token = token,
         _dio = Dio(BaseOptions(
           baseUrl: base.toString(),
@@ -20,6 +20,9 @@ class ApiClient {
 
   final Uri base;
   final void Function()? onUnauthorized;
+
+  /// A switch was turned off since the app last read them: the app re-reads /api/me.
+  final void Function()? onFeatureDisabled;
   final String? Function()? _token;
   final Dio _dio;
 
@@ -42,6 +45,7 @@ class ApiClient {
     } catch (e) {
       final err = mapError(e);
       if (err is Unauthorized) onUnauthorized?.call();
+      if (err is FeatureDisabled) onFeatureDisabled?.call();
       throw err;
     }
   }
