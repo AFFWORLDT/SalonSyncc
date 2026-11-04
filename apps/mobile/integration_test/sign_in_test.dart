@@ -39,7 +39,7 @@ void main() {
 
     await t.enterText(find.widgetWithText(TextField, 'Password'), 'pass1234');
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
-    await waitFor(t, find.text('Hi Barber Ali'));
+    await waitFor(t, find.text('Hi Barber Ali 👋'));
     await settle(t);
 
     // Barber: Today and More (with My account); nothing admin-only.

@@ -14,6 +14,6 @@ class CountUp extends StatelessWidget {
         tween: Tween(begin: 0, end: value.toDouble()),
         duration: skDuration(context, 350),
         curve: Curves.easeOutCubic,
-        builder: (_, v, __) => Text(format(v.round()), style: style),
+        builder: (_, v, _) => Text(format(v.round()), style: style),
       );
 }
