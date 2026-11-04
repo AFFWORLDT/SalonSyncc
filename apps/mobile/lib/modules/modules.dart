@@ -26,6 +26,7 @@ final appModules = <FeatureModule>[
   ledgerModule,
   servicesModule,
   customersModule,
+  sendAnnouncementsModule,
   expensesModule,
   billsModule,
   historyModule,
