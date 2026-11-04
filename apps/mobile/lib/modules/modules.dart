@@ -1,5 +1,6 @@
 import '../core/features/feature_module.dart';
 import 'account/account_module.dart';
+import 'announcements/announcements_module.dart';
 import 'bills/bills_module.dart';
 import 'history/history_module.dart';
 import 'home/home_module.dart';
@@ -9,5 +10,6 @@ final appModules = <FeatureModule>[
   homeModule,
   billsModule,
   historyModule,
+  announcementsModule,
   accountModule,
 ];
