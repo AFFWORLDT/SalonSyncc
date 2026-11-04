@@ -1,12 +1,13 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import type { AppEnv } from "../env";
 import { HttpError } from "../core/errors";
 import { checkPassword, hashPassword } from "../core/crypto";
 import { originGuard } from "../core/pipeline";
 import { clearSession, issueSession } from "../core/session";
 import { normalizeSlug, slugFromHost } from "../core/tenant";
-import { platformRepo } from "../data/platform";
+import { platformRepo, type Org } from "../data/platform";
 import { tenantRepo } from "../data/tenant";
+import type { UserRow } from "../data/tenant";
 import { rateCount, rateHit } from "../data/infra";
 import { LOGIN_WINDOW_MS, isLocked, loginLimits, loginWindow } from "../lib/limits";
 
@@ -22,14 +23,11 @@ export const auth = new Hono<AppEnv>();
 auth.use("/login", originGuard);
 auth.use("/logout", originGuard);
 
-auth.post("/login", async (c) => {
-  let body: { org?: unknown; username?: unknown; password?: unknown } = {};
-  try {
-    const parsed = await c.req.json();
-    if (parsed && typeof parsed === "object") body = parsed;
-  } catch {
-    /* falls through to the generic failure */
-  }
+/**
+ * Every check a sign-in makes before a session is issued (web cookie or phone token): the host's salon (body.org only
+ * off a salon host), the three throttling counters, a constant-cost miss, failure recording. Throws the same errors.
+ */
+export async function verifyLogin(c: Context<AppEnv>, body: { org?: unknown; username?: unknown; password?: unknown }): Promise<{ org: Org; user: UserRow }> {
   let username = typeof body.username === "string" ? body.username.trim() : "";
   if (username.length > 60) username = ""; // too long to be real: same 401 as not found, no failure row beyond the IP hit
   const password = typeof body.password === "string" ? body.password : "";
@@ -69,8 +67,20 @@ auth.post("/login", async (c) => {
   }
   await repo.clearLoginFailures(userKeys);
 
-  await issueSession(c, { uid: user.id, orgId: live.id, v: user.session_version });
-  return c.json({ ok: true, slug: live.slug });
+  return { org: live, user };
+}
+
+auth.post("/login", async (c) => {
+  let body: { org?: unknown; username?: unknown; password?: unknown } = {};
+  try {
+    const parsed = await c.req.json();
+    if (parsed && typeof parsed === "object") body = parsed;
+  } catch {
+    /* falls through to the generic failure */
+  }
+  const { org, user } = await verifyLogin(c, body);
+  await issueSession(c, { uid: user.id, orgId: org.id, v: user.session_version });
+  return c.json({ ok: true, slug: org.slug });
 });
 
 auth.post("/logout", (c) => {

@@ -5,6 +5,7 @@ import { HttpError } from "./core/errors";
 import { tenantAuth, writeGuard, requireFeature, originGuard, WRITE_METHODS } from "./core/pipeline";
 import { registerMe } from "./platform/me";
 import { auth } from "./platform/auth";
+import { mobile } from "./platform/mobile";
 import { publicApi } from "./core/public";
 // Registers /api/public/slug, /api/public/signup and /api/auth/handoff (before the routers are mounted below).
 import "./platform/signup";
@@ -39,6 +40,8 @@ export const app = new Hono<AppEnv>();
 app.get("/api/health", (c) => c.json({ ok: true, brand: c.env.BRAND_NAME }));
 
 app.route("/api/auth", auth);
+// The phone app's sign-in (bearer tokens, no cookie). Before the tenant router.
+app.route("/api/mobile", mobile);
 // The super admin panel's API (admin.<domain> only; its own ss_platform session). Before the tenant router.
 app.route("/api/platform", platformApi);
 

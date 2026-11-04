@@ -100,7 +100,7 @@ export const requireFeature =
 export const WRITE_OK: OrgStatus[] = ["trial", "active", "grace", "past_due"];
 
 export const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const WRITE_ALLOW_PREFIXES = ["/api/auth/", "/api/billing/"];
+const WRITE_ALLOW_PREFIXES = ["/api/auth/", "/api/mobile/", "/api/billing/"];
 /**
  * Exact method + path writes a lapsed org may still make: a device signing out of pushes, and marking the bell read.
  * Both are session- and org-scoped and touch no business data.
