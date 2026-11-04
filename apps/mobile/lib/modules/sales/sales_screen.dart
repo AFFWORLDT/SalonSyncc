@@ -1,0 +1,154 @@
+import 'package:flutter/material.dart';
+
+import '../../core/format/fmt.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/ui/filter_chip_menu.dart';
+import '../../core/ui/glass.dart';
+import '../../core/ui/states.dart';
+import '../../data/sales_api.dart';
+import '../../data/staff_api.dart';
+import '../../models/me.dart';
+import '../../models/paged.dart';
+import '../../models/sale.dart';
+import '../../models/staff.dart';
+import '../../shell/nav.dart';
+import '../dashboard/dashboard_screen.dart' show ymd;
+import '../today/sale_row.dart';
+
+const kSalesPage = 50;
+
+/// Every sale, filtered by day, barber and payment; 50 at a time.
+class SalesScreen extends StatefulWidget {
+  const SalesScreen({super.key, required this.me, required this.sales, required this.staff, required this.onOpen, required this.onNewSale});
+  final Me me;
+  final SalesApi sales;
+  final StaffApi staff;
+  final Future<void> Function(Sale sale) onOpen;
+  final Future<void> Function() onNewSale;
+
+  @override
+  State<SalesScreen> createState() => _SalesScreenState();
+}
+
+class _SalesScreenState extends State<SalesScreen> {
+  String? _day = salesDayRequest.value;
+  int? _barber;
+  String? _payment;
+  List<Staff> _staff = const [];
+  Paged<Sale>? _last;
+  List<Sale> _items = const [];
+  int _page = 1;
+  Object? _error;
+  int _seq = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    salesDayRequest.value = null;
+    salesDayRequest.addListener(_asked);
+    widget.staff.list().then((l) => mounted ? setState(() => _staff = l) : null, onError: (_) {});
+    _load();
+  }
+
+  @override
+  void dispose() {
+    salesDayRequest.removeListener(_asked);
+    super.dispose();
+  }
+
+  /// Opened again from the dashboard or the daily sheet for one day.
+  void _asked() {
+    final d = salesDayRequest.value;
+    if (d == null) return;
+    salesDayRequest.value = null;
+    _set(() => _day = d);
+  }
+
+  void _set(VoidCallback change) {
+    setState(change);
+    _load();
+  }
+
+  Future<void> _load({int page = 1}) async {
+    final n = ++_seq;
+    try {
+      final p = await widget.sales.search(day: _day, barberId: _barber, payment: _payment, page: page, pageSize: kSalesPage);
+      if (!mounted || n != _seq) return;
+      setState(() {
+        _last = p;
+        _page = page;
+        _items = page == 1 ? p.items : [..._items, ...p.items.where((s) => !_items.any((x) => x.id == s.id))];
+        _error = null;
+      });
+    } catch (e) {
+      if (mounted && n == _seq) setState(() => _error = e);
+    }
+  }
+
+  Future<void> _pickDay() async {
+    final today = DateTime.parse(widget.me.today);
+    final d = await showDatePicker(context: context, firstDate: DateTime(2020), lastDate: today, initialDate: _day == null ? today : DateTime.parse(_day!));
+    if (d != null) _set(() => _day = ymd(d));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = widget.me.fmt, t = Theme.of(context).textTheme;
+    final p = _last;
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
+        Row(children: [
+          Expanded(child: Text('Sales', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600))),
+          if (!widget.me.readOnly)
+            FilledButton.icon(onPressed: () => widget.onNewSale().then((_) => _load()), icon: const Icon(Icons.add_rounded), label: const Text('New sale')),
+        ]),
+        const SizedBox(height: 10),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          InputChip(
+            avatar: const Icon(Icons.calendar_today_outlined, size: 18),
+            label: Text(_day == null ? 'All days' : fmt.dayLabel(_day!)),
+            onPressed: _pickDay,
+            deleteButtonTooltipMessage: 'All days',
+            onDeleted: _day == null ? null : () => _set(() => _day = null),
+          ),
+          ChipMenu<int?>(
+            value: _barber,
+            icon: Icons.person_outline_rounded,
+            items: [(null, 'All barbers'), for (final s in _staff) (s.id, s.active ? s.name : '${s.name} (inactive)')],
+            onChanged: (v) => _set(() => _barber = v),
+          ),
+          ChipMenu<String?>(
+            value: _payment,
+            icon: Icons.payments_outlined,
+            items: const [(null, 'Cash + card'), ('cash', 'Cash'), ('card', 'Card')],
+            onChanged: (v) => _set(() => _payment = v),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        if (_error != null && p == null)
+          ErrorState(error: _error!, onRetry: _load)
+        else if (p == null)
+          for (var i = 0; i < 5; i++) const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: SkSkeleton(height: 56))
+        else ...[
+          Row(children: [
+            Expanded(child: Text(_day == null ? '' : fmt.dateLabel(_day!), style: t.titleSmall)),
+            Text('${p.total} sale${p.total == 1 ? '' : 's'} · ${fmt.money(p.sum ?? 0)}', style: SkText.mono.copyWith(fontSize: 13)),
+          ]),
+          const SizedBox(height: 8),
+          if (_items.isEmpty)
+            const EmptyState(text: 'No sales match.', icon: Icons.search_off_rounded)
+          else
+            SkGlass(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(children: [
+                for (final s in _items) SaleRow(sale: s, fmt: fmt, showBarber: true, showDay: _day == null, onTap: () => widget.onOpen(s).then((_) => _load())),
+              ]),
+            ),
+          if (p.total > _items.length && p.items.isNotEmpty)
+            Padding(padding: const EdgeInsets.only(top: 12), child: OutlinedButton(onPressed: () => _load(page: _page + 1), child: const Text('Show more'))),
+        ],
+      ]),
+    );
+  }
+}
