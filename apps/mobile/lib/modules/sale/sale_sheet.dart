@@ -15,9 +15,19 @@ import 'service_picker.dart';
 /// Extra buttons on the "bill generated" screen (sharing, Task 6), given the saved bill.
 typedef DoneActions = Widget Function(BuildContext context, Sale sale);
 
-/// Opens the sheet full-screen; resolves with the saved bill (null when closed without saving, or after a delete).
-Future<Sale?> openSaleSheet(BuildContext context, {required Me me, required SalesApi sales, Sale? existing, DoneActions? doneActions}) =>
-    Navigator.of(context).push<Sale>(MaterialPageRoute(
+/// How the sheet closed: with a saved bill, after deleting the bill, or (null) without a change.
+class SheetResult {
+  const SheetResult.saved(Sale this.sale) : deleted = false;
+  const SheetResult.deleted()
+      : sale = null,
+        deleted = true;
+  final Sale? sale;
+  final bool deleted;
+}
+
+/// Opens the sheet full-screen; resolves with how it closed (null when closed without saving).
+Future<SheetResult?> openSaleSheet(BuildContext context, {required Me me, required SalesApi sales, Sale? existing, DoneActions? doneActions}) =>
+    Navigator.of(context).push<SheetResult>(MaterialPageRoute(
       fullscreenDialog: true,
       builder: (_) => SaleSheet(me: me, sales: sales, existing: existing, doneActions: doneActions),
     ));
@@ -118,7 +128,7 @@ class _SaleSheetState extends State<SaleSheet> {
     try {
       final s = editing ? await widget.sales.update(widget.existing!.id, draft) : await widget.sales.create(draft);
       if (!mounted) return;
-      if (editing) return Navigator.of(context).pop(s);
+      if (editing) return Navigator.of(context).pop(SheetResult.saved(s));
       setState(() { _busy = false; _saved = s; });
     } catch (e) {
       if (mounted) setState(() { _busy = false; _error = messageOf(e); });
@@ -145,7 +155,7 @@ class _SaleSheetState extends State<SaleSheet> {
     setState(() { _busy = true; _error = null; });
     try {
       await widget.sales.delete(widget.existing!.id);
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) Navigator.of(context).pop(const SheetResult.deleted());
     } catch (e) {
       if (mounted) setState(() { _busy = false; _error = messageOf(e); });
     }
@@ -159,7 +169,7 @@ class _SaleSheetState extends State<SaleSheet> {
         sale: saved,
         fmt: fmt,
         actions: widget.doneActions?.call(context, saved),
-        onDone: () => Navigator.of(context).pop(saved),
+        onDone: () => Navigator.of(context).pop(SheetResult.saved(saved)),
         onNew: _reset,
       );
     }

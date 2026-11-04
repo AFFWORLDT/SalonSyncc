@@ -9,7 +9,9 @@ import '../../core/format/fmt.dart';
 import '../../data/report_api.dart';
 import '../../data/sales_api.dart';
 import '../../models/role.dart';
+import '../sale/bill_screen.dart';
 import '../sale/sale_sheet.dart';
+import '../sale/share_buttons.dart';
 import '../today/today_screen.dart';
 
 /// Home: a barber's "Today" (totals, add a bill); the admin's home is Stage 1's until the dashboard (Stage 3).
@@ -23,9 +25,6 @@ final homeModule = FeatureModule(
   builder: (_) => Get.find<AuthController>().me.value!.role == Role.barber ? const BarberHome() : const HomeScreen(),
 );
 
-/// Extra buttons for the "bill generated" screen and bill views (sharing). Set once at startup.
-DoneActions? saleShareActions;
-
 class BarberHome extends StatelessWidget {
   const BarberHome({super.key});
 
@@ -38,8 +37,8 @@ class BarberHome extends StatelessWidget {
       me: me,
       sales: sales,
       report: ReportApi(auth.api),
-      onNewSale: () => openSaleSheet(context, me: me, sales: sales, doneActions: saleShareActions),
-      onOpenSale: (s) => openSaleSheet(context, me: me, sales: sales, existing: s, doneActions: saleShareActions),
+      onNewSale: () => openSaleSheet(context, me: me, sales: sales, doneActions: shareActionsFor),
+      onOpenSale: (s) => openBill(context, me: me, sales: sales, sale: s),
     );
   }
 }
