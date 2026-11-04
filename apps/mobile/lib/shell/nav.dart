@@ -7,3 +7,6 @@ void openModule(String id) => pendingRoute.value = id;
 
 /// The day the Sales screen should filter to when it is opened from elsewhere (dashboard, daily sheet).
 final salesDayRequest = ValueNotifier<String?>(null);
+
+/// The month (YYYY-MM) the daily sheet should open on when opened from elsewhere (monthly).
+final sheetMonthRequest = ValueNotifier<String?>(null);
