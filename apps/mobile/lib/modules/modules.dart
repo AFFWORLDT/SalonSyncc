@@ -6,6 +6,7 @@ import 'dashboard/dashboard_module.dart';
 import 'expenses/expenses_module.dart';
 import 'history/history_module.dart';
 import 'sales/sales_module.dart';
+import 'sheet/sheet_module.dart';
 import 'home/home_module.dart';
 
 /// Every screen of the app. Later stages (and salon-specific custom features) add their modules here.
@@ -14,6 +15,7 @@ final appModules = <FeatureModule>[
   dashboardModule,
   salesModule,
   adminBillsModule,
+  sheetModule,
   expensesModule,
   billsModule,
   historyModule,
