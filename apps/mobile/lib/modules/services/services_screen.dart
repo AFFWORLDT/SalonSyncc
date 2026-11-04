@@ -199,7 +199,7 @@ class _ServiceSheetState extends State<_ServiceSheet> with FormSheetState {
   late final _name = TextEditingController(text: s?.name ?? '');
   late final _desc = TextEditingController(text: s?.description ?? '');
   late final _price = TextEditingController(text: s == null ? '' : widget.me.fmt.toInput(s!.price));
-  late final _order = TextEditingController(text: '${s?.sortOrder ?? 0}');
+  late final _order = TextEditingController(text: s == null ? '' : '${s!.sortOrder}');
 
   @override
   void dispose() {
@@ -215,7 +215,7 @@ class _ServiceSheetState extends State<_ServiceSheet> with FormSheetState {
         name: _name.text,
         description: _desc.text,
         price: _price.text,
-        sortOrder: int.tryParse(_order.text.trim()) ?? 0,
+        sortOrder: int.tryParse(_order.text.trim()) ?? s?.sortOrder,
         active: s?.active ?? true,
       );
 

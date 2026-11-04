@@ -74,6 +74,21 @@ void main() {
     expect(body(a)['notify_sale_min'], 5000);
   });
 
+  testWidgets('a number typed wrong once still goes as a number when corrected; 0 minimum is 0', (t) async {
+    var n = 0;
+    final (a, _) = await pump(t, extra: {'PUT /api/settings': (o) => n++ == 0 ? const FakeReply(400, {'error': 'Default commission % must be between 0 and 100'}) : raw('settings.json')});
+    await t.enterText(find.byKey(const ValueKey('set-default_commission_pct')), '5%');
+    await t.tap(find.text('Save settings'));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('set-default_commission_pct')), '12,5');
+    await t.enterText(find.byKey(const ValueKey('set-notify_sale_min')), '0');
+    await t.tap(find.text('Save settings'));
+    await t.pumpAndSettle();
+    final last = a.calls.where((c) => c.method == 'PUT').last.data as Map;
+    expect(last['default_commission_pct'], 12.5);
+    expect(last['notify_sale_min'], 0);
+  });
+
   testWidgets('thank-you preview fills the tokens', (t) async {
     await pump(t);
     expect(find.textContaining('Thank you Ali for visiting E2E Salon! Your bill: AED 25.'), findsOneWidget);

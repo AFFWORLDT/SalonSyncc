@@ -11,6 +11,7 @@ import 'package:salonkit/data/admin_reports_api.dart';
 import 'package:salonkit/models/daily_sheet.dart';
 import 'package:salonkit/models/me.dart';
 import 'package:salonkit/modules/sheet/sheet_screen.dart';
+import 'package:salonkit/shell/nav.dart';
 
 import 'support/fake_adapter.dart';
 
@@ -62,6 +63,13 @@ void main() {
   testWidgets('no blur layers over the big table', (t) async {
     await pump(t);
     expect(find.byType(BackdropFilter), findsNothing);
+  });
+
+  testWidgets('opens on the month asked for (from Monthly)', (t) async {
+    sheetMonthRequest.value = '2026-03';
+    final (a, _) = await pump(t);
+    expect(a.calls.single.queryParameters, {'month': '2026-03'});
+    expect(sheetMonthRequest.value, isNull);
   });
 
   testWidgets('expense columns follow the switch', (t) async {

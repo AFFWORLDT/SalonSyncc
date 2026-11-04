@@ -81,6 +81,7 @@ void main() {
     expect(body['category'], 'Care');
     expect(body['name'], 'Head massage');
     expect(body['price'], '30');
+    expect(body.containsKey('sort_order'), isFalse, reason: 'blank order = the server puts it last');
     expect(find.text('Head massage added'), findsOneWidget);
   });
 

@@ -69,6 +69,18 @@ void main() {
     expect(find.text('AUDIT BODY'), findsNothing);
   });
 
+  testWidgets('opening a tab from a screen on top closes that screen first', (t) async {
+    auth().me.value = meWith(features: ['core_sales', 'ledger', 'audit_log']);
+    await t.pumpWidget(app());
+    pendingRoute.value = 'audit';
+    await t.pumpAndSettle();
+    expect(find.text('AUDIT BODY'), findsOneWidget);
+    pendingRoute.value = 'ledger';
+    await t.pumpAndSettle();
+    expect(find.text('AUDIT BODY'), findsNothing);
+    expect(find.text('LEDGER BODY'), findsOneWidget);
+  });
+
   testWidgets('a tapped notification opens its tab or its More screen', (t) async {
     auth().me.value = meWith(features: ['core_sales', 'ledger', 'audit_log']);
     await t.pumpWidget(app());

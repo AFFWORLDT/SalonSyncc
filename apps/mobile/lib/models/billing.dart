@@ -18,7 +18,8 @@ class Billing {
   final int? periodEnd, cancelAt;
   final List<PlanOffer> plans;
 
-  bool get paysByCard => provider == 'stripe' && stripeStatus != null;
+  /// A live card subscription (as the web and server count it); a cancelled one can subscribe again.
+  bool get paysByCard => provider == 'stripe' && const {'active', 'trialing', 'past_due', 'unpaid'}.contains(stripeStatus);
 
   factory Billing.fromJson(Map<String, dynamic> j) {
     final p = j['plans'];

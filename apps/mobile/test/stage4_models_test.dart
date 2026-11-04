@@ -65,5 +65,7 @@ void main() {
     final b = Billing.fromJson(obj('billing.json'));
     expect(b.enabled, isFalse);
     expect(b.plans.map((p) => p.priceMonthly), [0, 200, 499]);
+    Billing st(String s) => Billing.fromJson({...obj('billing.json'), 'provider': 'stripe', 'stripe_status': s});
+    expect([for (final s in ['active', 'trialing', 'past_due', 'unpaid', 'canceled', 'incomplete_expired']) st(s).paysByCard], [true, true, true, true, false, false]);
   });
 }

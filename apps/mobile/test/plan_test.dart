@@ -65,6 +65,18 @@ void main() {
     expect(find.text('Your trial'), findsOneWidget);
   });
 
+  testWidgets('during a trial the trial plan can be chosen (paid for)', (t) async {
+    await pump(t, me(status: 'trial', trialEndsAt: DateTime.now().add(const Duration(days: 5)).millisecondsSinceEpoch), billing: stripe());
+    expect(find.text('Your trial'), findsOneWidget);
+    expect(find.text('Choose Pro Max'), findsOneWidget);
+  });
+
+  testWidgets('a cancelled card subscription can subscribe again', (t) async {
+    await pump(t, me(plan: 'free'), billing: {...stripe(), 'provider': 'stripe', 'stripe_status': 'canceled'});
+    expect(find.textContaining('Paid by card'), findsNothing);
+    expect(find.text('Choose Pro'), findsOneWidget);
+  });
+
   testWidgets('choose a plan opens checkout in the browser', (t) async {
     final (a, opened) = await pump(t, me(plan: 'free'), billing: stripe());
     await t.tap(find.text('Choose Pro'));

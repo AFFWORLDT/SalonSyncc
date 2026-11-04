@@ -65,12 +65,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       setState(() {
         _s = s;
+        _numeric = {for (final e in s.entries) if (e.value is num) e.key};
         _loadError = null;
       });
     } catch (e) {
       if (mounted) setState(() => _loadError = e);
     }
   }
+
+  /// The settings that are numbers, as loaded — so a field typed wrong once still goes back as a number when fixed.
+  Set<String> _numeric = const {};
+
+  /// "12,5" (comma keyboards) reads as 12.5.
+  static num? _num(String t) => num.tryParse(t.trim().replaceAll(',', '.'));
 
   /// One controller per text setting, filled from the loaded value; edits write back into the settings.
   TextEditingController _c(String key, [String Function(Object?)? show]) => _text.putIfAbsent(key, () {
@@ -87,9 +94,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (k == 'quick_amounts') {
         s[k] = [for (final p in t.split(RegExp(r'[,\s]+'))) if (num.tryParse(p) case final n? when n > 0) n == n.roundToDouble() ? n.toInt() : n];
       } else if (k == 'notify_sale_min') {
-        s[k] = t.trim().isEmpty ? 0 : (fmt.fromInput(t) ?? t);
-      } else if (s[k] is num) {
-        s[k] = num.tryParse(t.trim()) ?? t;
+        // Minor units; empty or 0 = every sale.
+        s[k] = t.trim().isEmpty || _num(t) == 0 ? 0 : (fmt.fromInput(t.replaceAll(',', '.')) ?? t);
+      } else if (_numeric.contains(k)) {
+        s[k] = _num(t) ?? t; // the server's words explain a bad number
       } else if (s[k] == null && t.trim().isEmpty) {
         s[k] = null;
       } else {

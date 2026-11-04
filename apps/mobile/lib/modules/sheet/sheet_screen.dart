@@ -40,7 +40,7 @@ class SheetScreen extends StatefulWidget {
 
 class _SheetScreenState extends State<SheetScreen> {
   late final String _current = widget.me.today.substring(0, 7);
-  late String _month = sheetMonthRequest.value ?? _current;
+  late String _month;
   DailySheet? _d;
   Object? _error;
   bool _showExp = false, _exporting = false;
@@ -49,6 +49,7 @@ class _SheetScreenState extends State<SheetScreen> {
   @override
   void initState() {
     super.initState();
+    _month = sheetMonthRequest.value ?? _current; // read before clearing the request
     sheetMonthRequest.value = null;
     sheetMonthRequest.addListener(_asked);
     _load();

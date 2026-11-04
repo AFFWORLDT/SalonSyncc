@@ -90,6 +90,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     if (id == null || me == null || !mounted) return;
     pendingRoute.value = null;
     if (widget.registry.tabsFor(me).any((m) => m.id == id)) {
+      // A tab sits under any screen opened on top (e.g. Monthly → its daily sheet): close those first.
+      Navigator.of(context).popUntil((r) => r.isFirst);
       setState(() => _tab = id);
     } else if (widget.registry.isVisible(id, me)) {
       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => FeatureGate(registry: widget.registry, id: id)));

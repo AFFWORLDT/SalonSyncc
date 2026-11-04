@@ -175,7 +175,8 @@ class _PlanScreenState extends State<PlanScreen> {
                     if (p.id == current) Chip(label: Text(me.subscription.status == 'trial' ? 'Your trial' : 'Current'), visualDensity: VisualDensity.compact),
                   ]),
                   Text(p.priceMonthly == 0 ? 'Free' : '${p.currency} ${p.priceMonthly} / month', style: t.titleSmall),
-                  if (p.id != current && !b.paysByCard && p.canCheckout && p.priceMonthly > 0)
+                  // During a trial the trial plan isn't "current" for paying: the owner can choose it (as the web).
+                  if (!(p.id == current && me.subscription.status != 'trial') && !b.paysByCard && p.canCheckout && p.priceMonthly > 0)
                     Padding(
                       padding: const EdgeInsets.only(top: 8),
                       child: FilledButton(onPressed: _opening != null ? null : () => _go(p.id, () => widget.api.checkout(p.id)), child: Text(_opening == p.id ? 'Opening…' : 'Choose ${p.name}')),

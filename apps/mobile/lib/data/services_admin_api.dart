@@ -3,10 +3,11 @@ import '../models/service.dart';
 
 /// The add / edit service form as the API takes it; [price] in major units as typed.
 class ServiceForm {
-  const ServiceForm({required this.category, required this.name, this.description, required this.price, required this.sortOrder, this.active = true});
+  const ServiceForm({required this.category, required this.name, this.description, required this.price, this.sortOrder, this.active = true});
   final String category, name, price;
   final String? description;
-  final int sortOrder;
+  /// Position in the group; null = the server puts a new service last.
+  final int? sortOrder;
   final bool active;
 
   Map<String, Object?> toJson() => {
@@ -14,7 +15,7 @@ class ServiceForm {
         'name': name.trim(),
         'description': (description ?? '').trim().isEmpty ? null : description!.trim(),
         'price': price.trim(),
-        'sort_order': sortOrder,
+        'sort_order': ?sortOrder,
         'active': active,
       };
 }
