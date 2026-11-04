@@ -87,6 +87,16 @@ void main() {
     expect(n, 1);
   });
 
+  testWidgets('an admin sees only their own sales today and can add their own expense', (t) async {
+    final a = FakeAdapter(ok());
+    final admin = meWith(); // the owner fixture
+    await t.pumpWidget(host(a, admin));
+    await t.pumpAndSettle();
+    final q = a.calls.firstWhere((c) => c.path == '/api/sales').queryParameters;
+    expect(q['barber_id'], admin.user.id);
+    expect(find.text('Add'), findsOneWidget);
+  });
+
   testWidgets('empty day', (t) async {
     await t.pumpWidget(host(FakeAdapter({...ok(), 'GET /api/sales': (o) => {'items': [], 'total': 0, 'page': 1, 'page_size': 200, 'sum': 0}}), barber));
     await t.pumpAndSettle();

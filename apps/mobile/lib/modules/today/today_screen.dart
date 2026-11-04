@@ -8,6 +8,7 @@ import '../../core/ui/states.dart';
 import '../../data/report_api.dart';
 import '../../data/sales_api.dart';
 import '../../models/me.dart';
+import '../../models/role.dart';
 import '../../models/paged.dart';
 import '../../models/report.dart';
 import '../../models/sale.dart';
@@ -64,7 +65,9 @@ class TodayScreenState extends State<TodayScreen> {
 
   Future<void> load() async {
     try {
-      final r = await Future.wait([widget.report.me(widget.me.today.substring(0, 7)), widget.sales.today(widget.me.today)]);
+      // An admin's Today is their own chair: their sales only (the API shows an admin every sale unless asked).
+      final mine = widget.me.role == Role.admin ? widget.me.user.id : null;
+      final r = await Future.wait([widget.report.me(widget.me.today.substring(0, 7)), widget.sales.today(widget.me.today, barberId: mine)]);
       if (!mounted) return;
       setState(() {
         _today = (r[0] as MyReport).today;
@@ -105,7 +108,7 @@ class TodayScreenState extends State<TodayScreen> {
           if (_today == null)
             const SkSkeleton(height: 64, radius: 24)
           else if (me.features.contains('expenses'))
-            ExpenseCard(today: _today!, fmt: fmt, canEdit: me.canAddExpense && !me.readOnly, sales: widget.sales, onSaved: load),
+            ExpenseCard(today: _today!, fmt: fmt, canEdit: (me.canAddExpense || me.role == Role.admin) && !me.readOnly, sales: widget.sales, onSaved: load),
           const SizedBox(height: 16),
           if (me.readOnly)
             SkGlass(child: Text(kReadOnly, style: t.bodyMedium))

@@ -56,7 +56,8 @@ class SalesApi {
   static Sale _sale(Object? j) => Sale.fromJson(j as Map<String, dynamic>);
   static Paged<Sale> _page(Object? j) => Paged.fromJson(j as Map<String, dynamic>, Sale.fromJson);
 
-  Future<Paged<Sale>> today(String day) => api.get('/api/sales', _page, query: {'day': day, 'page_size': 200});
+  /// One day's bills; [barberId] limits it to one person (an admin's own "Today"; barbers only ever get their own).
+  Future<Paged<Sale>> today(String day, {int? barberId}) => api.get('/api/sales', _page, query: {'day': day, 'barber_id': ?barberId, 'page_size': 200});
 
   /// [page] is 1-based; the server caps [pageSize] at 200, so long lists page instead of growing the size.
   Future<Paged<Sale>> search({String q = '', String? day, int? barberId, int? customerId, String? payment, int page = 1, int pageSize = 50}) => api.get('/api/sales', _page,

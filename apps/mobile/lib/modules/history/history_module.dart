@@ -11,11 +11,11 @@ import 'history_screen.dart';
 final historyModule = FeatureModule(
   id: 'history',
   featureKey: 'core_sales',
-  roles: {Role.barber},
+  roles: {Role.barber, Role.admin},
   title: 'My history',
   icon: Icons.insights_outlined,
   tab: true,
-  order: 20,
+  order: 25,
   builder: (_) {
     final auth = Get.find<AuthController>();
     return HistoryScreen(me: auth.me.value!, report: ReportApi(auth.api));
