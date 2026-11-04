@@ -14,6 +14,7 @@ DELETE FROM sales WHERE org_id='org_e2e';
 DELETE FROM customers WHERE org_id='org_e2e';
 DELETE FROM counters WHERE org_id='org_e2e';
 DELETE FROM expenses WHERE org_id='org_e2e';
+DELETE FROM company_expenses WHERE org_id='org_e2e';
 DELETE FROM ledger_entries WHERE org_id='org_e2e';
 DELETE FROM audit_log WHERE org_id='org_e2e';
 DELETE FROM notifications WHERE org_id='org_e2e';
@@ -29,6 +30,7 @@ INSERT INTO orgs(id,slug,name,status,plan_id,created_at) VALUES('org_e2e','e2esa
 INSERT INTO org_settings(org_id,display_name,currency,currency_minor,locale,timezone,phone_country,bill_prefix) VALUES('org_e2e','E2E Salon','AED',100,'en-AE','Asia/Dubai','971','E2E');
 INSERT INTO users(org_id,username,name,role,password_hash,created_at) VALUES('org_e2e','owner','Owner','owner','$HASH',$NOW);
 INSERT INTO users(org_id,username,name,role,password_hash,created_at) VALUES('org_e2e','barber','Barber Ali','barber','$HASH',$NOW);
+INSERT INTO users(org_id,username,name,role,password_hash,created_at,sort_order,commission_pct) VALUES('org_e2e','sam','Barber Sam','barber','$HASH',$NOW,2,40);
 INSERT INTO services(org_id,uid,category,name,price,sort_order,created_at,updated_at) VALUES('org_e2e','s1','Hair','Haircut',4000,1,$NOW,$NOW);
 INSERT INTO services(org_id,uid,category,name,price,sort_order,created_at,updated_at) VALUES('org_e2e','s2','Hair','Beard trim',2500,2,$NOW,$NOW);
 INSERT INTO services(org_id,uid,category,name,price,sort_order,created_at,updated_at) VALUES('org_e2e','s3','Care','Face mask',3550,3,$NOW,$NOW);
