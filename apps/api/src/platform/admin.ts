@@ -382,9 +382,18 @@ platformApi.get("/orgs/:id/bundles/:bid/preview", async (c) => c.json({ changes:
 
 platformApi.post("/orgs/:id/bundles/:bid/apply", async (c) => {
   const { row, bundle, changes } = await bundleChanges(c);
+  // The admin approved the preview; if the salon (its plan, an override) or the bundle changed since, ask again.
+  const b = await body(c);
+  const seen = Array.isArray(b.expect) ? (b.expect as { key?: unknown; from?: unknown; to?: unknown }[]).map((x) => `${x.key}:${x.from}:${x.to}`) : null;
+  if (!seen || seen.join(",") !== changes.map((x) => `${x.key}:${x.from}:${x.to}`).join(",")) {
+    throw new HttpError(409, "This salon changed since the preview. Check the changes again.", "stale");
+  }
+  // Every switch in the bundle is pinned as an override — also ones the plan or trial gives today — so a later plan
+  // or trial change can't take away what the bundle promised. `changed` counts what is different right now.
+  const want = bundleOut(bundle).features;
   await adminRepo(c.env.DB).applyBundle(
     row.id,
-    changes,
+    FEATURE_KEYS.filter((k) => k in want).map((k) => ({ key: k, to: want[k]! })),
     `Bundle: ${bundle.name}`,
     c.var.platform.id,
     auditOf(c, "bundle_apply", row.id, undefined, { bundle: bundle.name, changes }),

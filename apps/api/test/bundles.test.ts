@@ -71,19 +71,26 @@ describe("feature bundles", () => {
       { key: "push", from: true, to: false },
       { key: "ledger", from: false, to: true },
     ]);
-    expect((await P("POST", `/orgs/${org.id}/bundles/${b.id}/apply`, support)).status).toBe(403);
-    const ap = (await (await P("POST", `/orgs/${org.id}/bundles/${b.id}/apply`, owner)).json()) as { ok: boolean; changed: number };
+    expect((await P("POST", `/orgs/${org.id}/bundles/${b.id}/apply`, support, { expect: pv.changes })).status).toBe(403);
+    // Apply carries what the preview showed; a different picture (the salon changed meanwhile) is refused.
+    const stale = await P("POST", `/orgs/${org.id}/bundles/${b.id}/apply`, owner, { expect: [{ key: "ledger", from: false, to: true }] });
+    expect(stale.status).toBe(409);
+    expect(((await stale.json()) as { error: string }).error).toBe("This salon changed since the preview. Check the changes again.");
+    const ap = (await (await P("POST", `/orgs/${org.id}/bundles/${b.id}/apply`, owner, { expect: pv.changes })).json()) as { ok: boolean; changed: number };
     expect(ap).toEqual({ ok: true, changed: 2 });
     const after = await features("bundle-salon");
     expect(after).toContain("ledger");
     expect(after).not.toContain("push");
     expect(after.filter((k) => !["ledger", "push"].includes(k)).sort()).toEqual(before.filter((k) => !["ledger", "push"].includes(k)).sort());
     const ov = await env.DB.prepare("SELECT feature_key, enabled, reason FROM org_feature_overrides WHERE org_id = ? ORDER BY feature_key").bind(org.id).all();
+    // Every switch in the bundle is pinned on the salon — ratings too, which the plan already gave — so a later plan
+    // or trial change can't take away what the bundle promised.
     expect(ov.results).toEqual([
       { feature_key: "ledger", enabled: 1, reason: "Bundle: Pro plus ledger" },
       { feature_key: "push", enabled: 0, reason: "Bundle: Pro plus ledger" },
+      { feature_key: "ratings", enabled: 1, reason: "Bundle: Pro plus ledger" },
     ]);
-    expect(((await (await P("POST", `/orgs/${org.id}/bundles/${b.id}/apply`, owner)).json()) as { changed: number }).changed).toBe(0);
+    expect(((await (await P("POST", `/orgs/${org.id}/bundles/${b.id}/apply`, owner, { expect: [] })).json()) as { changed: number }).changed).toBe(0);
     const audit = await env.DB.prepare("SELECT COUNT(*) AS n FROM platform_audit WHERE action = 'bundle_apply' AND org_id = ?").bind(org.id).first<{ n: number }>();
     expect(audit!.n).toBe(2);
     // Deleting the bundle leaves the salon as it is.

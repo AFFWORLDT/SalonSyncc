@@ -51,12 +51,15 @@ export function ApplyBundle({ orgId, onApplied, disabled = false }: { orgId: str
     if (!pick) return;
     setBusy(true);
     try {
-      const r = await papi<{ changed: number }>(`/orgs/${encodeURIComponent(orgId)}/bundles/${pick.id}/apply`, { method: "POST" });
+      // The server refuses (409) if the salon changed since this preview, so what is saved is what was shown.
+      const r = await papi<{ changed: number }>(`/orgs/${encodeURIComponent(orgId)}/bundles/${pick.id}/apply`, { method: "POST", body: { expect: changes ?? [] } });
       toast.success(`${pick.name} applied · ${r.changed} change${r.changed === 1 ? "" : "s"}`);
       setOpen(false);
       onApplied();
     } catch (e) {
-      setError(errorMessage(e));
+      const msg = errorMessage(e);
+      await choose(pick); // show the salon as it is now
+      setError(msg);
     } finally {
       setBusy(false);
     }
@@ -99,6 +102,7 @@ export function ApplyBundle({ orgId, onApplied, disabled = false }: { orgId: str
                   <li key={c.key}>{`${FEATURE_LABELS[c.key]}: ${onOff(c.from)} → ${onOff(c.to)}`}</li>
                 ))}
               </ul>
+              <p className="text-xs text-muted-foreground">Every switch in the bundle is pinned on this salon, also ones it has today.</p>
             </div>
           )}
           <div className="flex justify-end gap-2">

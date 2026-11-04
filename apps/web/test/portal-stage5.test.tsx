@@ -149,7 +149,29 @@ describe("Salon page: Apply bundle", () => {
     expect(screen.getByText("Ledger and payouts: off → on")).toBeTruthy();
     fireEvent.click(screen.getByText("Apply"));
     await waitFor(() => expect(done).toHaveBeenCalled());
-    expect(calls.some((c) => c.key === "POST /api/platform/orgs/o1/bundles/1/apply")).toBe(true);
+    expect(calls.find((c) => c.key === "POST /api/platform/orgs/o1/bundles/1/apply")!.body).toEqual({
+      expect: [
+        { key: "push", from: true, to: false },
+        { key: "ledger", from: false, to: true },
+      ],
+    });
+    expect(screen.queryByText("Every switch in the bundle is pinned on this salon, also ones it has today.")).toBeNull(); // dialog closed
+  });
+
+  it("explains pinning; a changed salon shows the server's words and checks again", async () => {
+    let n = 0;
+    stub({
+      "GET /api/platform/bundles": () => [{ id: 1, name: "Pro plus ledger", description: null, features: { ledger: true }, updated_at: 1 }],
+      "GET /api/platform/orgs/o1/bundles/1/preview": () => (n++ === 0 ? { changes: [{ key: "ledger", from: false, to: true }] } : { changes: [] }),
+      "POST /api/platform/orgs/o1/bundles/1/apply": () => new Response(JSON.stringify({ error: "This salon changed since the preview. Check the changes again.", code: "stale" }), { status: 409 }),
+    });
+    render(<ApplyBundle orgId="o1" onApplied={() => {}} />);
+    fireEvent.click(screen.getByText("Apply bundle"));
+    fireEvent.click(await screen.findByText("Pro plus ledger"));
+    expect(await screen.findByText("Every switch in the bundle is pinned on this salon, also ones it has today.")).toBeTruthy();
+    fireEvent.click(screen.getByText("Apply"));
+    expect(await screen.findByText("This salon changed since the preview. Check the changes again.")).toBeTruthy();
+    expect(await screen.findByText("This salon already matches the bundle.")).toBeTruthy();
   });
 
   it("nothing to change says so", async () => {
