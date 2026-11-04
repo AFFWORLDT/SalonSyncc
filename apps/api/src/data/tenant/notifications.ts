@@ -82,13 +82,13 @@ export function notificationsRepo(db: D1Database, orgId: string) {
      * device-global primary key, so ON CONFLICT(token) reassigns org_id/user_id: a device that signs into another salon
      * moves there and stops receiving the old salon's pushes. Every other push_tokens write is org-scoped.
      */
-    async registerToken(userId: number, token: string): Promise<void> {
+    async registerToken(userId: number, token: string, mobileSessionId: string | null = null): Promise<void> {
       const at = Date.now();
       await db
         .prepare(
-          "INSERT INTO push_tokens (token, org_id, user_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(token) DO UPDATE SET org_id = excluded.org_id, user_id = excluded.user_id, updated_at = excluded.updated_at",
+          "INSERT INTO push_tokens (token, org_id, user_id, mobile_session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(token) DO UPDATE SET org_id = excluded.org_id, user_id = excluded.user_id, mobile_session_id = excluded.mobile_session_id, updated_at = excluded.updated_at",
         )
-        .bind(token, orgId, userId, at, at)
+        .bind(token, orgId, userId, mobileSessionId, at, at)
         .run();
     },
 

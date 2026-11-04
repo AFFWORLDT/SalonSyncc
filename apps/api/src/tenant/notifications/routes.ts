@@ -28,7 +28,7 @@ notifications.post("/push/tokens", gate, async (c) => {
   const { token } = await bodyOf(c);
   if (typeof token !== "string" || !PUSH_TOKEN_RE.test(token)) throw bad("That notification token doesn't look right");
   // One device = one token; it follows whoever is signed in on that device now, in whichever salon.
-  await repoOf(c).registerToken(c.var.tenant.user.id, token);
+  await repoOf(c).registerToken(c.var.tenant.user.id, token, c.var.tenant.mobileSessionId);
   return c.json({ ok: true });
 });
 

@@ -10,7 +10,7 @@ import { notificationsRepo, PUSH_MAX_TOKENS } from "../../data/tenant";
 async function orgAndFeatures(target: Context<AppEnv> | Env, orgId: string): Promise<{ env: Env; org: Org; features: readonly string[] } | null> {
   if (!("DB" in target)) {
     const t = target.var.tenant;
-    if (t?.org.id === orgId) return { env: target.env, org: t.org, features: t.features };
+    if (t?.org.id === orgId) return { env: target.env, org: t.org, features: t.orgFeatures };
     target = target.env;
   }
   const org = await platformRepo(target.DB).orgById(orgId);

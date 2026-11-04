@@ -195,10 +195,11 @@ export function usersRepo(db: D1Database, orgId: string) {
       ]);
     },
 
-    /** Deletes a user with no history. Child rows first: lockout counters, device push tokens and their notification feed (FM parity). */
+    /** Deletes a user with no history. Child rows first: lockout counters, phone sessions, device push tokens and their notification feed (FM parity). */
     async remove(target: StaffRow, actor: Actor): Promise<void> {
       const { accountKey, devicePrefix } = lockoutKeys(orgId, target.username);
       await db.batch([
+        db.prepare("DELETE FROM mobile_sessions WHERE org_id = ? AND user_id = ?").bind(orgId, target.id),
         db.prepare("DELETE FROM push_tokens WHERE org_id = ? AND user_id = ?").bind(orgId, target.id),
         db.prepare("DELETE FROM notifications WHERE org_id = ? AND user_id = ?").bind(orgId, target.id),
         db.prepare("DELETE FROM login_failures WHERE org_id = ? AND key = ?").bind(orgId, accountKey),

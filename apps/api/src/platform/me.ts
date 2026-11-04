@@ -62,6 +62,10 @@ export function registerMe(tenantApi: App): void {
     // a fresh cookie on the web, the new version on this phone's session row.
     const v = await repo.setPassword(user.id, await hashPassword(b.next), Date.now());
     const phone = c.var.tenant.mobileSessionId;
+    // The other phones' pushes stop too (their sessions are now stale).
+    await c.env.DB.prepare("DELETE FROM push_tokens WHERE org_id = ? AND user_id = ? AND mobile_session_id IS NOT NULL AND mobile_session_id <> ?")
+      .bind(org.id, user.id, phone ?? "")
+      .run();
     if (phone) await c.env.DB.prepare("UPDATE mobile_sessions SET session_version = ? WHERE id = ?").bind(v, phone).run();
     else await issueSession(c, { uid: user.id, orgId: org.id, v });
     return c.json({ ok: true });

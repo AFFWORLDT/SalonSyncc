@@ -209,9 +209,70 @@ describe("phone tokens on tenant routes", () => {
     expect((await call(`https://tok-adm.${ROOT}/api/me`, { headers: { authorization: `Bearer ${token}` } })).status).toBe(401);
   });
 
+  it("deleting a staff member signed in on a phone removes the phone session", async () => {
+    const owner = await phone("tok-del", "boss", "owner", device("device-boss2"));
+    const ali = await makeUser(owner.org.id, { username: "ali", role: "barber" });
+    expect((await signIn("tok-del", "ali", "pass1234", device("device-ali02"))).status).toBe(200);
+    const r = await call(`https://tok-del.${ROOT}/api/users/${ali.id}`, { method: "DELETE", headers: owner.auth });
+    expect(r.status).toBe(200);
+    expect((await rows(owner.org.id)).results.map((x) => x.user_id)).toEqual([owner.user.id]);
+  });
+
   it("bearer POST without Origin passes originGuard", async () => {
     const p = await phone("tok-post", "sam");
     const r = await call(`https://tok-post.${ROOT}/api/_probe/write`, { method: "POST", headers: p.auth });
     expect(r.status).toBe(200);
+  });
+});
+
+describe("phone push tokens follow the phone session", () => {
+  const tokens = (orgId: string) =>
+    env.DB.prepare("SELECT token, user_id FROM push_tokens WHERE org_id = ? ORDER BY token").bind(orgId).all<{ token: string; user_id: number }>().then((r) => r.results);
+  async function pushSalon(slug: string) {
+    const org = await makeOrg({ slug, plan: "pro" });
+    const boss = await makeUser(org.id, { username: "boss", role: "owner" });
+    const sam = await makeUser(org.id, { username: "sam", role: "barber" });
+    const tok = async (u: string, dev: string) => ((await (await signIn(slug, u, "pass1234", device(dev))).json()) as { token: string }).token;
+    const reg = async (bearer: string, t: string) =>
+      expect((await call(`https://${slug}.${ROOT}/api/push/tokens`, { method: "POST", headers: { authorization: `Bearer ${bearer}`, "content-type": "application/json" }, body: JSON.stringify({ token: t }) })).status).toBe(200);
+    return { org, boss, sam, tok, reg, host: `https://${slug}.${ROOT}` };
+  }
+
+  it("signing the phone out drops its push token", async () => {
+    const s = await pushSalon("pt-out");
+    const t = await s.tok("sam", "device-pt-01");
+    await s.reg(t, "fcm-token-sam-phone-0001");
+    expect((await call(`${s.host}/api/mobile/session`, { method: "DELETE", headers: { authorization: `Bearer ${t}` } })).status).toBe(200);
+    expect(await tokens(s.org.id)).toEqual([]);
+  });
+
+  it("an admin signing out a barber's phone drops that phone's push token only", async () => {
+    const s = await pushSalon("pt-adm");
+    const boss = await s.tok("boss", "device-pt-02");
+    const sam = await s.tok("sam", "device-pt-03");
+    await s.reg(boss, "fcm-token-boss-phone-0001");
+    await s.reg(sam, "fcm-token-sam-phone-0002");
+    const sid = (await env.DB.prepare("SELECT id FROM mobile_sessions WHERE user_id = ?").bind(s.sam.id).first<{ id: string }>())!.id;
+    expect((await call(`${s.host}/api/users/${s.sam.id}/devices/${sid}`, { method: "DELETE", headers: { authorization: `Bearer ${boss}` } })).status).toBe(200);
+    expect((await tokens(s.org.id)).map((x) => x.token)).toEqual(["fcm-token-boss-phone-0001"]);
+  });
+
+  it("another user signing in on the device drops the first user's push token", async () => {
+    const s = await pushSalon("pt-swap");
+    const sam = await s.tok("sam", "device-pt-04");
+    await s.reg(sam, "fcm-token-shared-phone-01");
+    await s.tok("boss", "device-pt-04");
+    expect(await tokens(s.org.id)).toEqual([]);
+  });
+
+  it("a password change drops the user's other phones' push tokens, keeps this phone's", async () => {
+    const s = await pushSalon("pt-pw");
+    const a = await s.tok("sam", "device-pt-05");
+    const b = await s.tok("sam", "device-pt-06");
+    await s.reg(a, "fcm-token-sam-phone-aaaa");
+    await s.reg(b, "fcm-token-sam-phone-bbbb");
+    const r = await call(`${s.host}/api/me/password`, { method: "PUT", headers: { authorization: `Bearer ${a}`, "content-type": "application/json" }, body: JSON.stringify({ current: "pass1234", next: "newpass99" }) });
+    expect(r.status).toBe(200);
+    expect((await tokens(s.org.id)).map((x) => x.token)).toEqual(["fcm-token-sam-phone-aaaa"]);
   });
 });

@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:salonkit/core/api/api_client.dart';
 import 'package:salonkit/core/api/api_error.dart';
@@ -13,6 +16,15 @@ void main() {
     final before = networkTrouble.value;
     await expectLater(client(a).get('/api/me', (j) => j), throwsA(isA<Offline>()));
     expect(networkTrouble.value, before + 1);
+  });
+
+  test('a connection dropped mid-request maps to offline', () async {
+    for (final cause in [const SocketException('Connection reset by peer'), const HttpException('Connection closed while receiving data')]) {
+      final a = FakeAdapter({'GET /api/me': (o) => throw DioException(requestOptions: o, error: cause)});
+      final before = networkTrouble.value;
+      await expectLater(client(a).get('/api/me', (j) => j), throwsA(isA<Offline>()));
+      expect(networkTrouble.value, before + 1);
+    }
   });
 
   test('401 calls onUnauthorized and throws Unauthorized', () async {

@@ -46,7 +46,10 @@ export interface TenantContext {
   org: Org;
   user: UserRow;
   repo: ReturnType<typeof tenantRepo>;
+  /** What this user may use: the org's features narrowed by the per-role switches. Gates routes and menus. */
   features: FeatureKey[];
+  /** The org's features before the role switches. Salon-wide side effects (owner pushes, auto WhatsApp) use these. */
+  orgFeatures: FeatureKey[];
   limits: { max_staff: number | null };
   /** Support mode: the platform user signed in as this salon's owner (null for a normal session). */
   supportBy: number | null;

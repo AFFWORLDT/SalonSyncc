@@ -96,6 +96,20 @@ void main() {
     expect(t.c.salon.value!.slug, 'supersalon');
   });
 
+  test('401 also runs afterSignOut (push resets, so the next person registers again)', () async {
+    var n = 0, out = 0;
+    final t = make({
+      'POST /api/mobile/session': (o) => {'token': 'skm_tok', 'expires_at': 1},
+      'GET /api/me': (o) => n++ == 0 ? fx('me_barber.json') : const FakeReply(401, {'error': 'Please sign in'}),
+    });
+    t.c.afterSignOut = () async => out++;
+    await t.c.chooseSalon(salon);
+    await t.c.signIn('ali', 'pass1234');
+    await expectLater(t.c.refreshMe(), throwsA(anything));
+    await pumpEventQueue();
+    expect(out, 1);
+  });
+
   test('switchSalon clears both', () async {
     final t = make({
       'POST /api/mobile/session': (o) => {'token': 'skm_tok', 'expires_at': 1},

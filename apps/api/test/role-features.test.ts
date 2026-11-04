@@ -5,7 +5,9 @@ import type { Env } from "../src/env";
 import { hashPassword } from "../src/core/crypto";
 import { makeOrg, makeUser, loginAs } from "./helpers";
 
-const ctx = { waitUntil() {}, passThroughOnException() {} } as unknown as ExecutionContext;
+// waitUntil work (sale hooks) is collected so a test can await it.
+const pending: Promise<unknown>[] = [];
+const ctx = { waitUntil(p: Promise<unknown>) { pending.push(p); }, passThroughOnException() {} } as unknown as ExecutionContext;
 const E = { ...env, ROOT_DOMAIN: "salonkit.online" } as Env;
 const ADMIN = "https://admin.salonkit.online";
 const call = (method: string, url: string, headers: Record<string, string> = {}, body?: unknown) =>
@@ -41,6 +43,16 @@ describe("per-role switches", () => {
     expect(g.admin.ledger).toBe(true);
     expect((await setRole(s.org.id, "barber", "ledger", true)).status).toBe(200);
     expect(await features(s.host, s.barber)).toContain("ledger");
+  });
+
+  it("barber push off: the owner still hears about the barber's sale", async () => {
+    const s = await salon("role-side");
+    expect((await setRole(s.org.id, "barber", "push", false)).status).toBe(200);
+    const r = await call("POST", `https://${s.host}/api/sales`, { cookie: s.barber, origin: `https://${s.host}` }, { amount: "25", payment_mode: "cash" });
+    expect(r.status).toBe(201);
+    await Promise.all(pending.splice(0));
+    const n = await env.DB.prepare("SELECT COUNT(*) AS n FROM notifications n JOIN users u ON u.id = n.user_id WHERE n.org_id = ? AND u.username = 'boss'").bind(s.org.id).first<{ n: number }>();
+    expect(n!.n).toBe(1);
   });
 
   it("role off blocks route", async () => {

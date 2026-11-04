@@ -60,8 +60,11 @@ mobileTenant.get("/users/:id/devices", requireAdmin, async (c) => {
 });
 
 mobileTenant.delete("/users/:id/devices/:sid", requireAdmin, async (c) => {
-  const r = await c.env.DB.prepare("DELETE FROM mobile_sessions WHERE id = ? AND org_id = ? AND user_id = ?")
-    .bind(c.req.param("sid"), c.var.tenant.org.id, userIdOf(c.req.param("id"))).run();
-  if (!r.meta.changes) throw new HttpError(404, "Not found");
+  const [sid, orgId, uid] = [c.req.param("sid"), c.var.tenant.org.id, userIdOf(c.req.param("id"))];
+  const [, r] = await c.env.DB.batch([
+    c.env.DB.prepare("DELETE FROM push_tokens WHERE mobile_session_id = ? AND org_id = ? AND user_id = ?").bind(sid, orgId, uid),
+    c.env.DB.prepare("DELETE FROM mobile_sessions WHERE id = ? AND org_id = ? AND user_id = ?").bind(sid, orgId, uid),
+  ]);
+  if (!r!.meta.changes) throw new HttpError(404, "Not found");
   return c.json({ ok: true });
 });

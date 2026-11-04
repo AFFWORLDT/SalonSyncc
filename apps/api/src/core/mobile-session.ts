@@ -28,7 +28,10 @@ export async function issueMobileSession(db: D1Database, o: MobileDevice, now = 
   const expiresAt = now + MOBILE_TTL_MS;
   const hash = await hashToken(token);
   await db.batch([
-    // One signed-in person per phone: someone else's session on this device ends.
+    // One signed-in person per phone: someone else's session on this device ends, and its pushes with it.
+    db.prepare(
+      "DELETE FROM push_tokens WHERE mobile_session_id IN (SELECT id FROM mobile_sessions WHERE org_id = ? AND device_id = ? AND user_id <> ?)",
+    ).bind(o.orgId, o.deviceId, o.userId),
     db.prepare("DELETE FROM mobile_sessions WHERE org_id = ? AND device_id = ? AND user_id <> ?").bind(o.orgId, o.deviceId, o.userId),
     db.prepare(
       `INSERT INTO mobile_sessions(id,org_id,user_id,token_hash,device_id,device_name,platform,app_version,session_version,created_at,last_used_at,expires_at)
@@ -61,5 +64,8 @@ export async function readMobileSession(db: D1Database, token: string, now = Dat
 }
 
 export async function revokeMobileSession(db: D1Database, id: string): Promise<void> {
-  await db.prepare("DELETE FROM mobile_sessions WHERE id = ?").bind(id).run();
+  await db.batch([
+    db.prepare("DELETE FROM push_tokens WHERE mobile_session_id = ?").bind(id),
+    db.prepare("DELETE FROM mobile_sessions WHERE id = ?").bind(id),
+  ]);
 }
