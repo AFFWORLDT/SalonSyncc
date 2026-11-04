@@ -14,6 +14,9 @@ class Me {
 
   Role get role => roleOf(user.role);
   bool get canAddExpense => user.canAddExpense;
+
+  /// A lapsed subscription: the server refuses new or changed bills (402), so the app hides those actions.
+  bool get readOnly => !const {'trial', 'active', 'grace', 'past_due'}.contains(org.status);
   String get salonName {
     final d = settings['display_name'];
     return d is String && d.trim().isNotEmpty ? d.trim() : org.name;
