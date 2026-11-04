@@ -37,7 +37,7 @@ class _LockScreenState extends State<LockScreen> {
                 const SizedBox(height: 16),
                 Text(s?.name ?? 'SalonKit', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
                 const SizedBox(height: 28),
-                FilledButton.icon(onPressed: lock.unlock, icon: const Icon(Icons.fingerprint), label: const Text('Unlock')),
+                FilledButton.icon(style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)), onPressed: lock.unlock, icon: const Icon(Icons.fingerprint), label: const Text('Unlock')),
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () async {
