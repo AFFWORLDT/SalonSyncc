@@ -10,11 +10,14 @@ String saleWhat(Sale s) => s.items.isEmpty ? (s.note ?? '') : s.items.map((i) =>
 /// One bill in a list: cash/card icon, customer, time · phone · what, and the amount. With [showDay] (My bills) the
 /// line starts with the bill no. and the day, as the web's bills list does.
 class SaleRow extends StatelessWidget {
-  const SaleRow({super.key, required this.sale, required this.fmt, required this.onTap, this.showDay = false});
+  const SaleRow({super.key, required this.sale, required this.fmt, required this.onTap, this.showDay = false, this.showBarber = false});
   final Sale sale;
   final Fmt fmt;
   final VoidCallback onTap;
   final bool showDay;
+
+  /// Admin lists: who did it.
+  final bool showBarber;
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +25,7 @@ class SaleRow extends StatelessWidget {
     final sub = [
       if (showDay) sale.billNo,
       showDay ? '${fmt.dayLabel(sale.day)} ${fmt.time(sale.createdAt)}' : fmt.time(sale.createdAt),
+      if (showBarber) sale.barberName,
       if (sale.customerPhone != null) fmt.phone(sale.customerPhone!),
       saleWhat(sale),
     ].where((x) => x.isNotEmpty).join(' · ');
