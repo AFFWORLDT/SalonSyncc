@@ -6,6 +6,9 @@ import '../../core/format/fmt.dart';
 import '../../core/ui/states.dart';
 import '../../core/ui/motion.dart';
 import '../../data/sales_api.dart';
+import '../../data/staff_api.dart';
+import '../../models/role.dart';
+import '../../models/staff.dart';
 import '../../models/me.dart';
 import '../../models/sale.dart';
 import '../../models/service.dart';
@@ -27,17 +30,20 @@ class SheetResult {
 }
 
 /// Opens the sheet full-screen; resolves with how it closed (null when closed without saving).
-Future<SheetResult?> openSaleSheet(BuildContext context, {required Me me, required SalesApi sales, Sale? existing, DoneActions? doneActions}) =>
+Future<SheetResult?> openSaleSheet(BuildContext context, {required Me me, required SalesApi sales, StaffApi? staff, Sale? existing, DoneActions? doneActions}) =>
     Navigator.of(context).push<SheetResult>(MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) => SaleSheet(me: me, sales: sales, existing: existing, doneActions: doneActions),
+      builder: (_) => SaleSheet(me: me, sales: sales, staff: staff, existing: existing, doneActions: doneActions),
     ));
 
-/// New sale or edit bill, in two steps (services → customer), then the saved bill.
+/// New sale or edit bill: (admin: who did it →) services → customer, then the saved bill.
 class SaleSheet extends StatefulWidget {
-  const SaleSheet({super.key, required this.me, required this.sales, this.existing, this.doneActions, this.now});
+  const SaleSheet({super.key, required this.me, required this.sales, this.staff, this.existing, this.doneActions, this.now});
   final Me me;
   final SalesApi sales;
+
+  /// Admins pick the barber from this list; barbers always sell as themselves.
+  final StaffApi? staff;
   final Sale? existing;
   final DoneActions? doneActions;
 
@@ -57,6 +63,10 @@ class _SaleSheetState extends State<SaleSheet> {
   final _note = TextEditingController();
   String? _payment;
   int _step = 0;
+  bool _goingBack = false;
+  List<Staff>? _staff;
+  int? _barberId;
+  late String _day = widget.existing?.day ?? widget.me.today;
   bool _busy = false;
   String? _error;
   Sale? _saved;
@@ -66,6 +76,22 @@ class _SaleSheetState extends State<SaleSheet> {
 
   Fmt get fmt => widget.me.fmt;
   bool get editing => widget.existing != null;
+  bool get admin => widget.me.role == Role.admin && widget.staff != null;
+  List<String> get _steps => admin ? const ['barber', 'services', 'customer'] : const ['services', 'customer'];
+  String get _kind => _steps[_step];
+  bool get _last => _step == _steps.length - 1;
+  bool get _canNext => _kind == 'barber' ? _barberId != null : _total > 0;
+
+  void _next() => setState(() {
+        _goingBack = false;
+        _step++;
+        _error = null;
+      });
+
+  void _back() => setState(() {
+        _goingBack = true;
+        _step--;
+      });
 
   @override
   void initState() {
@@ -78,6 +104,12 @@ class _SaleSheetState extends State<SaleSheet> {
       _phone.text = s.customerPhone ?? '';
       _note.text = s.note ?? '';
       _payment = s.payment;
+      _barberId = s.barberId;
+    }
+    if (admin) {
+      widget.staff!.list().then((l) => mounted ? setState(() => _staff = l.where((x) => x.active || x.id == _barberId).toList()) : null, onError: (Object e) {
+        if (mounted) setState(() { _staff = const []; _error = messageOf(e); });
+      });
     }
     _amount.addListener(() => setState(() {}));
     _loadServices();
@@ -108,6 +140,8 @@ class _SaleSheetState extends State<SaleSheet> {
           c.clear();
         }
         _payment = null;
+        _barberId = null;
+        _day = widget.me.today;
         _step = 0;
         _error = null;
         _saved = null;
@@ -130,6 +164,8 @@ class _SaleSheetState extends State<SaleSheet> {
       customerName: name.isEmpty ? null : name,
       customerPhone: phone,
       note: note.isEmpty ? null : note,
+      barberId: admin ? _barberId : null,
+      day: admin && (editing || _day != widget.me.today) ? _day : null,
     );
     setState(() { _busy = true; _error = null; });
     final at = widget.now?.call() ?? DateTime.now().millisecondsSinceEpoch;
@@ -153,11 +189,13 @@ class _SaleSheetState extends State<SaleSheet> {
     }
   }
 
-  /// One of my bills from today with this total and payment, made since [since] (a minute's grace for clock skew).
+  /// A bill for this barber and day (an admin's choice, else mine today) with this total and payment, made since
+  /// [since] (a minute's grace for clock skew).
   Future<Sale?> _landed(SaleDraft d, int since) async {
-    final today = await widget.sales.today(widget.me.today);
-    for (final s in today.items) {
-      if (s.barberId == widget.me.user.id && s.amount == d.total && s.payment == d.payment && s.createdAt >= since - 60000) return s;
+    final barber = d.barberId ?? widget.me.user.id;
+    final list = await widget.sales.search(day: d.day ?? widget.me.today, barberId: d.barberId, pageSize: 200);
+    for (final s in list.items) {
+      if (s.barberId == barber && s.amount == d.total && s.payment == d.payment && s.createdAt >= since - 60000) return s;
     }
     return null;
   }
@@ -166,8 +204,8 @@ class _SaleSheetState extends State<SaleSheet> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Delete this bill?'),
-        content: Text('${widget.existing!.billNo} · ${fmt.money(widget.existing!.amount)}'),
+        title: const Text('Delete this sale?'),
+        content: const Text("It will be removed from today's totals."),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
           FilledButton(
@@ -204,19 +242,19 @@ class _SaleSheetState extends State<SaleSheet> {
     return PopScope(
       canPop: _step == 0,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) setState(() => _step = 0);
+        if (!didPop) _back();
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(editing ? 'Edit bill' : 'New sale'),
-          leading: _step == 0 ? const CloseButton() : BackButton(onPressed: () => setState(() => _step = 0)),
+          title: Text(editing ? 'Edit ${widget.existing!.billNo}' : 'New sale'),
+          leading: _step == 0 ? const CloseButton() : BackButton(onPressed: _back),
           actions: [
             if (editing) IconButton(tooltip: 'Delete bill', onPressed: _busy ? null : _delete, icon: const Icon(Icons.delete_outline_rounded)),
           ],
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(4),
             child: TweenAnimationBuilder<double>(
-              tween: Tween(end: _step == 0 ? 0.5 : 1),
+              tween: Tween(end: (_step + 1) / _steps.length),
               duration: skDuration(context),
               builder: (_, v, _) => LinearProgressIndicator(value: v, minHeight: 3),
             ),
@@ -224,10 +262,12 @@ class _SaleSheetState extends State<SaleSheet> {
         ),
         body: PageTransitionSwitcher(
           duration: skDuration(context, 300),
-          reverse: _step == 0,
+          reverse: _goingBack,
           transitionBuilder: (child, a, b) =>
               SharedAxisTransition(animation: a, secondaryAnimation: b, transitionType: SharedAxisTransitionType.horizontal, child: child),
-          child: _step == 0
+          child: _kind == 'barber'
+              ? _BarberGrid(key: const ValueKey('step-barber'), staff: _staff, selected: _barberId, onPick: (id) => setState(() { _barberId = id; _error = null; }))
+              : _kind == 'services'
               ? ServicePicker(
                   key: const ValueKey('step-services'),
                   services: _services,
@@ -246,6 +286,9 @@ class _SaleSheetState extends State<SaleSheet> {
                   payment: _payment,
                   onPayment: (p) => setState(() { _payment = p; _error = null; }),
                   phoneCountry: widget.me.salon.phoneCountry,
+                  day: admin ? _day : null,
+                  today: widget.me.today,
+                  onDay: (d) => setState(() => _day = d),
                 ),
         ),
         bottomNavigationBar: SafeArea(
@@ -261,12 +304,16 @@ class _SaleSheetState extends State<SaleSheet> {
                         child: Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                       ),
               ),
-              _step == 0
+              !_last
                   ? FilledButton(
                       key: const ValueKey('next'),
                       style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                      onPressed: total > 0 ? () => setState(() { _step = 1; _error = null; }) : null,
-                      child: Text(total > 0 ? 'Next · ${fmt.money(total)}' : 'Pick a service or enter the amount'),
+                      onPressed: _canNext ? _next : null,
+                      child: Text(_kind == 'barber'
+                          ? (_barberId == null ? 'Pick who did it' : 'Next')
+                          : total > 0
+                              ? 'Next · ${fmt.money(total)}'
+                              : 'Pick a service or enter the amount'),
                     )
                   : FilledButton(
                       key: const ValueKey('save'),
@@ -281,5 +328,34 @@ class _SaleSheetState extends State<SaleSheet> {
         ),
       ),
     );
+  }
+}
+
+/// Admin step 1: "Who did this customer?" — the active staff (admins marked ★).
+class _BarberGrid extends StatelessWidget {
+  const _BarberGrid({super.key, required this.staff, required this.selected, required this.onPick});
+  final List<Staff>? staff;
+  final int? selected;
+  final ValueChanged<int> onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = staff;
+    return ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 24), children: [
+      Text('Who did this customer?', style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 12),
+      if (l == null)
+        const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
+      else
+        Wrap(spacing: 10, runSpacing: 10, children: [
+          for (final s in l)
+            ChoiceChip(
+              avatar: CircleAvatar(child: Text(s.name.isEmpty ? '?' : s.name[0].toUpperCase())),
+              label: Text(s.isAdmin ? '${s.name} ★' : s.name),
+              selected: selected == s.id,
+              onSelected: (_) => onPick(s.id),
+            ),
+        ]),
+    ]);
   }
 }

@@ -41,8 +41,10 @@ class ServerError extends ApiError {
   const ServerError() : super(kGeneric);
 }
 
+/// The server refused the input (400 / 404 / 409) with words to show. [code] is its machine code, e.g. "stale".
 class Validation extends ApiError {
-  const Validation(super.message);
+  const Validation(super.message, {this.code});
+  final String? code;
 }
 
 ApiError mapError(Object e) {
@@ -68,5 +70,5 @@ ApiError mapError(Object e) {
   if (status == 429) return Throttled(error ?? kGeneric);
   if (status == 402) return const Paused();
   if (status >= 500) return const ServerError();
-  return Validation(error ?? kGeneric);
+  return Validation(error ?? kGeneric, code: code is String ? code : null);
 }

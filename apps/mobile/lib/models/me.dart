@@ -3,7 +3,7 @@ import 'role.dart';
 
 /// GET /api/me: who is signed in, their salon, its settings and the features switched on for them.
 class Me {
-  const Me({required this.user, required this.org, required this.settings, required this.features, required this.today, required this.subscription});
+  const Me({required this.user, required this.org, required this.settings, required this.features, required this.today, required this.subscription, this.maxStaff});
 
   final MeUser user;
   final MeOrg org;
@@ -11,6 +11,9 @@ class Me {
   final Set<String> features;
   final String today;
   final Subscription subscription;
+
+  /// The plan's active-staff limit (owner not counted); null = no limit.
+  final int? maxStaff;
 
   Role get role => roleOf(user.role);
   bool get canAddExpense => user.canAddExpense;
@@ -32,6 +35,7 @@ class Me {
       features: f.whereType<String>().toSet(),
       today: str(j, 'today'),
       subscription: Subscription.fromJson(obj(j['subscription'], 'subscription')),
+      maxStaff: j['limits'] is Map && (j['limits'] as Map)['max_staff'] is int ? (j['limits'] as Map)['max_staff'] as int : null,
     );
   }
 }

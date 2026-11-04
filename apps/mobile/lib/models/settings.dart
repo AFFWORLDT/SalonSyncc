@@ -19,12 +19,16 @@ class SalonSettings {
     this.phone,
     this.trn,
     required this.waReady,
+    this.defaultCommissionPct = 0,
   });
 
   final String currency, locale, timezone, displayName, phoneCountry, thankYouText;
   final int currencyMinor;
   final bool vatEnabled, waReady;
   final num vatRate;
+
+  /// Commission % for staff without their own.
+  final num defaultCommissionPct;
 
   /// Shortcut amounts for a bill, in major units.
   final List<num> quickAmounts;
@@ -50,6 +54,7 @@ class SalonSettings {
       phone: strOrNull(j, 'phone'),
       trn: strOrNull(j, 'trn'),
       waReady: j['wa_ready'] == true,
+      defaultCommissionPct: numOrNull(j, 'default_commission_pct') ?? 0,
     );
   }
 }

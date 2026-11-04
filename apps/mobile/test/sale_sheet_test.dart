@@ -232,7 +232,7 @@ void main() {
       final a = FakeAdapter({...base(), 'PUT /api/sales/17': (o) => raw('sale.json')});
       await t.pumpWidget(host(a, edit: sale));
       await t.pumpAndSettle();
-      expect(find.text('Edit bill'), findsOneWidget);
+      expect(find.text('Edit E2E-20261104-001'), findsOneWidget);
       expect(find.text('Next · AED 65'), findsOneWidget);
       await toCustomer(t);
       expect(find.widgetWithText(TextField, 'Omar'), findsOneWidget);
@@ -267,7 +267,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byTooltip('Delete bill'));
       await t.pumpAndSettle();
-      expect(find.text('Delete this bill?'), findsOneWidget);
+      expect(find.text('Delete this sale?'), findsOneWidget);
       await t.tap(find.text('Cancel'));
       await t.pumpAndSettle();
       expect(a.calls.where((c) => c.method == 'DELETE'), isEmpty);

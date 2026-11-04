@@ -28,7 +28,7 @@ class FeatureGate extends StatelessWidget {
               const SizedBox(height: 16),
               Text("This feature isn't on for your salon", textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 20),
-              FilledButton(onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst), child: const Text('Back to home')),
+              FilledButton(style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)), onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst), child: const Text('Back to home')),
             ]),
           ),
         ),

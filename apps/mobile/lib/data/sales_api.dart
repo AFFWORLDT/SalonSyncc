@@ -16,11 +16,15 @@ class DraftLine {
 
 /// A bill to save: either [lines] or a plain [amount] (minor units), as the web sends them.
 class SaleDraft {
-  const SaleDraft({this.lines = const [], this.amount, required this.payment, this.customerName, this.customerPhone, this.note});
+  const SaleDraft({this.lines = const [], this.amount, required this.payment, this.customerName, this.customerPhone, this.note, this.barberId, this.day});
   final List<DraftLine> lines;
   final int? amount;
   final String payment;
   final String? customerName, customerPhone, note;
+
+  /// Admin only: who did it and (for a missed sale) which day. Barbers always sell as themselves, today.
+  final int? barberId;
+  final String? day;
 
   int get total => lines.isNotEmpty ? lines.fold(0, (s, l) => s + l.price * l.qty) : (amount ?? 0);
 
@@ -38,6 +42,8 @@ class SaleDraft {
         'customer_name': customerName,
         'customer_phone': customerPhone,
         'note': note,
+        'barber_id': ?barberId,
+        'day': ?day,
       };
 }
 
@@ -53,8 +59,15 @@ class SalesApi {
   Future<Paged<Sale>> today(String day) => api.get('/api/sales', _page, query: {'day': day, 'page_size': 200});
 
   /// [page] is 1-based; the server caps [pageSize] at 200, so long lists page instead of growing the size.
-  Future<Paged<Sale>> search({String q = '', String? day, int page = 1, int pageSize = 50}) => api.get('/api/sales', _page,
-      query: {if (q.trim().isNotEmpty) 'q': q.trim(), 'day': ?day, if (page > 1) 'page': page, 'page_size': pageSize});
+  Future<Paged<Sale>> search({String q = '', String? day, int? barberId, String? payment, int page = 1, int pageSize = 50}) => api.get('/api/sales', _page,
+      query: {
+        if (q.trim().isNotEmpty) 'q': q.trim(),
+        'day': ?day,
+        'barber_id': ?barberId,
+        'payment_mode': ?payment,
+        if (page > 1) 'page': page,
+        'page_size': pageSize,
+      });
 
   Future<Sale> create(SaleDraft d) => api.post('/api/sales', d.toJson(fmt), _sale);
   Future<Sale> update(int id, SaleDraft d) => api.put('/api/sales/$id', d.toJson(fmt), _sale);

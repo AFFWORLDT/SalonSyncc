@@ -65,7 +65,7 @@ class _UpdateScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   const Text('This version is no longer supported. Update to keep using SalonKit.', textAlign: TextAlign.center),
                   const SizedBox(height: 24),
-                  FilledButton(onPressed: () => _open(storeUrl), child: const Text('Update')),
+                  FilledButton(style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)), onPressed: () => _open(storeUrl), child: const Text('Update')),
                 ]),
               ),
             ),

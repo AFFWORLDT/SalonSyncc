@@ -57,6 +57,9 @@ class CustomerStep extends StatefulWidget {
     required this.payment,
     required this.onPayment,
     required this.phoneCountry,
+    this.day,
+    this.today,
+    this.onDay,
   });
 
   final SalesApi sales;
@@ -64,6 +67,10 @@ class CustomerStep extends StatefulWidget {
   final String? payment;
   final ValueChanged<String> onPayment;
   final String phoneCountry;
+
+  /// Admin only: the bill's day (null hides "More (day, note)" and shows the note directly).
+  final String? day, today;
+  final ValueChanged<String>? onDay;
 
   @override
   State<CustomerStep> createState() => _CustomerStepState();
@@ -118,6 +125,21 @@ class _CustomerStepState extends State<CustomerStep> {
     FocusScope.of(context).unfocus();
   }
 
+  Widget _noteField() => TextField(
+        key: const ValueKey('note'),
+        controller: widget.note,
+        maxLength: 300,
+        minLines: 1,
+        maxLines: 3,
+        decoration: const InputDecoration(labelText: 'Note on the bill', counterText: ''),
+      );
+
+  Future<void> _pickDay() async {
+    final last = DateTime.parse(widget.today!);
+    final d = await showDatePicker(context: context, firstDate: DateTime(2020), lastDate: last, initialDate: DateTime.parse(widget.day!));
+    if (d != null) widget.onDay?.call('${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}');
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
@@ -162,14 +184,29 @@ class _CustomerStepState extends State<CustomerStep> {
         ],
       ]),
       const SizedBox(height: 20),
-      TextField(
-        key: const ValueKey('note'),
-        controller: widget.note,
-        maxLength: 300,
-        minLines: 1,
-        maxLines: 3,
-        decoration: const InputDecoration(labelText: 'Note on the bill', counterText: ''),
-      ),
+      if (widget.day == null)
+        _noteField()
+      else
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          title: const Text('More (day, note)'),
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: InputChip(
+                key: const ValueKey('sale-day'),
+                avatar: const Icon(Icons.calendar_today_outlined, size: 18),
+                label: Text(widget.day == widget.today ? 'Today' : widget.day!),
+                onPressed: _pickDay,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(padding: const EdgeInsets.only(top: 4, bottom: 12), child: Text('Change only to enter a missed sale', style: t.bodySmall)),
+            ),
+            _noteField(),
+          ],
+        ),
     ]);
   }
 }

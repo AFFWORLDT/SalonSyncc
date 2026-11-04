@@ -93,6 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 20),
                     FilledButton(
+                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
                       onPressed: _busy ? null : _submit,
                       child: _busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Sign in'),
                     ),

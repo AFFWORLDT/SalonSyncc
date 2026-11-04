@@ -15,10 +15,13 @@ const kBillsPage = 50;
 
 /// The barber's own bills: search by bill no., customer or phone, filter by day, 50 at a time.
 class BillsScreen extends StatefulWidget {
-  const BillsScreen({super.key, required this.me, required this.sales, required this.onOpen});
+  const BillsScreen({super.key, required this.me, required this.sales, required this.onOpen, this.admin = false});
   final Me me;
   final SalesApi sales;
   final Future<void> Function(Sale sale) onOpen;
+
+  /// Every bill in the salon (the server shows a barber only their own).
+  final bool admin;
 
   @override
   State<BillsScreen> createState() => _BillsScreenState();
@@ -91,7 +94,8 @@ class _BillsScreenState extends State<BillsScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
-        Text('My bills', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+        Text(widget.admin ? 'Bills' : 'My bills', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+        if (widget.admin) Text('Every sale makes a bill. Open one to see or print it.', style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 12),
         TextField(
           key: const ValueKey('bill-search'),
@@ -121,13 +125,13 @@ class _BillsScreenState extends State<BillsScreen> {
         else if (list == null)
           for (var i = 0; i < 5; i++) const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: SkSkeleton(height: 56))
         else if (_items.isEmpty)
-          const EmptyState(text: 'No bills found', icon: Icons.receipt_long_outlined)
+          EmptyState(text: widget.admin ? 'No bills match.' : 'No bills found', icon: Icons.receipt_long_outlined)
         else ...[
           SkGlass(
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Column(children: [
               for (final s in _items)
-                SaleRow(sale: s, fmt: fmt, showDay: true, onTap: () => widget.onOpen(s).then((_) => _load())),
+                SaleRow(sale: s, fmt: fmt, showDay: true, showBarber: widget.admin, onTap: () => widget.onOpen(s).then((_) => _load())),
             ]),
           ),
           if (list.total > _items.length && list.items.isNotEmpty)
