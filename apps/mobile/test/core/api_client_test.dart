@@ -10,7 +10,9 @@ ApiClient client(FakeAdapter a, {String? token, void Function()? onUnauthorized}
 void main() {
   test('connection error maps to offline', () async {
     final a = FakeAdapter({'GET /api/me': (o) => throw offline(o)});
+    final before = networkTrouble.value;
     await expectLater(client(a).get('/api/me', (j) => j), throwsA(isA<Offline>()));
+    expect(networkTrouble.value, before + 1);
   });
 
   test('401 calls onUnauthorized and throws Unauthorized', () async {

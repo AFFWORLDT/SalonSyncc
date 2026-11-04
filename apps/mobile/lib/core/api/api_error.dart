@@ -1,6 +1,11 @@
 import 'package:dio/dio.dart';
 
+import 'package:flutter/foundation.dart';
+
 const kGeneric = 'Something went wrong. Try again.';
+
+/// Bumped whenever a request fails for lack of a connection; the offline bar listens.
+final networkTrouble = ValueNotifier<int>(0);
 
 /// Every failure the app shows, in plain words. Screens switch on the type; [message] is safe to show.
 sealed class ApiError implements Exception {

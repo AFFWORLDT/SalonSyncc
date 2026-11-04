@@ -46,6 +46,7 @@ class ApiClient {
       final err = mapError(e);
       if (err is Unauthorized) onUnauthorized?.call();
       if (err is FeatureDisabled) onFeatureDisabled?.call();
+      if (err is Offline) networkTrouble.value++;
       throw err;
     }
   }
