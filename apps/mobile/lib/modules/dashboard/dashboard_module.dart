@@ -6,9 +6,12 @@ import '../../core/features/feature_module.dart';
 import '../../core/format/fmt.dart';
 import '../../data/admin_reports_api.dart';
 import '../../data/sales_api.dart';
+import '../../data/staff_api.dart';
 import '../../models/role.dart';
 import '../../shell/nav.dart';
 import '../sale/bill_screen.dart';
+import '../sale/sale_sheet.dart';
+import '../sale/share_buttons.dart';
 import 'dashboard_screen.dart';
 
 /// The owner's and admins' home.
@@ -33,6 +36,7 @@ final dashboardModule = FeatureModule(
         openModule('sales');
       },
       onDailySheet: () => openModule('sheet'),
+      onNewSale: () => openSaleSheet(context, me: me, sales: sales, staff: StaffApi(auth.api), doneActions: shareActionsFor),
     );
   },
 );

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/format/fmt.dart';
 import '../../data/sales_api.dart';
+import '../../data/staff_api.dart';
+import '../../models/role.dart';
 import '../../models/me.dart';
 import '../../models/sale.dart';
 import 'bill_view.dart';
@@ -25,10 +27,14 @@ class BillScreen extends StatefulWidget {
 class _BillScreenState extends State<BillScreen> {
   late Sale _sale = widget.sale;
 
-  bool get _canEdit => _sale.day == widget.me.today && _sale.barberId == widget.me.user.id && !widget.me.readOnly;
+  bool get _admin => widget.me.role == Role.admin;
+
+  /// Admins edit any bill; a barber only their own from today (the server enforces the same).
+  bool get _canEdit => !widget.me.readOnly && (_admin || (_sale.day == widget.me.today && _sale.barberId == widget.me.user.id));
 
   Future<void> _edit() async {
-    final r = await openSaleSheet(context, me: widget.me, sales: widget.sales, existing: _sale, doneActions: shareActionsFor);
+    final r = await openSaleSheet(context,
+        me: widget.me, sales: widget.sales, staff: _admin ? StaffApi(widget.sales.api) : null, existing: _sale, doneActions: shareActionsFor);
     if (!mounted || r == null) return;
     if (r.deleted) return Navigator.of(context).pop();
     setState(() => _sale = r.sale!);

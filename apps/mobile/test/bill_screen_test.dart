@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:salonkit/core/api/api_client.dart';
 import 'package:salonkit/core/format/fmt.dart';
 import 'package:salonkit/data/sales_api.dart';
+import 'package:salonkit/models/me.dart';
 import 'package:salonkit/models/sale.dart';
 import 'package:salonkit/modules/sale/bill_screen.dart';
 
@@ -34,6 +35,18 @@ void main() {
     await pump(t, {...raw('sale.json'), 'day': me.today, 'barber_id': me.user.id});
     expect(find.text('Edit'), findsOneWidget);
     expect(find.text('Share link'), findsOneWidget);
+  });
+
+  testWidgets("an admin can edit anyone's bill on any day", (t) async {
+    final j = raw('me_owner_e2e.json');
+    final me = Me.fromJson(j);
+    final auth = putAuth(FakeAdapter({}));
+    auth.salon.value = const SavedSalonForTest().salon;
+    auth.me.value = me;
+    final c = ApiClient(Uri.parse('https://e2esalon.salonkit.online'), token: () => 't', adapter: FakeAdapter({}));
+    await t.pumpWidget(MaterialApp(home: BillScreen(me: me, sales: SalesApi(c, me.fmt), sale: Sale.fromJson({...raw('sale.json'), 'day': '2020-01-01'}))));
+    await t.pumpAndSettle();
+    expect(find.text('Edit'), findsOneWidget);
   });
 
   testWidgets('an older bill is view-only', (t) async {

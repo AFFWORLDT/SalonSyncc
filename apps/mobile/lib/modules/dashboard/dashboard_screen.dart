@@ -32,6 +32,7 @@ class DashboardScreen extends StatefulWidget {
     required this.onOpenSale,
     required this.onAllSales,
     required this.onDailySheet,
+    this.onNewSale,
     this.onAddCompanyExpense,
   });
   final Me me;
@@ -39,6 +40,9 @@ class DashboardScreen extends StatefulWidget {
   final Future<void> Function(Sale sale) onOpenSale;
   final void Function(String? day) onAllSales;
   final VoidCallback onDailySheet;
+
+  /// Opens the new-sale sheet; resolves when it closes.
+  final Future<void> Function()? onNewSale;
 
   /// Opens "Add company expense"; resolves when it closes.
   final Future<void> Function()? onAddCompanyExpense;
@@ -139,6 +143,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ]),
         ),
         const SizedBox(height: 12),
+        if (widget.onNewSale != null && !me.readOnly) ...[
+          FilledButton.icon(
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+            onPressed: () => widget.onNewSale!().then((_) => _load()),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('New sale'),
+          ),
+          const SizedBox(height: 12),
+        ],
         if (_setup != null && !me.readOnly) SetupChecklist(slug: me.org.slug, setup: _setup!, withRatings: me.features.contains('ratings')),
         if (_error != null && o == null)
           ErrorState(error: _error!, onRetry: _load)
