@@ -32,7 +32,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('barber signs in to e2esalon, adds a bill, sees only barber screens, signs out keeping the salon', (t) async {
-    await app.main();
+    await app.run(crashReports: false);
     await waitFor(t, find.text('Enter your salon ID'));
 
     await t.enterText(find.byType(TextField), 'E2ESalon');
@@ -75,7 +75,7 @@ void main() {
     await t.tap(find.text('My bills'));
     await waitFor(t, find.textContaining('E2E-'));
     await settle(t, 1); // the tab switch fades the old tab out
-    await t.tap(find.text('Customer 1').last);
+    await t.tap(find.text('Customer 1').first); // newest first: older runs' bills can't be edited
     await waitFor(t, find.text('Share link'));
     expect(find.text('Edit'), findsOneWidget);
     await t.pageBack();

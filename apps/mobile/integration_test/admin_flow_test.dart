@@ -30,7 +30,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('owner: dashboard, a sale for a barber, sales, daily sheet, staff', (t) async {
-    await app.main();
+    await app.run(crashReports: false);
     await waitFor(t, find.text('Enter your salon ID').evaluate().isNotEmpty ? find.text('Enter your salon ID') : find.byType(TextField));
     if (find.text('Enter your salon ID').evaluate().isNotEmpty) {
       await t.enterText(find.byType(TextField), 'e2esalon');

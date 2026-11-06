@@ -31,7 +31,7 @@ The config files are **never committed** (git-ignored). Download them from the S
 whose service account is the API's `FCM_SERVICE_ACCOUNT` secret), apps `online.salonkit.app`:
 
 - Android: `android/app/google-services.json`
-- iOS: `ios/Runner/GoogleService-Info.plist` (and add it to the Runner target in Xcode)
+- iOS: `ios/Runner/GoogleService-Info.plist` (the Thin Binary build step copies it into the app when present)
 
 Without them the app builds and runs with push and crash reports off.
 

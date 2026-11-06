@@ -59,7 +59,7 @@ void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('owner: services, monthly, ledger, settings, plan', (t) async {
-    await app.main();
+    await app.run(crashReports: false);
     await waitFor(t, find.byType(TextField));
     if (find.text('Enter your salon ID').evaluate().isNotEmpty) {
       await t.enterText(find.byType(TextField), 'e2esalon');

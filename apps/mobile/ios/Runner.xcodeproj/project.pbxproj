@@ -288,7 +288,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin";
+			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin\n# Firebase config is git-ignored: bundle it only when present (see README).\nif [ -f \"${SRCROOT}/Runner/GoogleService-Info.plist\" ]; then cp \"${SRCROOT}/Runner/GoogleService-Info.plist\" \"${TARGET_BUILD_DIR}/${WRAPPER_NAME}/\"; fi\n";
 		};
 		5E060AD48E00F96D120AFE5A /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;

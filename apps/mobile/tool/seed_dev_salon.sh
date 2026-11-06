@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Seeds salon "e2esalon" (owner/pass1234, barber/pass1234, three services) into the LOCAL D1 used by `wrangler dev --local`.
 # Never touches the remote database. Run from anywhere; re-running replaces the salon.
+# The e2e tests assume an empty day: re-run this before each integration_test file (they add bills).
 set -euo pipefail
 cd "$(dirname "$0")/../../api"
 HASH=$(node -e '

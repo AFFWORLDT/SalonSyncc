@@ -28,7 +28,10 @@ import 'core/theme/theme_controller.dart';
 import 'core/version/update_gate.dart';
 import 'core/version/version_check.dart';
 
-Future<void> main() async {
+Future<void> main() => run();
+
+/// [crashReports] off in the e2e tests: the test runner owns FlutterError.onError.
+Future<void> run({bool crashReports = true}) async {
   WidgetsFlutterBinding.ensureInitialized();
   // Firebase (push + crash reports) needs google-services.json / GoogleService-Info.plist. Without them the app runs
   // with both off; it must never fail to start over it.
@@ -36,11 +39,13 @@ Future<void> main() async {
   try {
     await Firebase.initializeApp();
     firebase = true;
-    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-    PlatformDispatcher.instance.onError = (e, st) {
-      FirebaseCrashlytics.instance.recordError(e, st, fatal: true);
-      return true;
-    };
+    if (crashReports) {
+      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+      PlatformDispatcher.instance.onError = (e, st) {
+        FirebaseCrashlytics.instance.recordError(e, st, fatal: true);
+        return true;
+      };
+    }
   } catch (e) {
     debugPrint('Firebase off: $e');
   }
