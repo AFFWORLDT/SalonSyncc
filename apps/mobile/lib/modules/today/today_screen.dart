@@ -138,7 +138,7 @@ class TodayScreenState extends State<TodayScreen> {
             tourTarget(
               'new-sale-today',
               FilledButton.icon(
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), textStyle: const TextStyle(fontFamily: kTextFont, fontSize: 16, fontWeight: FontWeight.w600)),
                 onPressed: () => _after(widget.onNewSale),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('New sale'),

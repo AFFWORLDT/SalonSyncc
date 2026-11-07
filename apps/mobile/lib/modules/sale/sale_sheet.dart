@@ -591,7 +591,7 @@ class _SaleSheetState extends State<SaleSheet> {
             ] else
               FilledButton(
                 key: const ValueKey('save'),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56), textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56), textStyle: const TextStyle(fontFamily: kTextFont, fontSize: 16, fontWeight: FontWeight.w600)),
                 onPressed: _busy ? null : _save,
                 child: _busy
                     ? const SizedBox.square(dimension: 22, child: CircularProgressIndicator(strokeWidth: 2.5))

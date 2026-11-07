@@ -203,7 +203,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             tourTarget(
               'new-sale',
               FilledButton.icon(
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), textStyle: const TextStyle(fontFamily: kTextFont, fontSize: 16, fontWeight: FontWeight.w600)),
                 onPressed: () => widget.onNewSale!().then((_) => _load()),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('New sale'),
