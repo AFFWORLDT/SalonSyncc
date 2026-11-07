@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/screen_cache.dart';
 import '../../core/theme/scale.dart';
 import '../../core/ui/haptics.dart';
 import '../../core/ui/avatar.dart';
@@ -28,9 +29,6 @@ String? deltaText(int now, int before, String label) {
 String ymd(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
 /// The owner's dashboard: sales, expense, commission and profit for a day or a range, per barber, the latest sales.
-/// The last overview per salon and range, so the tab opens filled and refreshes quietly (tests clear it).
-final dashboardCache = <String, Overview>{};
-
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     super.key,
@@ -68,12 +66,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Object? _error;
   int _seq = 0;
 
-  String get _key => '${widget.me.org.slug}|$_from|$_to';
+  String get _key => 'dashboard|${widget.me.org.slug}|$_from|$_to';
 
   @override
   void initState() {
     super.initState();
-    _o = dashboardCache[_key];
+    _o = ScreenCache.get<Overview>(_key);
     _load();
     widget.reports.setup().then((s) => mounted ? setState(() => _setup = s) : null, onError: (_) {});
   }
@@ -91,7 +89,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final o = await widget.reports.overview(_from, _to);
       if (mounted && n == _seq) {
-        dashboardCache[_key] = o;
+        ScreenCache.put(_key, o);
         setState(() {
           _o = o;
           _error = null;
@@ -107,7 +105,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _preset = preset;
       _from = from;
       _to = to;
-      _o = dashboardCache[_key];
+      _o = ScreenCache.get<Overview>(_key);
       _error = null;
     });
     _load();

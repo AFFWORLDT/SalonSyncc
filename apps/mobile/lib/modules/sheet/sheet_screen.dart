@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../../core/screen_cache.dart';
 import '../../data/staff_api.dart';
 import '../../core/ui/haptics.dart';
 import '../../core/ui/avatar.dart';
@@ -87,8 +88,12 @@ class _SheetScreenState extends State<SheetScreen> {
 
   Future<void> _load() async {
     final n = ++_seq;
+    final key = 'sheet|${widget.me.org.slug}|$_month';
+    final cached = ScreenCache.get<DailySheet>(key);
+    if (cached != null) fillFromCache(setState, () => _d = cached);
     try {
       final d = await widget.reports.daily(_month);
+      ScreenCache.put(key, d);
       if (mounted && n == _seq) {
         setState(() {
           _d = d;

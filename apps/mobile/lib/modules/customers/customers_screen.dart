@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../core/screen_cache.dart';
 import '../../core/ui/haptics.dart';
 import '../../core/ui/avatar.dart';
 import '../../core/ui/search_field.dart';
@@ -58,8 +59,19 @@ class _CustomersScreenState extends State<CustomersScreen> {
 
   Future<void> _load({int page = 1}) async {
     final n = ++_seq;
+    final key = 'customers|${widget.me.org.slug}|${_q.text.trim()}';
+    final cached = page == 1 ? ScreenCache.get<Paged<Customer>>(key) : null;
+    if (cached != null) {
+      fillFromCache(setState, () {
+        _items = cached.items;
+        _total = cached.total;
+        _page = 1;
+        _loaded = true;
+      });
+    }
     try {
       final p = await widget.api.list(q: _q.text, page: page);
+      if (page == 1) ScreenCache.put(key, p);
       if (!mounted || n != _seq) return;
       setState(() {
         _items = page == 1 ? p.items : [..._items, ...p.items];

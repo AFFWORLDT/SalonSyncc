@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/screen_cache.dart';
 import '../../core/ui/avatar.dart';
 import '../../core/theme/scale.dart';
 import '../../core/ui/stats.dart';
@@ -48,12 +49,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   Future<void> _load() async {
     final n = ++_seq;
+    final key = 'expenses|${widget.me.org.slug}|$_company|$_month|$_barber';
     try {
       if (_company) {
+        final cached = ScreenCache.get<List<CompanyExpense>>(key);
+        if (cached != null) fillFromCache(setState, () => _companyRows = cached);
         final l = await widget.api.company(_month);
+        ScreenCache.put(key, l);
         if (mounted && n == _seq) setState(() { _companyRows = l; _error = null; });
       } else {
+        final cached = ScreenCache.get<List<Expense>>(key);
+        if (cached != null) fillFromCache(setState, () => _barberRows = cached);
         final l = await widget.api.barber(_month, barberId: _barber);
+        ScreenCache.put(key, l);
         if (mounted && n == _seq) setState(() { _barberRows = l; _error = null; });
       }
     } catch (e) {

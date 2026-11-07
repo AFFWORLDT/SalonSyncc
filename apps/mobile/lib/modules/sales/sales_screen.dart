@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/screen_cache.dart';
 import '../../core/theme/scale.dart';
 import '../../core/ui/stats.dart';
 import '../../core/ui/heading.dart';
@@ -73,8 +74,18 @@ class _SalesScreenState extends State<SalesScreen> {
 
   Future<void> _load({int page = 1}) async {
     final n = ++_seq;
+    final key = 'sales|${widget.me.org.slug}|$_day|$_barber|$_payment';
+    final cached = page == 1 ? ScreenCache.get<Paged<Sale>>(key) : null;
+    if (cached != null) {
+      fillFromCache(setState, () {
+        _last = cached;
+        _items = cached.items;
+        _page = 1;
+      });
+    }
     try {
       final p = await widget.sales.search(day: _day, barberId: _barber, payment: _payment, page: page, pageSize: kSalesPage);
+      if (page == 1) ScreenCache.put(key, p);
       if (!mounted || n != _seq) return;
       setState(() {
         _last = p;

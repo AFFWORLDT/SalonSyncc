@@ -85,16 +85,33 @@ void main() {
     expect(find.text('Head massage added'), findsOneWidget);
   });
 
-  testWidgets('delete asks, then deletes', (t) async {
+  testWidgets('delete goes at once with Undo; the server hears only after the toast', (t) async {
     final a = await pump(t);
     await t.tap(find.byTooltip('Actions for Haircut'));
     await t.pumpAndSettle();
     await t.tap(find.text('Delete'));
-    await t.pumpAndSettle();
-    expect(find.text('Delete Haircut?'), findsOneWidget);
-    await t.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await t.pump();
+    expect(find.text('Haircut deleted. Old bills keep it.'), findsOneWidget);
+    expect(find.byTooltip('Actions for Haircut'), findsNothing); // gone from the list
+    expect(a.calls.where((c) => c.method == 'DELETE'), isEmpty); // not yet
+    await t.pump(const Duration(seconds: 6));
     await t.pumpAndSettle();
     expect(a.calls.where((c) => c.method == 'DELETE'), hasLength(1));
-    expect(find.text('Haircut deleted. Old bills keep it.'), findsOneWidget);
+  });
+
+  testWidgets('Undo keeps the service and never deletes it', (t) async {
+    final a = await pump(t);
+    await t.tap(find.byTooltip('Actions for Haircut'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Delete'));
+    // Let the menu finish closing and the toast slide in (well inside its 5 s).
+    for (var i = 0; i < 8; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    await t.tap(find.text('Undo'));
+    await t.pump(const Duration(seconds: 6));
+    await t.pumpAndSettle();
+    expect(find.byTooltip('Actions for Haircut'), findsOneWidget);
+    expect(a.calls.where((c) => c.method == 'DELETE'), isEmpty);
   });
 }

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:salonkit/core/screen_cache.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -22,7 +23,7 @@ Me owner({List<String>? features}) {
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
-    dashboardCache.clear();
+    ScreenCache.clear();
   });
 
   Future<FakeAdapter> pump(WidgetTester t, Me me, {Map<String, Handler> extra = const {}, Object? setup}) async {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:salonkit/core/screen_cache.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -38,7 +39,7 @@ Map<String, Handler> ok() => {
     };
 
 void main() {
-  setUp(todayCache.clear);
+  setUp(ScreenCache.clear);
   final barber = meWith(barber: true);
 
   testWidgets('skeleton while loading', (t) async {

@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../screen_cache.dart';
 import '../../models/brand.dart';
 import '../../models/me.dart';
 import '../api/api_client.dart';
@@ -125,6 +126,7 @@ class AuthController extends GetxController {
   void onUnauthorized() => _forget().then((_) => afterSignOut?.call());
 
   Future<void> _forget() async {
+    ScreenCache.clear(); // the next person must not see this one's numbers
     _token = null;
     _api = null;
     me.value = null;

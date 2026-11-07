@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -71,5 +72,22 @@ void main() {
     await t.pumpWidget(MaterialApp(home: Scaffold(body: BillsScreen(key: const ValueKey('empty'), me: owner, sales: SalesApi(client(e), owner.fmt), onOpen: (_) async {}, admin: true))));
     await t.pumpAndSettle();
     expect(find.text('No bills match.'), findsOneWidget);
+  });
+
+  testWidgets('opens again instantly with the last list while it refreshes (Stage D)', (t) async {
+    await pump(t);
+    expect(find.text('3 sales'), findsOneWidget);
+    // Leave, then come back to a server that hasn't answered yet: the last list shows at once.
+    await t.pumpWidget(const MaterialApp(home: SizedBox()));
+    final slow = Completer<Object?>();
+    final c = client(FakeAdapter({'GET /api/sales': (o) => slow.future, 'GET /api/users': (o) => raw('users.json')}));
+    await t.pumpWidget(MaterialApp(
+      home: Scaffold(body: SalesScreen(me: owner, sales: SalesApi(c, owner.fmt), staff: StaffApi(c), onOpen: (_) async {}, onNewSale: () async {})),
+    ));
+    await t.pump();
+    expect(find.text('3 sales'), findsOneWidget);
+    expect(find.byKey(const ValueKey('skeleton')), findsNothing);
+    slow.complete(raw('sales_admin_page.json'));
+    await t.pumpAndSettle();
   });
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/haptics.dart';
+import '../../core/screen_cache.dart';
 import '../../core/theme/scale.dart';
 import '../../core/ui/stats.dart';
 import '../../core/ui/toast.dart';
@@ -34,8 +36,12 @@ class _ServicesScreenState extends State<ServicesScreen> {
   }
 
   Future<void> _load() async {
+    final key = 'services|${widget.me.org.slug}';
+    final cached = ScreenCache.get<List<Service>>(key);
+    if (cached != null && _all == null) fillFromCache(setState, () => _all = cached);
     try {
       final l = await widget.api.all();
+      ScreenCache.put(key, l);
       if (mounted) {
         setState(() {
           _all = l;
@@ -69,26 +75,31 @@ class _ServicesScreenState extends State<ServicesScreen> {
     _load();
   }
 
+  /// Services deleted a moment ago, hidden while their Undo is on screen.
+  final _hidden = <int>{};
+
+  /// Deletes with Undo instead of a question: the row goes at once, the server is told after the toast (5 s) unless
+  /// Undo was tapped. Old bills keep the name and price either way.
   Future<void> _delete(Service s) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: Text('Delete ${s.name}?'),
-        content: const Text('It disappears from new sales. Bills already made keep the name and price they had. To keep it for later, hide it instead.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(style: FilledButton.styleFrom(backgroundColor: Theme.of(c).colorScheme.error), onPressed: () => Navigator.pop(c, true), child: const Text('Delete')),
-        ],
-      ),
-    );
-    if (ok != true) return;
+    Haptic.warning();
+    setState(() => _hidden.add(s.id));
+    var undone = false;
+    showSkToast(context, '${s.name} deleted. Old bills keep it.', onUndo: () {
+      undone = true;
+      if (mounted) setState(() => _hidden.remove(s.id));
+    });
+    await Future<void>.delayed(const Duration(seconds: 5));
+    if (undone) return;
     try {
       await widget.api.delete(s.id);
-      _toast('${s.name} deleted. Old bills keep it.');
     } catch (e) {
-      _toast(messageOf(e));
+      if (mounted) {
+        setState(() => _hidden.remove(s.id));
+        showSkToast(context, messageOf(e), kind: ToastKind.error);
+      }
     }
-    _load();
+    if (mounted) await _load();
+    if (mounted) setState(() => _hidden.remove(s.id));
   }
 
   Future<void> _starter() async {
@@ -110,7 +121,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
     final all = _all;
     final groups = <String, List<Service>>{};
     for (final s in all ?? const <Service>[]) {
-      (groups[s.category] ??= []).add(s);
+      if (!_hidden.contains(s.id)) (groups[s.category] ??= []).add(s);
     }
     for (final l in groups.values) {
       l.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));

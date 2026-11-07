@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../core/screen_cache.dart';
 import '../../core/ui/filter_chip_menu.dart';
 import '../../core/ui/search_field.dart';
 import '../../core/theme/scale.dart';
@@ -58,8 +59,18 @@ class _BillsScreenState extends State<BillsScreen> {
   /// Page 1 replaces the list (new search, day, refresh); later pages are added to it.
   Future<void> _load({int page = 1}) async {
     final n = ++_seq;
+    final key = 'bills|${widget.me.org.slug}|${widget.me.user.id}|${widget.admin}|${_q.text.trim()}|$_day';
+    final cached = page == 1 ? ScreenCache.get<Paged<Sale>>(key) : null;
+    if (cached != null) {
+      fillFromCache(setState, () {
+        _list = cached;
+        _items = cached.items;
+        _page = 1;
+      });
+    }
     try {
       final p = await widget.sales.search(q: _q.text, day: _day, page: page, pageSize: kBillsPage);
+      if (page == 1) ScreenCache.put(key, p);
       if (!mounted || n != _seq) return;
       setState(() {
         _page = page;

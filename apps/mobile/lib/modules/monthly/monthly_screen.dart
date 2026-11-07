@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../../core/screen_cache.dart';
 import '../../core/ui/avatar.dart';
 import '../../core/theme/scale.dart';
 import '../../core/ui/stats.dart';
@@ -55,8 +56,12 @@ class _MonthlyScreenState extends State<MonthlyScreen> {
 
   Future<void> _load() async {
     final n = ++_seq;
+    final key = 'monthly|${widget.me.org.slug}|$_year';
+    final cached = ScreenCache.get<MonthlyReport>(key);
+    if (cached != null) fillFromCache(setState, () => _r = cached);
     try {
       final r = await widget.api.year('$_year');
+      ScreenCache.put(key, r);
       if (mounted && n == _seq) {
         setState(() {
           _r = r;

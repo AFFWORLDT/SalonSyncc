@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../../core/screen_cache.dart';
 import '../../core/ui/form_sheet.dart';
 import '../../core/ui/toast.dart';
 import '../../core/ui/avatar.dart';
@@ -39,8 +40,12 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   Future<void> _load() async {
+    final key = 'staff|${widget.me.org.slug}';
+    final cached = ScreenCache.get<List<Staff>>(key);
+    if (cached != null && _all == null) fillFromCache(setState, () => _all = cached);
     try {
       final l = await widget.api.list();
+      ScreenCache.put(key, l);
       if (mounted) setState(() { _all = l; _error = null; });
     } catch (e) {
       if (mounted) setState(() => _error = e);
