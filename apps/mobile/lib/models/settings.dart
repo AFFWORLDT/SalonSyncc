@@ -18,6 +18,7 @@ class SalonSettings {
     this.address,
     this.phone,
     this.trn,
+    this.nameAr,
     required this.waReady,
     this.defaultCommissionPct = 0,
   });
@@ -32,7 +33,7 @@ class SalonSettings {
 
   /// Shortcut amounts for a bill, in major units.
   final List<num> quickAmounts;
-  final String? receiptFooter, logoUrl, address, phone, trn;
+  final String? receiptFooter, logoUrl, address, phone, trn, nameAr;
 
   factory SalonSettings.fromJson(Map<String, dynamic> j) {
     final q = j['quick_amounts'];
@@ -53,6 +54,7 @@ class SalonSettings {
       address: strOrNull(j, 'address'),
       phone: strOrNull(j, 'phone'),
       trn: strOrNull(j, 'trn'),
+      nameAr: strOrNull(j, 'salon_name_ar'),
       waReady: j['wa_ready'] == true,
       defaultCommissionPct: numOrNull(j, 'default_commission_pct') ?? 0,
     );

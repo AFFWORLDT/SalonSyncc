@@ -69,7 +69,7 @@ void main() {
     expect(find.text('BILL'), findsOneWidget);
     expect(find.text('Haircut'), findsOneWidget);
     expect(find.text('Hair oil'), findsOneWidget);
-    expect(find.text('E2E-20261104-001'), findsOneWidget);
+    expect(find.text('No: E2E-20261104-001', findRichText: true), findsOneWidget);
     expect(find.text('Total'), findsOneWidget);
     expect(find.textContaining('VAT'), findsNothing);
     expect(find.text('Thank you for visiting E2E Salon!'), findsOneWidget);

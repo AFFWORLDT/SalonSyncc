@@ -11,6 +11,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/theme/tokens.dart';
 import 'core/ui/background.dart';
+import 'core/ui/intro_overlay.dart';
 import 'core/ui/motion.dart';
 import 'modules/modules.dart';
 import 'shell/shell.dart';
@@ -20,8 +21,11 @@ typedef AppWrapper = Widget Function(BuildContext context, Widget child);
 final appWrappers = <AppWrapper>[];
 
 class SalonKitApp extends StatelessWidget {
-  const SalonKitApp({super.key, this.registry});
+  const SalonKitApp({super.key, this.registry, this.intro = false});
   final FeatureRegistry? registry;
+
+  /// Play the logo animation over the first screen (the real app; tests leave it off).
+  final bool intro;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +37,10 @@ class SalonKitApp extends StatelessWidget {
           theme: buildTheme(SkTokens.light, Brightness.light),
           darkTheme: buildTheme(SkTokens.dark, Brightness.dark),
           themeMode: theme.mode.value,
-          builder: (context, child) => appWrappers.fold(child ?? const SizedBox(), (w, wrap) => wrap(context, w)),
+          builder: (context, child) {
+            final app = appWrappers.fold(child ?? const SizedBox(), (w, wrap) => wrap(context, w));
+            return intro ? IntroOverlay(child: app) : app;
+          },
           home: _AuthGate(registry: reg),
         ));
   }

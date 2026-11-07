@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:intl/intl.dart';
+import 'package:timezone/data/latest_10y.dart' as tzdata;
+import 'package:timezone/timezone.dart' as tz;
 
 import '../../models/me.dart';
 import '../../models/settings.dart';
@@ -11,7 +13,8 @@ class Fmt {
   Fmt(SalonSettings s)
       : currency = s.currency,
         minor = s.currencyMinor,
-        digits = math.max(0, (math.log(s.currencyMinor) / math.ln10).round()) {
+        digits = math.max(0, (math.log(s.currencyMinor) / math.ln10).round()),
+        _tz = _location(s.timezone) {
     final loc = _locale(s.locale);
     _whole = NumberFormat.decimalPattern(loc)
       ..minimumFractionDigits = 0
@@ -24,6 +27,24 @@ class Fmt {
   final String currency;
   final int minor, digits;
   late final NumberFormat _whole, _frac;
+
+  /// The salon's time zone, so times read the same as on the web and the bill link (null: the phone's own).
+  final tz.Location? _tz;
+
+  static bool _tzReady = false;
+  static tz.Location? _location(String name) {
+    if (!_tzReady) {
+      tzdata.initializeTimeZones();
+      _tzReady = true;
+    }
+    try {
+      return tz.getLocation(name);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  DateTime _at(int ms) => _tz == null ? DateTime.fromMillisecondsSinceEpoch(ms) : tz.TZDateTime.fromMillisecondsSinceEpoch(_tz, ms);
 
   static const maxMajor = 1000000;
 
@@ -69,8 +90,11 @@ class Fmt {
   /// "October 2026" from "2026-10".
   String monthLabel(String ym) => DateFormat('MMMM y', 'en_US').format(_day('$ym-01'));
 
-  /// "14:05" in the phone's time zone.
-  String time(int ms) => DateFormat('HH:mm', 'en_US').format(DateTime.fromMillisecondsSinceEpoch(ms));
+  /// "14:05" in the salon's time zone.
+  String time(int ms) => DateFormat('HH:mm', 'en_US').format(_at(ms));
+
+  /// "7 Nov 2026, 22:03" in the salon's time zone (web: dateTimeLabel).
+  String dateTime(int ms) => DateFormat('d MMM y, HH:mm', 'en_US').format(_at(ms));
 
   /// "050 123 4567" for a local 05XXXXXXXX number; anything else unchanged.
   String phone(String p) =>

@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/auth/auth_controller.dart';
 import '../../core/format/fmt.dart';
 import '../../core/share/bill_share.dart';
+import '../../core/ui/haptics.dart';
 import '../../core/ui/states.dart';
 import '../../data/sales_api.dart';
 import '../../models/me.dart';
@@ -62,6 +63,7 @@ class _ShareButtonsState extends State<ShareButtons> {
 
   Future<void> _send() async {
     if (_sending) return;
+    Haptic.tap();
     setState(() => _sending = true);
     try {
       final s = await widget.sales.sendWhatsApp(widget.sale.id);
@@ -89,7 +91,10 @@ class _ShareButtonsState extends State<ShareButtons> {
       Row(children: [
         Expanded(
           child: FilledButton.tonalIcon(
-            onPressed: () => widget.open(b.whatsAppLink(s)),
+            onPressed: () {
+              Haptic.tap();
+              widget.open(b.whatsAppLink(s));
+            },
             icon: const Icon(Icons.chat_outlined),
             label: const Text('WhatsApp'),
           ),
@@ -97,7 +102,10 @@ class _ShareButtonsState extends State<ShareButtons> {
         const SizedBox(width: 10),
         Expanded(
           child: FilledButton.tonalIcon(
-            onPressed: () => widget.share(b.shareText(s), b.shareTitle(s)),
+            onPressed: () {
+              Haptic.tap();
+              widget.share(b.shareText(s), b.shareTitle(s));
+            },
             icon: const Icon(Icons.ios_share_rounded),
             label: const Text('Share link'),
           ),

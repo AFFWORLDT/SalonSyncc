@@ -45,6 +45,12 @@ class StaffApi {
   Future<StaffDeleted> delete(int id) =>
       api.delete('/api/users/$id', (j) => j is Map && j['deactivated'] == true ? StaffDeleted.deactivated : StaffDeleted.deleted);
 
+  /// Sets a staff member's photo (JPEG / PNG / WebP, max 200 KB); returns its new URL.
+  Future<String?> setPhoto(int id, List<int> bytes, String type) =>
+      api.putBytes('/api/users/$id/avatar', bytes, type, (j) => j is Map ? j['avatar_url'] as String? : null);
+
+  Future<void> clearPhoto(int id) => api.delete('/api/users/$id/avatar', (_) {});
+
   static Staff _one(Object? j) => Staff.fromJson(j as Map<String, dynamic>);
 
   static Future<T> _limit<T>(Future<T> Function() call) async {

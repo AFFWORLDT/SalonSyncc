@@ -46,10 +46,12 @@ class _BillScreenState extends State<BillScreen> {
           title: Text(_sale.billNo),
           actions: [if (_canEdit) TextButton.icon(onPressed: _edit, icon: const Icon(Icons.edit_outlined), label: const Text('Edit'))],
         ),
-        body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-          BillView(sale: _sale, settings: widget.me.salon, fmt: widget.me.fmt),
-          const SizedBox(height: 16),
-          shareActionsFor(context, _sale),
+        body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+          BillView(sale: _sale, settings: widget.me.salon, fmt: widget.me.fmt, slug: widget.me.org.slug),
         ]),
+        // Sharing stays under the thumb, however long the bill is.
+        bottomNavigationBar: SafeArea(
+          child: Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 12), child: shareActionsFor(context, _sale)),
+        ),
       );
 }

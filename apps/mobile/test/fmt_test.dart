@@ -48,6 +48,16 @@ void main() {
     expect(aed.num(0, dash: true), '–');
   });
 
+  test('times are in the salon\'s time zone, not the phone\'s', () {
+    // 2026-11-07 18:03 UTC is 22:03 in Dubai (the bill link shows the same).
+    final ms = DateTime.utc(2026, 11, 7, 18, 3).millisecondsSinceEpoch;
+    final dubai = Fmt(SalonSettings.fromJson({...fx('me_barber.json')['settings'] as Map<String, dynamic>, 'timezone': 'Asia/Dubai'}));
+    expect(dubai.time(ms), '22:03');
+    expect(dubai.dateTime(ms), '7 Nov 2026, 22:03');
+    final kolkata = Fmt(SalonSettings.fromJson({...fx('me_barber.json')['settings'] as Map<String, dynamic>, 'timezone': 'Asia/Kolkata'}));
+    expect(kolkata.time(ms), '23:33');
+  });
+
   test('day labels', () {
     expect(aed.dayLabel('2026-10-21'), 'Wed 21 Oct');
     expect(aed.dateLabel('2026-10-21'), '21 Oct 2026');

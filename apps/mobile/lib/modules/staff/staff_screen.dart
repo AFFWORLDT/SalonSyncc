@@ -1,7 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../core/format/fmt.dart';
 import '../../core/ui/glass.dart';
+import '../../core/ui/haptics.dart';
+import '../../core/ui/photo_pick.dart';
 import '../../core/ui/salon_logo.dart';
 import '../../core/ui/states.dart';
 import '../../data/staff_api.dart';
@@ -210,6 +214,13 @@ class _StaffFormState extends State<_StaffForm> {
   bool _userTouched = false, _busy = false;
   String? _error;
 
+  /// A photo picked in this form (sent on Save), or the current one removed.
+  PickedPhoto? _photo;
+  bool _removePhoto = false;
+
+  /// The owner's photo is only theirs to change.
+  bool get _canPhoto => !(s?.isOwner ?? false) || s!.id == widget.me.user.id;
+
   @override
   void initState() {
     super.initState();
@@ -242,18 +253,81 @@ class _StaffFormState extends State<_StaffForm> {
     );
     setState(() { _busy = true; _error = null; });
     try {
-      if (s == null) {
-        await widget.api.create(f, password: _pass.text);
-        if (mounted) Navigator.pop(context, '${f.name.trim()} added. Share the username and password with them.');
-      } else {
-        await widget.api.update(s!.id, f, active: s!.active);
-        if (mounted) Navigator.pop(context, 'Saved');
-      }
+      final saved = s == null ? await widget.api.create(f, password: _pass.text) : await widget.api.update(s!.id, f, active: s!.active);
+      final photoNote = await _savePhoto(saved.id);
+      if (!mounted) return;
+      Haptic.success();
+      Navigator.pop(context, s == null ? '${f.name.trim()} added. Share the username and password with them.$photoNote' : 'Saved$photoNote');
     } on StaffLimit {
       if (mounted) setState(() { _busy = false; _error = widget.limitText; });
     } catch (e) {
       if (mounted) setState(() { _busy = false; _error = messageOf(e); });
     }
+  }
+
+  /// Uploads or removes the photo after the details are saved; a failure here doesn't undo them, it's only reported.
+  Future<String> _savePhoto(int id) async {
+    try {
+      if (_photo != null) {
+        await widget.api.setPhoto(id, _photo!.$1, _photo!.$2);
+      } else if (_removePhoto) {
+        await widget.api.clearPhoto(id);
+      }
+      return '';
+    } catch (e) {
+      return ' (photo not saved: ${messageOf(e)})';
+    }
+  }
+
+  Future<void> _pickPhoto() async {
+    Haptic.tap();
+    final has = _photo != null || (!_removePhoto && s?.avatarUrl != null);
+    final c = await choosePhoto(context, hasPhoto: has);
+    if (!mounted || c == null) return;
+    setState(() => switch (c) {
+          NewPhoto(:final photo) => (_photo = photo, _removePhoto = false),
+          RemovePhoto() => (_photo = null, _removePhoto = s?.avatarUrl != null),
+        });
+  }
+
+  Widget _photoRow(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    const size = 72.0;
+    final name = _name.text.trim().isEmpty ? (s?.name ?? '') : _name.text.trim();
+    final Widget face = _photo != null
+        ? ClipRRect(borderRadius: BorderRadius.circular(size * 0.28), child: Image.memory(Uint8List.fromList(_photo!.$1), width: size, height: size, fit: BoxFit.cover))
+        : SalonLogo(slug: widget.me.org.slug, name: name, logoUrl: _removePhoto ? null : s?.avatarUrl, size: size);
+    final has = _photo != null || (!_removePhoto && s?.avatarUrl != null);
+    return Row(children: [
+      InkWell(
+        key: const ValueKey('st-photo'),
+        onTap: _busy ? null : _pickPhoto,
+        borderRadius: BorderRadius.circular(size * 0.28),
+        child: Stack(clipBehavior: Clip.none, children: [
+          face,
+          Positioned(
+            right: -4,
+            bottom: -4,
+            child: Container(
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(color: cs.primary, shape: BoxShape.circle, border: Border.all(color: cs.surface, width: 2)),
+              child: Icon(Icons.photo_camera_rounded, size: 14, color: cs.onPrimary),
+            ),
+          ),
+        ]),
+      ),
+      const SizedBox(width: 16),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          TextButton(
+            style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+            onPressed: _busy ? null : _pickPhoto,
+            child: Text(has ? 'Change photo' : 'Add photo'),
+          ),
+          Text('Shown on the sale screen and the team list', style: Theme.of(context).textTheme.bodySmall),
+        ]),
+      ),
+    ]);
   }
 
   @override
@@ -267,7 +341,8 @@ class _StaffFormState extends State<_StaffForm> {
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text(s == null ? 'Add barber' : 'Edit ${s!.name}', style: t.titleLarge),
           Text(s == null ? 'They sign in with this username and password.' : 'Password is changed with “Reset password”.', style: t.bodySmall),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+          if (_canPhoto) ...[_photoRow(context), const SizedBox(height: 16)],
           TextField(key: const ValueKey('st-name'), controller: _name, textCapitalization: TextCapitalization.words, decoration: dec('Name')),
           const SizedBox(height: 10),
           TextField(

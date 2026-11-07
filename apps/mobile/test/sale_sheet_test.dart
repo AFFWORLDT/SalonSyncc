@@ -31,35 +31,61 @@ Future<void> toCustomer(WidgetTester t) async {
 
 List<dynamic> posts(FakeAdapter a) => a.calls.where((c) => c.method == 'POST').toList();
 
+/// A phone-sized screen (360×800), like the devices the sheet is made for.
+Future<void> pumpHost(WidgetTester t, Widget w) async {
+  t.view.physicalSize = const Size(1080, 2400);
+  t.view.devicePixelRatio = 3;
+  addTearDown(t.view.reset);
+  await t.pumpWidget(w);
+}
+
+/// Types on the sheet's number pad.
+Future<void> typeAmount(WidgetTester t, String v) async {
+  for (final c in v.split('')) {
+    await t.tap(find.byKey(ValueKey('pad-$c')));
+    await t.pump();
+  }
+  await t.pumpAndSettle();
+}
+
+String totalText(WidgetTester t) => t.widget<Text>(find.byKey(const ValueKey('total'))).data!;
+
+/// Picks a barber; the sheet moves on to the services by itself.
+Future<void> pickBarber(WidgetTester t, String name) async {
+  await t.tap(find.text(name));
+  await t.pump(const Duration(milliseconds: 250));
+  await t.pumpAndSettle();
+}
+
 void main() {
   testWidgets('tapping a service twice makes qty 2 and the total follows', (t) async {
-    await t.pumpWidget(host(FakeAdapter(base())));
+    await pumpHost(t, host(FakeAdapter(base())));
     await t.pumpAndSettle();
-    await t.tap(find.widgetWithText(ActionChip, 'Haircut'));
+    await t.tap(find.byKey(const ValueKey('service-109')));
     await t.pump();
-    await t.tap(find.widgetWithText(ActionChip, 'Haircut'));
+    await t.tap(find.byKey(const ValueKey('service-109')));
     await t.pumpAndSettle();
-    expect(find.text('2'), findsOneWidget);
-    expect(find.text('Next · AED 80'), findsOneWidget);
+    expect(find.text('× 2 = AED 80'), findsOneWidget);
+    expect(totalText(t), 'AED 80');
     await t.tap(find.byKey(const ValueKey('minus-0')));
     await t.pumpAndSettle();
-    expect(find.text('Next · AED 40'), findsOneWidget);
+    expect(totalText(t), 'AED 40');
   });
 
   testWidgets('categories: chips of the chosen one', (t) async {
-    await t.pumpWidget(host(FakeAdapter(base())));
+    await pumpHost(t, host(FakeAdapter(base())));
     await t.pumpAndSettle();
-    expect(find.widgetWithText(ActionChip, 'Face mask'), findsNothing);
-    await t.tap(find.widgetWithText(ChoiceChip, 'Care'));
+    expect(find.text('Face mask'), findsNothing);
+    await t.tap(find.text('Care'));
     await t.pumpAndSettle();
-    expect(find.widgetWithText(ActionChip, 'Face mask'), findsOneWidget);
+    expect(find.text('Face mask'), findsOneWidget);
   });
 
   testWidgets('amount only, cash: saves and shows the bill', (t) async {
     final a = FakeAdapter({...base(), 'POST /api/sales': (o) => FakeReply(201, raw('sale_walkin.json'))});
-    await t.pumpWidget(host(a));
+    await pumpHost(t, host(a));
     await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('amount')), '25');
+    await typeAmount(t, '25');
     await t.pumpAndSettle();
     await toCustomer(t);
     await t.tap(find.text('Cash'));
@@ -71,29 +97,32 @@ void main() {
   });
 
   testWidgets('quick amounts fill the amount', (t) async {
-    await t.pumpWidget(host(FakeAdapter(base())));
+    await pumpHost(t, host(FakeAdapter(base())));
     await t.pumpAndSettle();
-    await t.tap(find.widgetWithText(ActionChip, '35'));
+    await t.tap(find.byKey(const ValueKey('quick-35')));
     await t.pumpAndSettle();
-    expect(find.text('Next · AED 35'), findsOneWidget);
+    expect(totalText(t), 'AED 35');
   });
 
   testWidgets('Next stays off until there is a total', (t) async {
-    await t.pumpWidget(host(FakeAdapter(base())));
+    await pumpHost(t, host(FakeAdapter(base())));
     await t.pumpAndSettle();
-    expect(t.widget<FilledButton>(find.byKey(const ValueKey('next'))).onPressed, isNull);
+    expect(t.widget<InkWell>(find.byKey(const ValueKey('next'))).onTap, isNull);
   });
 
   testWidgets('customer and phone are sent as the server stores them', (t) async {
     final a = FakeAdapter({...base(), 'POST /api/sales': (o) => FakeReply(201, raw('sale.json'))});
-    await t.pumpWidget(host(a));
+    await pumpHost(t, host(a));
     await t.pumpAndSettle();
-    await t.tap(find.widgetWithText(ActionChip, 'Haircut'));
+    await t.tap(find.byKey(const ValueKey('service-109')));
     await t.pumpAndSettle();
     await toCustomer(t);
     await t.enterText(find.byKey(const ValueKey('customer-name')), 'Omar');
     await t.enterText(find.byKey(const ValueKey('customer-phone')), '0501234567');
     await t.tap(find.text('Card'));
+    await t.tap(find.text('More (note)'));
+    await t.pumpAndSettle();
+    await t.ensureVisible(find.byKey(const ValueKey('note')));
     await t.enterText(find.byKey(const ValueKey('note')), 'Regular');
     await t.tap(find.byKey(const ValueKey('save')));
     await t.pumpAndSettle();
@@ -110,9 +139,9 @@ void main() {
 
   testWidgets('a bad phone is caught before saving', (t) async {
     final a = FakeAdapter({...base(), 'POST /api/sales': (o) => FakeReply(201, raw('sale.json'))});
-    await t.pumpWidget(host(a));
+    await pumpHost(t, host(a));
     await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('amount')), '25');
+    await typeAmount(t, '25');
     await t.pumpAndSettle();
     await toCustomer(t);
     await t.enterText(find.byKey(const ValueKey('customer-phone')), '12');
@@ -124,9 +153,9 @@ void main() {
   });
 
   testWidgets('a suggestion fills name and phone', (t) async {
-    await t.pumpWidget(host(FakeAdapter(base())));
+    await pumpHost(t, host(FakeAdapter(base())));
     await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('amount')), '25');
+    await typeAmount(t, '25');
     await t.pumpAndSettle();
     await toCustomer(t);
     await t.tap(find.widgetWithText(ActionChip, 'Omar'));
@@ -138,9 +167,9 @@ void main() {
   testWidgets('double tap saves once', (t) async {
     final hold = Completer<Object?>();
     final a = FakeAdapter({...base(), 'POST /api/sales': (o) => hold.future});
-    await t.pumpWidget(host(a));
+    await pumpHost(t, host(a));
     await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('amount')), '25');
+    await typeAmount(t, '25');
     await t.pumpAndSettle();
     await toCustomer(t);
     await t.tap(find.text('Cash'));
@@ -154,9 +183,9 @@ void main() {
 
   testWidgets('a server error shows its text and keeps the input', (t) async {
     final a = FakeAdapter({...base(), 'POST /api/sales': (o) => FakeReply(400, raw('error_400.json'))});
-    await t.pumpWidget(host(a));
+    await pumpHost(t, host(a));
     await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('amount')), '25');
+    await typeAmount(t, '25');
     await t.pumpAndSettle();
     await toCustomer(t);
     await t.enterText(find.byKey(const ValueKey('customer-name')), 'Sam');
@@ -169,9 +198,9 @@ void main() {
 
   testWidgets('offline save says so and keeps the sheet', (t) async {
     final a = FakeAdapter({...base(), 'POST /api/sales': (o) => throw offline(o)});
-    await t.pumpWidget(host(a));
+    await pumpHost(t, host(a));
     await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('amount')), '25');
+    await typeAmount(t, '25');
     await t.pumpAndSettle();
     await toCustomer(t);
     await t.tap(find.text('Cash'));
@@ -188,9 +217,9 @@ void main() {
       'POST /api/sales': (o) => throw DioException(requestOptions: o, type: DioExceptionType.receiveTimeout),
       'GET /api/sales': (o) => {'items': [landed], 'total': 1, 'page': 1, 'page_size': 200, 'sum': 2500},
     });
-    await t.pumpWidget(host(a, now: () => landed['created_at'] as int));
+    await pumpHost(t, host(a, now: () => landed['created_at'] as int));
     await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('amount')), '25');
+    await typeAmount(t, '25');
     await t.pumpAndSettle();
     await toCustomer(t);
     await t.tap(find.text('Cash'));
@@ -211,9 +240,9 @@ void main() {
       'POST /api/sales': (o) => n++ == 0 ? throw DioException(requestOptions: o, type: DioExceptionType.receiveTimeout) : FakeReply(201, raw('sale_walkin.json')),
       'GET /api/sales': (o) => {'items': [], 'total': 0, 'page': 1, 'page_size': 200, 'sum': 0},
     });
-    await t.pumpWidget(host(a));
+    await pumpHost(t, host(a));
     await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('amount')), '25');
+    await typeAmount(t, '25');
     await t.pumpAndSettle();
     await toCustomer(t);
     await t.tap(find.text('Cash'));
@@ -230,10 +259,10 @@ void main() {
 
     testWidgets('prefills and saves with PUT', (t) async {
       final a = FakeAdapter({...base(), 'PUT /api/sales/17': (o) => raw('sale.json')});
-      await t.pumpWidget(host(a, edit: sale));
+      await pumpHost(t, host(a, edit: sale));
       await t.pumpAndSettle();
       expect(find.text('Edit E2E-20261104-001'), findsOneWidget);
-      expect(find.text('Next · AED 65'), findsOneWidget);
+      expect(totalText(t), 'AED 65');
       await toCustomer(t);
       expect(find.widgetWithText(TextField, 'Omar'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('save')));
@@ -251,7 +280,7 @@ void main() {
         ...base(),
         'PUT /api/sales/17': (o) => const FakeReply(409, {'error': 'This sale was changed by someone else. Reload and try again.', 'code': 'stale'}),
       });
-      await t.pumpWidget(host(a, edit: sale));
+      await pumpHost(t, host(a, edit: sale));
       await t.pumpAndSettle();
       await toCustomer(t);
       await t.enterText(find.byKey(const ValueKey('customer-name')), 'Omar K');
@@ -263,7 +292,7 @@ void main() {
 
     testWidgets('delete asks first, then deletes', (t) async {
       final a = FakeAdapter({...base(), 'DELETE /api/sales/17': (o) => {'ok': true}});
-      await t.pumpWidget(host(a, edit: sale));
+      await pumpHost(t, host(a, edit: sale));
       await t.pumpAndSettle();
       await t.tap(find.byTooltip('Delete bill'));
       await t.pumpAndSettle();

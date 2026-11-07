@@ -28,19 +28,42 @@ Map<String, Handler> base() => {
       'GET /api/users': (o) => raw('users.json'),
     };
 
+/// A phone-sized screen (360×800), like the devices the sheet is made for.
+Future<void> pumpHost(WidgetTester t, Widget w) async {
+  t.view.physicalSize = const Size(1080, 2400);
+  t.view.devicePixelRatio = 3;
+  addTearDown(t.view.reset);
+  await t.pumpWidget(w);
+}
+
+/// Types on the sheet's number pad.
+Future<void> typeAmount(WidgetTester t, String v) async {
+  for (final c in v.split('')) {
+    await t.tap(find.byKey(ValueKey('pad-$c')));
+    await t.pump();
+  }
+  await t.pumpAndSettle();
+}
+
+String totalText(WidgetTester t) => t.widget<Text>(find.byKey(const ValueKey('total'))).data!;
+
+/// Picks a barber; the sheet moves on to the services by itself.
+Future<void> pickBarber(WidgetTester t, String name) async {
+  await t.tap(find.text(name));
+  await t.pump(const Duration(milliseconds: 250));
+  await t.pumpAndSettle();
+}
+
 void main() {
   testWidgets('admin picks barber and day', (t) async {
     final a = FakeAdapter({...base(), 'POST /api/sales': (o) => FakeReply(201, raw('sale_admin.json'))});
-    await t.pumpWidget(host(a));
+    await pumpHost(t, host(a));
     await t.pumpAndSettle();
     expect(find.text('Who did this customer?'), findsOneWidget);
     expect(find.text('Owner ★'), findsOneWidget);
-    expect(t.widget<FilledButton>(find.byKey(const ValueKey('next'))).onPressed, isNull);
-    await t.tap(find.text('Barber Sam'));
-    await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('next')));
-    await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('amount')), '60');
+    expect(find.byKey(const ValueKey('next')), findsNothing);
+    await pickBarber(t, 'Barber Sam');
+    await typeAmount(t, '60');
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('next')));
     await t.pumpAndSettle();
@@ -69,13 +92,10 @@ void main() {
       'POST /api/sales': (o) => throw DioException(requestOptions: o, type: DioExceptionType.receiveTimeout),
       'GET /api/sales': (o) => {'items': [landed], 'total': 1, 'page': 1, 'page_size': 200, 'sum': 6000},
     });
-    await t.pumpWidget(host(a, now: () => landed['created_at'] as int));
+    await pumpHost(t, host(a, now: () => landed['created_at'] as int));
     await t.pumpAndSettle();
-    await t.tap(find.text('Barber Sam'));
-    await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('next')));
-    await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('amount')), '60');
+    await pickBarber(t, 'Barber Sam');
+    await typeAmount(t, '60');
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('next')));
     await t.pumpAndSettle();
@@ -90,13 +110,10 @@ void main() {
 
   testWidgets('today is not sent as a day', (t) async {
     final a = FakeAdapter({...base(), 'POST /api/sales': (o) => FakeReply(201, raw('sale_admin.json'))});
-    await t.pumpWidget(host(a));
+    await pumpHost(t, host(a));
     await t.pumpAndSettle();
-    await t.tap(find.text('Barber Ali'));
-    await t.pumpAndSettle();
-    await t.tap(find.byKey(const ValueKey('next')));
-    await t.pumpAndSettle();
-    await t.enterText(find.byKey(const ValueKey('amount')), '40');
+    await pickBarber(t, 'Barber Ali');
+    await typeAmount(t, '40');
     await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('next')));
     await t.pumpAndSettle();
@@ -111,15 +128,15 @@ void main() {
   testWidgets('admin edit: prefilled barber, change it, PUT carries it', (t) async {
     final sale = Sale.fromJson(raw('sale_admin.json') as Map<String, dynamic>);
     final a = FakeAdapter({...base(), 'PUT /api/sales/25': (o) => raw('sale_admin.json')});
-    await t.pumpWidget(host(a, edit: sale));
+    await pumpHost(t, host(a, edit: sale));
     await t.pumpAndSettle();
     expect(find.text('Edit E2E-20261104-002'), findsOneWidget);
-    await t.tap(find.text('Barber Ali'));
+    // Editing opens on the services; the barber is a tap away in the steps.
+    await t.tap(find.byKey(const ValueKey('tab-barber')));
     await t.pumpAndSettle();
-    for (var i = 0; i < 2; i++) {
-      await t.tap(find.byKey(const ValueKey('next')));
-      await t.pumpAndSettle();
-    }
+    await pickBarber(t, 'Barber Ali');
+    await t.tap(find.byKey(const ValueKey('next')));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const ValueKey('save')));
     await t.pumpAndSettle();
     final body = a.calls.singleWhere((c) => c.method == 'PUT').data as Map;

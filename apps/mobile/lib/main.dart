@@ -86,7 +86,7 @@ Future<void> run({bool crashReports = true}) async {
     });
   }
   await Future.wait([theme.load(), lock.load()]);
-  runApp(SalonKitApp(registry: registry));
+  runApp(SalonKitApp(registry: registry, intro: crashReports));
   // The splash stays until the version check is back, and at least 400 ms so it never flashes.
   await auth.boot(hold: Future.wait([update.check(), Future<void>.delayed(const Duration(milliseconds: 400))]));
 }
