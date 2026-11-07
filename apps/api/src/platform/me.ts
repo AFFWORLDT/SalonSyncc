@@ -6,7 +6,7 @@ import { issueSession } from "../core/session";
 import { LOGIN_WINDOW_MS, isLocked, loginLimits } from "../lib/limits";
 import { businessDay } from "../lib/clock";
 import { clockOf, settingsRepo, withWaReady } from "../data/tenant";
-import { avatarUrl } from "../data/tenant/users";
+import { avatarUrl, bannerUrl } from "../data/tenant/users";
 
 /** Registers /me routes on the tenant router. Auth, origin and write guards come from the router-level tenantGuard; do not add them here. */
 export function registerMe(tenantApi: App): void {
@@ -21,6 +21,7 @@ export function registerMe(tenantApi: App): void {
         role: user.role,
         commission_pct: user.commission_pct,
         avatar_url: avatarUrl(user.id, user.avatar_v, org.slug),
+        banner_url: bannerUrl(user.id, user.banner_v, org.slug),
         can_add_expense: !!user.can_add_expense,
       },
       org: { id: org.id, slug: org.slug, name: org.name, status: org.status, planId: org.planId },

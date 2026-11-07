@@ -11,11 +11,12 @@ import 'bill_view.dart';
 /// "Congrats! Bill generated": a success banner, the bill itself (as the customer gets it), sharing (when given),
 /// and Done / New sale pinned at the bottom.
 class SaleDone extends StatelessWidget {
-  const SaleDone({super.key, required this.sale, required this.fmt, required this.settings, this.slug, this.actions, required this.onDone, required this.onNew});
+  const SaleDone({super.key, required this.sale, required this.fmt, required this.settings, this.slug, this.onFillDetails, this.actions, required this.onDone, required this.onNew});
   final Sale sale;
   final Fmt fmt;
   final SalonSettings settings;
   final String? slug;
+  final VoidCallback? onFillDetails;
   final Widget? actions;
   final VoidCallback onDone, onNew;
 
@@ -53,7 +54,7 @@ class SaleDone extends StatelessWidget {
             ]),
           ),
           const SizedBox(height: 14),
-          BillView(sale: sale, settings: settings, fmt: fmt, slug: slug),
+          BillView(sale: sale, settings: settings, fmt: fmt, slug: slug, onFillDetails: onFillDetails),
           if (actions != null) ...[const SizedBox(height: 14), actions!],
         ]),
       ),

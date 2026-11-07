@@ -88,4 +88,15 @@ void main() {
     await t.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: BillView(sale: noPhone, settings: s, fmt: Fmt(s))))));
     expect(find.text('Salon service'), findsOneWidget);
   });
+
+  testWidgets('admins see "+ Add" for missing salon details; customers never do', (t) async {
+    var opened = 0;
+    await t.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: BillView(sale: noPhone, settings: s, fmt: Fmt(s), onFillDetails: () => opened++)))));
+    expect(find.text('Add your salon address'), findsOneWidget);
+    expect(find.text('Add your salon phone'), findsOneWidget);
+    await t.tap(find.text('Add your salon address'));
+    expect(opened, 1);
+    await t.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: BillView(sale: noPhone, settings: s, fmt: Fmt(s))))));
+    expect(find.text('Add your salon address'), findsNothing);
+  });
 }

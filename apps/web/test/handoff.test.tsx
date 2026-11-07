@@ -66,17 +66,17 @@ describe("setup checklist", () => {
       vi.fn(async (url: RequestInfo | URL) => new Response(JSON.stringify(String(url) === "/api/me" ? meFixture({ role: "owner", features: ["core_sales", "ratings"], slug: `s${Math.random()}` }) : setup)))
     );
   it("lists what is left", async () => {
-    serve({ logo: true, services: false, staff: false, vat: false, google_review: false });
+    serve({ logo: true, services: false, staff: false, vat: false, google_review: false, details: false });
     render(
       <AuthProvider>
         <SetupChecklist />
       </AuthProvider>
     );
     expect(await screen.findByTestId("setup-checklist")).toBeTruthy();
-    expect(screen.getByText("1 of 5 done")).toBeTruthy();
+    expect(screen.getByText("1 of 6 done")).toBeTruthy();
   });
   it("disappears when everything is done", async () => {
-    serve({ logo: true, services: true, staff: true, vat: true, google_review: true });
+    serve({ logo: true, services: true, staff: true, vat: true, google_review: true, details: true });
     render(
       <AuthProvider>
         <SetupChecklist />

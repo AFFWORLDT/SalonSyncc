@@ -205,13 +205,31 @@ describe("avatars", () => {
     expect((await pub(`/avatar/${owner.id}/2?org=st-av`)).status).toBe(404);
   });
 
-  it("rejects over 200 KB, empty and wrong types", async () => {
+  it("rejects over 300 KB, empty and wrong types", async () => {
     const { ck } = await setup("st-av2");
-    expect((await put("/me/avatar", ck, png(200 * 1024 + 1))).status).toBe(400);
-    expect((await put("/me/avatar", ck, png(200 * 1024))).status).toBe(200);
+    expect((await put("/me/avatar", ck, png(300 * 1024 + 1))).status).toBe(400);
+    expect((await put("/me/avatar", ck, png(300 * 1024))).status).toBe(200);
     expect((await put("/me/avatar", ck, png(0))).status).toBe(400);
     expect((await put("/me/avatar", ck, png(10), "image/gif")).status).toBe(400);
     expect((await put("/me/avatar", ck, png(10), "text/html")).status).toBe(400);
+  });
+
+  it("my banner: uploads, shows in /me, serves publicly, clears", async () => {
+    const { owner, ck } = await setup("st-bn");
+    const r = await put("/me/banner", ck, png(120));
+    expect(r.status).toBe(200);
+    const { banner_url } = (await r.json()) as any;
+    expect(banner_url).toBe(`/api/public/banner/${owner.id}/1?org=st-bn`);
+    const me: any = await (await call("GET", "/me", ck)).json();
+    expect(me.user.banner_url).toBe(banner_url);
+    const img = await pub(banner_url.replace("/api/public", ""));
+    expect(img.status).toBe(200);
+    expect(new Uint8Array(await img.arrayBuffer())).toEqual(png(120));
+    expect((await put("/me/banner", ck, png(300 * 1024 + 1))).status).toBe(400);
+    expect((await put("/me/banner", ck, png(10), "image/gif")).status).toBe(400);
+    expect(((await (await call("DELETE", "/me/banner", ck)).json()) as any).banner_url).toBeNull();
+    expect((await pub(`/banner/${owner.id}/1?org=st-bn`)).status).toBe(404);
+    expect(((await (await call("GET", "/me", ck)).json()) as any).user.banner_url).toBeNull();
   });
 
   it("admin sets another user's avatar; barbers can't", async () => {
@@ -237,7 +255,7 @@ describe("avatars", () => {
     const { ck } = await setup("st-av5");
     const r = await put("/me/avatar", ck, png(10), "image/png");
     expect(r.status).toBe(200);
-    const big = await call("PUT", "/me/avatar", ck, png(10), { "content-type": "image/png", "content-length": String(300 * 1024) });
+    const big = await call("PUT", "/me/avatar", ck, png(10), { "content-type": "image/png", "content-length": String(300 * 1024 + 1) });
     expect(big.status).toBe(400);
   });
 

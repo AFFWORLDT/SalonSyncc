@@ -14,11 +14,13 @@ export interface SetupStatus {
   staff: boolean;
   vat: boolean;
   google_review: boolean;
+  details: boolean;
 }
 
 /** The checklist steps, each linked to where it is done. */
 export const SETUP_STEPS: { key: keyof SetupStatus; label: string; href: string; feature?: "ratings" }[] = [
   { key: "logo", label: "Upload your salon logo", href: "/settings/" },
+  { key: "details", label: "Add your salon address and phone", href: "/settings/" },
   { key: "services", label: "Add your services and prices", href: "/services/" },
   { key: "staff", label: "Add your staff", href: "/barbers/" },
   { key: "vat", label: "Set up VAT on bills", href: "/settings/" },

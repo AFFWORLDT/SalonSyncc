@@ -1,4 +1,5 @@
 import 'package:animations/animations.dart';
+import '../core/ui/tour.dart';
 import '../core/ui/toast.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -143,7 +144,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
                   if (i != index) HapticFeedback.selectionClick();
                   setState(() => _tab = ids[i]);
                 },
-                destinations: [for (final m in tabs) NavigationDestination(icon: _Badged(icon: m.icon, counts: [?m.badge]), label: m.title)],
+                destinations: [for (final m in tabs) NavigationDestination(icon: tourTarget('tab-${m.id}', _Badged(icon: m.icon, counts: [?m.badge])), label: m.title)],
               ),
       );
     });

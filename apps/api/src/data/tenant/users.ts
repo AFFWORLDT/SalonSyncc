@@ -37,6 +37,11 @@ const COLS =
  * avatar_v only ever grows: positive = a photo at that version, zero or negative = cleared (clearAvatar negates it), so a
  * re-upload after a clear never reuses an immutable URL. `slug` is needed on workers.dev (no tenant host).
  */
+/** The banner's public URL at version `v`, or null when there is none. */
+export function bannerUrl(id: number, v: number | null | undefined, slug: string): string | null {
+  return v && v > 0 ? `/api/public/banner/${id}/${v}?org=${encodeURIComponent(slug)}` : null;
+}
+
 export function avatarUrl(id: number, v: number | null | undefined, slug: string, active: boolean | number = true): string | null {
   return v && v > 0 && active ? `/api/public/avatar/${id}/${v}?org=${encodeURIComponent(slug)}` : null;
 }
@@ -219,6 +224,27 @@ export function usersRepo(db: D1Database, orgId: string) {
     },
     async clearAvatar(id: number): Promise<void> {
       await db.prepare("UPDATE users SET avatar = NULL, avatar_type = NULL, avatar_v = -(abs(avatar_v) + 1), updated_at = ? WHERE org_id = ? AND id = ?").bind(Date.now(), orgId, id).run();
+    },
+    /** Stores a profile banner and returns the new version, or null when the user isn't in this org. */
+    async setBanner(id: number, bytes: ArrayBuffer, type: string): Promise<number | null> {
+      const r = await db
+        .prepare("UPDATE users SET banner = ?, banner_type = ?, banner_v = abs(banner_v) + 1, updated_at = ? WHERE org_id = ? AND id = ? RETURNING banner_v")
+        .bind(bytes, type, Date.now(), orgId, id)
+        .first<{ banner_v: number }>();
+      return r?.banner_v ?? null;
+    },
+    async clearBanner(id: number): Promise<void> {
+      await db.prepare("UPDATE users SET banner = NULL, banner_type = NULL, banner_v = -(abs(banner_v) + 1), updated_at = ? WHERE org_id = ? AND id = ?").bind(Date.now(), orgId, id).run();
+    },
+    /** The banner of an active user of this org at version `v`; null otherwise. */
+    async banner(id: number, v: number): Promise<{ bytes: Uint8Array; type: string } | null> {
+      const r = await db
+        .prepare("SELECT banner, banner_type FROM users WHERE org_id = ? AND id = ? AND banner_v = ? AND active = 1 AND banner IS NOT NULL")
+        .bind(orgId, id, v)
+        .first<{ banner: ArrayBuffer | number[]; banner_type: string | null }>();
+      if (!r) return null;
+      const bytes = r.banner instanceof ArrayBuffer ? new Uint8Array(r.banner) : new Uint8Array(r.banner as number[]);
+      return { bytes, type: r.banner_type ?? "application/octet-stream" };
     },
     /** The photo of an active user of this org at version `v` (its current avatar_v); null otherwise. */
     async avatar(id: number, v: number): Promise<{ bytes: Uint8Array; type: string } | null> {

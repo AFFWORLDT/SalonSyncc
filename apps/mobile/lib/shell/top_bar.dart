@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/ui/tour.dart';
 import '../core/ui/avatar.dart';
 import 'package:flutter/material.dart';
 
@@ -42,7 +43,7 @@ class SkTopBar extends StatelessWidget {
         icon('Search', Icons.search_rounded, onSearch, const ValueKey('top-search')),
         icon('SalonKit AI', Icons.auto_awesome_outlined, onAi, const ValueKey('top-ai')),
         const SizedBox(width: 2),
-        InkResponse(
+        tourTarget('profile', InkResponse(
           key: const ValueKey('top-profile'),
           radius: 24,
           onTap: () {
@@ -61,7 +62,7 @@ class SkTopBar extends StatelessWidget {
                     },
                   ),
           ),
-        ),
+        )),
       ]),
     );
   }

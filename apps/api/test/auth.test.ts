@@ -198,6 +198,7 @@ describe("auth", () => {
       "POST /api/public/feedback/:token",
       "GET /api/public/review/:token",
       "GET /api/public/avatar/:id/:v",
+      "GET /api/public/banner/:id/:v",
       "GET /api/public/services",
       "OPTIONS /api/public/services",
       "GET /api/public/logo/:v",

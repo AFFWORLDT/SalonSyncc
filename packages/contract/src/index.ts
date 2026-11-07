@@ -46,7 +46,8 @@
  *
  * Photos (stored in D1)
  *   GET    /api/public/avatar/:id/:v  image bytes (no sign-in; org from host, or ?org=<slug> on workers.dev; immutable)
- *   PUT    /api/me/avatar             body = image (webp/jpeg/png, max 200 KB)  -> { avatar_url }
+ *   PUT    /api/me/avatar             body = image (webp/jpeg/png, max 300 KB)  -> { avatar_url }
+ *   PUT    /api/me/banner             body = image (webp/jpeg/png, max 300 KB)  -> { banner_url }  (DELETE clears it)
  *   PUT    /api/users/:id/avatar      admin, same body
  *   DELETE /api/me/avatar | /api/users/:id/avatar
  */
@@ -62,6 +63,7 @@ export interface MeUser {
   role: Role;
   commission_pct: number | null; // percent; null = the salon default
   avatar_url: string | null;
+  banner_url: string | null; // the banner behind the photo on the profile
   can_add_expense: boolean;
 }
 

@@ -14,13 +14,17 @@ const _faint = Color(0x4D000000);
 /// salon header, bill details, a Service / Qty / Price / Amount table, totals with VAT inside the total, and the footer.
 /// Always dark on white, like paper, in the mono face.
 class BillView extends StatelessWidget {
-  const BillView({super.key, required this.sale, required this.settings, required this.fmt, this.slug});
+  const BillView({super.key, required this.sale, required this.settings, required this.fmt, this.slug, this.onFillDetails});
   final Sale sale;
   final SalonSettings settings;
   final Fmt fmt;
 
   /// The salon's slug, to load its uploaded logo; without it (or a logo) the SalonKit mark shows.
   final String? slug;
+
+  /// Admins only: missing salon details show as tappable "+ Add …" lines that open Settings. Customers never see
+  /// these (the bill link and PDF are drawn by the server).
+  final VoidCallback? onFillDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -69,12 +73,22 @@ class BillView extends StatelessWidget {
         style: base,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           // Header
-          Center(child: _BillLogo(slug: slug, logoUrl: settings.logoUrl)),
+          Center(
+            child: onFillDetails != null && settings.logoUrl == null
+                ? _Missing(label: 'Add logo', onTap: onFillDetails!, circle: true)
+                : _BillLogo(slug: slug, logoUrl: settings.logoUrl),
+          ),
           const SizedBox(height: 10),
           Text(name, textAlign: TextAlign.center, style: sans),
           if ((settings.nameAr ?? '').isNotEmpty) Text(settings.nameAr!, textAlign: TextAlign.center, textDirection: TextDirection.rtl, style: sans.copyWith(fontSize: 14, fontWeight: FontWeight.w500)),
-          if ((settings.address ?? '').isNotEmpty) Text(settings.address!, textAlign: TextAlign.center, style: base.copyWith(fontSize: 11)),
-          if ((settings.phone ?? '').isNotEmpty) Text('Phone: ${fmt.phone(settings.phone!)}', textAlign: TextAlign.center, style: base.copyWith(fontSize: 11)),
+          if ((settings.address ?? '').isNotEmpty)
+            Text(settings.address!, textAlign: TextAlign.center, style: base.copyWith(fontSize: 11))
+          else if (onFillDetails != null)
+            _Missing(label: 'Add your salon address', onTap: onFillDetails!),
+          if ((settings.phone ?? '').isNotEmpty)
+            Text('Phone: ${fmt.phone(settings.phone!)}', textAlign: TextAlign.center, style: base.copyWith(fontSize: 11))
+          else if (onFillDetails != null)
+            _Missing(label: 'Add your salon phone', onTap: onFillDetails!),
           if (tax && (settings.trn ?? '').isNotEmpty)
             Text('${RegExp(r'^\d{15}$').hasMatch(settings.trn!) ? 'TRN' : 'Tax no.'}: ${settings.trn}', textAlign: TextAlign.center, style: base.copyWith(fontSize: 11)),
           const SizedBox(height: 10),
@@ -170,6 +184,50 @@ class _BillLogo extends StatelessWidget {
             errorWidget: (_, _, _) => mark,
           );
     return ClipOval(child: SizedBox(width: size, height: size, child: img));
+  }
+}
+
+/// A placeholder for a salon detail the admin hasn't filled in yet: grey, dashed, "+ Add …", opens Settings.
+class _Missing extends StatelessWidget {
+  const _Missing({required this.label, required this.onTap, this.circle = false});
+  final String label;
+  final VoidCallback onTap;
+  final bool circle;
+
+  @override
+  Widget build(BuildContext context) {
+    const grey = Color(0xFF8A8A8A);
+    if (circle) {
+      return GestureDetector(
+        onTap: onTap,
+        child: Container(
+          key: const ValueKey('bill-add-logo'),
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFFF2F2F2), border: Border.all(color: const Color(0x33000000))),
+          child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.add_photo_alternate_outlined, size: 20, color: grey),
+            Text('Logo', style: TextStyle(fontSize: 10, color: grey)),
+          ]),
+        ),
+      );
+    }
+    return Center(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          margin: const EdgeInsets.only(top: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), border: Border.all(color: const Color(0x40000000))),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            const Icon(Icons.add_rounded, size: 14, color: grey),
+            const SizedBox(width: 4),
+            Text(label, style: const TextStyle(fontSize: 11, color: grey, fontStyle: FontStyle.italic)),
+          ]),
+        ),
+      ),
+    );
   }
 }
 

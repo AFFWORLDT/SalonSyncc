@@ -18,7 +18,8 @@ export function meFixture(o: {
 } = {}): MeResponse {
   const status = o.status ?? "active";
   return {
-    user: { id: 1, name: "Sam", username: "sam", role: o.role ?? "owner", commission_pct: null, avatar_url: null, can_add_expense: false },
+    user: { id: 1, name: "Sam", username: "sam", role: o.role ?? "owner", commission_pct: null, avatar_url: null,
+    banner_url: null, can_add_expense: false },
     org: { id: "org_1", slug: o.slug ?? "alpha", name: "Alpha Cuts", status, planId: "pro" },
     settings: {
       display_name: "Alpha Cuts",

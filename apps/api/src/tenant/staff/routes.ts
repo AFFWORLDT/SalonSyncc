@@ -6,6 +6,7 @@ import { hashPassword } from "../../core/crypto";
 import { requireAdmin } from "../../core/roles";
 import { requireFeature } from "../../core/pipeline";
 import { settingsRepo, usersRepo, avatarUrl, type StaffRow, type StaffWrite } from "../../data/tenant";
+import { bannerUrl } from "../../data/tenant/users";
 import { canonicalPhone } from "../../lib/phone";
 import { resolvePublicOrg, publicRateLimit } from "../../core/public";
 
@@ -16,7 +17,7 @@ const ownerLocked = () => bad("The owner can't be changed here");
 /** Plain names ("sonu") or email-style logins ("admin@salon.com"); case is kept as typed, uniqueness ignores case. */
 const USERNAME_RE = /^[A-Za-z0-9._@+-]{2,60}$/;
 const AVATAR_TYPES = ["image/webp", "image/jpeg", "image/png"];
-const AVATAR_MAX = 200 * 1024;
+const AVATAR_MAX = 300 * 1024;
 
 function clean(v: unknown, max = 200): string | null {
   if (v === undefined || v === null) return null;
@@ -211,10 +212,10 @@ async function saveAvatar(c: Context<AppEnv>, id: number) {
   if (target.role === "owner" && id !== c.var.tenant.user.id) throw ownerLocked();
   const type = (c.req.header("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
   if (!AVATAR_TYPES.includes(type)) throw bad("Send a WebP, JPEG or PNG image");
-  if (Number(c.req.header("content-length") ?? 0) > AVATAR_MAX) throw bad("Photo is too large (max 200 KB)");
+  if (Number(c.req.header("content-length") ?? 0) > AVATAR_MAX) throw bad("Photo is too large (max 300 KB)");
   const bytes = await c.req.arrayBuffer();
   if (!bytes.byteLength) throw bad("The photo is empty");
-  if (bytes.byteLength > AVATAR_MAX) throw bad("Photo is too large (max 200 KB)");
+  if (bytes.byteLength > AVATAR_MAX) throw bad("Photo is too large (max 300 KB)");
   const v = await repo.setAvatar(id, bytes, type);
   if (v === null) throw notFound();
   return c.json({ avatar_url: avatarUrl(id, v, c.var.tenant.org.slug) });
@@ -231,6 +232,23 @@ async function clearAvatar(c: Context<AppEnv>, id: number) {
 
 staff.put("/me/avatar", gate, (c) => saveAvatar(c, c.var.tenant.user.id));
 staff.delete("/me/avatar", gate, (c) => clearAvatar(c, c.var.tenant.user.id));
+// The banner behind my photo on my profile: same image rules as the photo.
+staff.put("/me/banner", gate, async (c) => {
+  const id = c.var.tenant.user.id;
+  const type = (c.req.header("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+  if (!AVATAR_TYPES.includes(type)) throw bad("Send a WebP, JPEG or PNG image");
+  if (Number(c.req.header("content-length") ?? 0) > AVATAR_MAX) throw bad("Banner is too large (max 300 KB)");
+  const bytes = await c.req.arrayBuffer();
+  if (!bytes.byteLength) throw bad("The banner is empty");
+  if (bytes.byteLength > AVATAR_MAX) throw bad("Banner is too large (max 300 KB)");
+  const v = await repoOf(c).setBanner(id, bytes, type);
+  if (v === null) throw notFound();
+  return c.json({ banner_url: bannerUrl(id, v, c.var.tenant.org.slug) });
+});
+staff.delete("/me/banner", gate, async (c) => {
+  await repoOf(c).clearBanner(c.var.tenant.user.id);
+  return c.json({ banner_url: null });
+});
 staff.put("/users/:id/avatar", gate, requireAdmin, (c) => saveAvatar(c, userId(c.req.param("id"))));
 staff.delete("/users/:id/avatar", gate, requireAdmin, (c) => clearAvatar(c, userId(c.req.param("id"))));
 
@@ -246,6 +264,20 @@ avatarPublic.get("/:id/:v", publicRateLimit("avatar"), async (c) => {
   if (!org || !Number.isInteger(id) || id <= 0 || !Number.isInteger(v) || v <= 0) return c.json({ error: "Not found" }, 404);
   // Only the current version of an active user's photo: old URLs and deactivated staff are 404.
   const img = await usersRepo(c.env.DB, org.id).avatar(id, v);
+  if (!img) return c.json({ error: "Not found" }, 404);
+  return new Response(img.bytes, {
+    headers: { "content-type": img.type, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" },
+  });
+});
+
+/** Public banner route, mounted on publicApi at /banner: GET /api/public/banner/:id/:v (same rules as the photo). */
+export const bannerPublic = new Hono<AppEnv>();
+bannerPublic.get("/:id/:v", publicRateLimit("avatar"), async (c) => {
+  const org = await resolvePublicOrg(c);
+  const id = Number(c.req.param("id"));
+  const v = Number(c.req.param("v"));
+  if (!org || !Number.isInteger(id) || id <= 0 || !Number.isInteger(v) || v <= 0) return c.json({ error: "Not found" }, 404);
+  const img = await usersRepo(c.env.DB, org.id).banner(id, v);
   if (!img) return c.json({ error: "Not found" }, 404);
   return new Response(img.bytes, {
     headers: { "content-type": img.type, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" },

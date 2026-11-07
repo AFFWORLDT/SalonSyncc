@@ -101,7 +101,7 @@ void main() {
   testWidgets('setup checklist: steps, then dismissed for good', (t) async {
     await pump(t, owner());
     expect(find.text('Get your salon ready'), findsOneWidget);
-    expect(find.text('2 of 5 done'), findsOneWidget);
+    expect(find.text('3 of 6 done'), findsOneWidget);
     expect(find.text('Upload your salon logo'), findsOneWidget);
     await t.tap(find.byTooltip('Hide'));
     await t.pumpAndSettle();

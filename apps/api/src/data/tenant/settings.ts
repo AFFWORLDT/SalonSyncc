@@ -87,6 +87,8 @@ export interface SetupStatus {
   staff: boolean;
   vat: boolean;
   google_review: boolean;
+  /** The salon's address and phone are filled in (they print on every bill). */
+  details: boolean;
 }
 
 export function settingsRepo(db: D1Database, orgId: string) {
@@ -97,12 +99,13 @@ export function settingsRepo(db: D1Database, orgId: string) {
         `SELECT (SELECT COUNT(*) FROM org_assets WHERE org_id = ?1 AND kind = 'logo') AS logo,
                 (SELECT COUNT(*) FROM services WHERE org_id = ?1) AS services,
                 (SELECT COUNT(*) FROM users WHERE org_id = ?1 AND role != 'owner') AS staff,
-                vat_enabled AS vat, google_review_url AS google
+                vat_enabled AS vat, google_review_url AS google,
+                (coalesce(trim(address), '') != '' AND coalesce(trim(contact_phone), '') != '') AS details
          FROM org_settings WHERE org_id = ?1`,
       )
       .bind(orgId)
-      .first<{ logo: number; services: number; staff: number; vat: number; google: string | null }>();
-    return { logo: !!r?.logo, services: !!r?.services, staff: !!r?.staff, vat: !!r?.vat, google_review: !!r?.google };
+      .first<{ logo: number; services: number; staff: number; vat: number; google: string | null; details: number }>();
+    return { logo: !!r?.logo, services: !!r?.services, staff: !!r?.staff, vat: !!r?.vat, google_review: !!r?.google, details: !!r?.details };
   }
 
   async function get(): Promise<Settings> {

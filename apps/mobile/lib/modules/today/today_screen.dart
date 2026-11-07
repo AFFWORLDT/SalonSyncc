@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/tour.dart';
 import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
@@ -125,11 +126,14 @@ class TodayScreenState extends State<TodayScreen> {
           if (me.readOnly)
             SkGlass(child: Text(kReadOnly, style: t.bodyMedium))
           else
-            FilledButton.icon(
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-              onPressed: () => _after(widget.onNewSale),
-              icon: const Icon(Icons.add_rounded),
-              label: const Text('New sale'),
+            tourTarget(
+              'new-sale-today',
+              FilledButton.icon(
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                onPressed: () => _after(widget.onNewSale),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('New sale'),
+              ),
             ),
           const SizedBox(height: 20),
           Row(children: [

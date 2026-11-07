@@ -48,7 +48,10 @@ void main() {
     expect(find.text('Ledger'), findsOneWidget);
     expect(find.text('More'), findsNothing);
     await t.tap(find.byKey(const ValueKey('top-profile')));
-    await t.pumpAndSettle();
+    // The profile banner drifts forever, so wait for the page instead of for "settled".
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 400));
+    await t.dragUntilVisible(find.text('Audit log'), find.byType(ListView).last, const Offset(0, -200));
     expect(find.text('Audit log'), findsOneWidget);
   });
 

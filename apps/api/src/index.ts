@@ -13,7 +13,7 @@ import "./platform/signup";
 import "./platform/support";
 import { platformApi } from "./platform/admin";
 import { settings, logoPublic, brandPublic } from "./tenant/settings/routes";
-import { staff, avatarPublic } from "./tenant/staff/routes";
+import { staff, avatarPublic, bannerPublic } from "./tenant/staff/routes";
 import { services, servicesPublic } from "./tenant/services/routes";
 import { sales } from "./tenant/sales/routes";
 import { customers } from "./tenant/customers/routes";
@@ -48,6 +48,7 @@ app.route("/api/platform", platformApi);
 
 // Public (no session) routes, before the tenant router so its guard never sees them.
 publicApi.route("/avatar", avatarPublic);
+publicApi.route("/banner", bannerPublic);
 publicApi.route("/services", servicesPublic);
 publicApi.route("/logo", logoPublic);
 publicApi.route("/brand", brandPublic);

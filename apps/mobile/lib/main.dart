@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'models/role.dart';
+import 'core/ui/tour.dart';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -83,6 +85,14 @@ Future<void> run({bool crashReports = true}) async {
       // Crash reports name the salon and user id only (never the token or request headers).
       FirebaseCrashlytics.instance.setUserIdentifier('${me.org.slug}:${me.user.id}').ignore();
       await push.onSignedIn(me);
+    });
+  }
+  // Last: the first-login walkthrough (once per person per salon; the e2e tests skip it).
+  if (crashReports) {
+    postSignInSteps.add((context) async {
+      final me = auth.me.value;
+      if (me == null || !context.mounted) return;
+      await maybeShowTour(context, slug: me.org.slug, userId: me.user.id, steps: tourSteps(salonName: me.salonName, admin: me.role == Role.admin));
     });
   }
   await Future.wait([theme.load(), lock.load()]);

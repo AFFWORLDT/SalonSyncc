@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/tour.dart';
 import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
@@ -150,11 +151,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         const SizedBox(height: 12),
         if (widget.onNewSale != null && !me.readOnly) ...[
-          FilledButton.icon(
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-            onPressed: () => widget.onNewSale!().then((_) => _load()),
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('New sale'),
+          tourTarget(
+            'new-sale',
+            FilledButton.icon(
+              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+              onPressed: () => widget.onNewSale!().then((_) => _load()),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('New sale'),
+            ),
           ),
           const SizedBox(height: 12),
         ],

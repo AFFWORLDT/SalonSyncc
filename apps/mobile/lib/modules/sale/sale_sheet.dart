@@ -1,4 +1,5 @@
 import 'package:animations/animations.dart';
+import '../../shell/nav.dart';
 import '../../core/ui/avatar.dart';
 import 'package:flutter/material.dart';
 
@@ -411,6 +412,7 @@ class _SaleSheetState extends State<SaleSheet> {
         fmt: fmt,
         settings: widget.me.salon,
         slug: _slug,
+        onFillDetails: widget.me.role == Role.admin && !widget.me.readOnly ? () => openModule('settings') : null,
         actions: widget.doneActions?.call(context, saved),
         onDone: () => Navigator.of(context).pop(SheetResult.saved(saved)),
         onNew: _reset,

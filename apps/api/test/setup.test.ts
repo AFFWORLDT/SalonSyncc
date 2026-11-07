@@ -16,9 +16,11 @@ describe("setup checklist", () => {
     await env.DB.prepare("INSERT INTO services(org_id,category,name,price,sort_order,active,created_at) VALUES(?,'Hair','Cut',2000,0,1,?)").bind(b.id, Date.now()).run().catch(() => {});
     await env.DB.prepare("UPDATE org_settings SET vat_enabled = 1, google_review_url = 'https://g.page/x' WHERE org_id = ?").bind(b.id).run();
     const ra: any = await (await get(await loginAs("setup-a", "own"))).json();
-    expect(ra).toEqual({ logo: false, services: false, staff: false, vat: false, google_review: false });
+    expect(ra).toEqual({ logo: false, services: false, staff: false, vat: false, google_review: false, details: false });
     const rb: any = await (await get(await loginAs("setup-b", "own"))).json();
-    expect(rb).toMatchObject({ staff: true, vat: true, google_review: true });
+    expect(rb).toMatchObject({ staff: true, vat: true, google_review: true, details: false });
+    await env.DB.prepare("UPDATE org_settings SET address = 'Main St', contact_phone = '0501234567' WHERE org_id = ?").bind(b.id).run();
+    expect(((await (await get(await loginAs("setup-b", "own"))).json()) as any).details).toBe(true);
   });
   it("barbers can't read it", async () => {
     const o = await makeOrg({ slug: "setup-c" });

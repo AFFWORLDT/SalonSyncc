@@ -41,11 +41,14 @@ class Me {
 }
 
 class MeUser {
-  const MeUser({required this.id, required this.name, required this.username, required this.role, this.commissionPct, this.avatarUrl, required this.canAddExpense});
+  const MeUser({required this.id, required this.name, required this.username, required this.role, this.commissionPct, this.avatarUrl, this.bannerUrl, required this.canAddExpense});
   final int id;
   final String name, username, role;
   final num? commissionPct;
   final String? avatarUrl;
+
+  /// The banner behind my photo on my profile.
+  final String? bannerUrl;
   final bool canAddExpense;
 
   factory MeUser.fromJson(Map<String, dynamic> j) => MeUser(
@@ -55,6 +58,7 @@ class MeUser {
         role: str(j, 'role'),
         commissionPct: numOrNull(j, 'commission_pct'),
         avatarUrl: strOrNull(j, 'avatar_url'),
+        bannerUrl: strOrNull(j, 'banner_url'),
         canAddExpense: j['can_add_expense'] == true,
       );
 }

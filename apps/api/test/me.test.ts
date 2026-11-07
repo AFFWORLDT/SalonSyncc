@@ -117,7 +117,7 @@ describe("/api/me user fields for the dashboard", () => {
     const b = await makeUser(org.id, { username: "barb", role: "barber" });
     await env.DB.prepare("UPDATE users SET commission_pct = 35, can_add_expense = 1, avatar = x'00', avatar_type = 'image/png', avatar_v = 2 WHERE id = ?").bind(b.id).run();
     const body: any = await (await me(await loginAs("me-user", "barb"))).json();
-    expect(body.user).toEqual({ id: b.id, name: expect.any(String), username: "barb", role: "barber", commission_pct: 35, avatar_url: `/api/public/avatar/${b.id}/2?org=me-user`, can_add_expense: true });
+    expect(body.user).toEqual({ id: b.id, name: expect.any(String), username: "barb", role: "barber", commission_pct: 35, avatar_url: `/api/public/avatar/${b.id}/2?org=me-user`, banner_url: null, can_add_expense: true });
     await makeUser(org.id, { username: "boss", role: "owner" });
     const o: any = await (await me(await loginAs("me-user", "boss"))).json();
     expect(o.user).toMatchObject({ role: "owner", commission_pct: null, avatar_url: null, can_add_expense: false });
