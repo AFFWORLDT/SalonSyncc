@@ -26,8 +26,8 @@ class SaleRow extends StatelessWidget {
       if (showDay) sale.billNo,
       showDay ? '${fmt.dayLabel(sale.day)} ${fmt.time(sale.createdAt)}' : fmt.time(sale.createdAt),
       if (showBarber) sale.barberName,
-      if (sale.customerPhone != null) fmt.phone(sale.customerPhone!),
       saleWhat(sale),
+      if (sale.customerPhone != null) fmt.phone(sale.customerPhone!),
     ].where((x) => x.isNotEmpty).join(' · ');
     return ListTile(
       onTap: onTap,
@@ -37,8 +37,8 @@ class SaleRow extends StatelessWidget {
         foregroundColor: cs.primary,
         child: Icon(sale.payment == 'card' ? Icons.credit_card_rounded : Icons.payments_outlined, size: 20),
       ),
-      title: Text(sale.customerLabel, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(sub, maxLines: 2, overflow: TextOverflow.ellipsis),
+      title: Text(sale.customerLabel, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: Text(fmt.money(sale.amount), style: SkText.mono.copyWith(fontWeight: FontWeight.w600, fontSize: 15)),
     );
   }

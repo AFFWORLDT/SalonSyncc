@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/scale.dart';
+import '../../core/ui/stats.dart';
 import '../../core/ui/tour.dart';
 import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/ui/count_up.dart';
 import '../../core/ui/glass.dart';
 import '../../core/ui/states.dart';
 import '../../data/report_api.dart';
@@ -106,93 +107,62 @@ class TodayScreenState extends State<TodayScreen> {
   Widget build(BuildContext context) {
     final me = widget.me, fmt = me.fmt, t = Theme.of(context).textTheme;
     final loading = _error == null && _list == null;
+    final cs = Theme.of(context).colorScheme;
+    final d = _today;
     return RefreshIndicator(
       onRefresh: _pull,
-      child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
-        SkHeading('Hi ${me.user.name} 👋'),
-        const SizedBox(height: 2),
-        Text(fmt.dateLabel(me.today), style: SkText.mono.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 16),
+      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+        SkHeading('Hi ${me.user.name} 👋', subtitle: fmt.dateLabel(me.today), mono: true),
+        const SizedBox(height: SkSpace.sm),
         if (_error != null && _list == null)
           ErrorState(error: _error!, onRetry: _retry)
         else ...[
-          _Tiles(today: _today, fmt: fmt),
-          const SizedBox(height: 12),
-          if (_today == null)
-            const SkSkeleton(height: 64, radius: 24)
+          SkHero(
+            label: 'My sales today',
+            value: d?.sales,
+            format: fmt.money,
+            notes: [if (d != null) '${d.count} customer${d.count == 1 ? '' : 's'}'],
+          ),
+          const SizedBox(height: SkSpace.lg),
+          SkStatStrip(format: fmt.money, stats: [
+            SkStat(label: 'My commission', value: d?.commission),
+            SkStat(label: 'Sales − expense', value: d?.net, color: d != null && d.net < 0 ? cs.error : null),
+          ]),
+          const SizedBox(height: SkSpace.md),
+          if (d == null)
+            const SkSkeleton(height: 64, radius: 18)
           else if (me.features.contains('expenses'))
-            ExpenseCard(today: _today!, fmt: fmt, canEdit: (me.canAddExpense || me.role == Role.admin) && !me.readOnly, sales: widget.sales, onSaved: load),
-          const SizedBox(height: 16),
+            ExpenseCard(today: d, fmt: fmt, canEdit: (me.canAddExpense || me.role == Role.admin) && !me.readOnly, sales: widget.sales, onSaved: load),
+          const SizedBox(height: SkSpace.lg),
           if (me.readOnly)
             SkGlass(child: Text(kReadOnly, style: t.bodyMedium))
           else
             tourTarget(
               'new-sale-today',
               FilledButton.icon(
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 onPressed: () => _after(widget.onNewSale),
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('New sale'),
               ),
             ),
-          const SizedBox(height: 20),
-          Row(children: [
-            Expanded(child: Text("Today's sales", style: t.titleMedium)),
-            if (_list != null) Text(fmt.money(_list!.sum ?? 0), style: SkText.mono.copyWith(fontWeight: FontWeight.w600)),
-          ]),
-          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(top: SkSpace.xl, bottom: SkSpace.sm),
+            child: Row(children: [
+              Expanded(child: Text("Today's sales", style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
+              if (_list != null) Text(fmt.money(_list!.sum ?? 0), style: SkText.mono.copyWith(fontWeight: FontWeight.w700)),
+            ]),
+          ),
           if (loading)
-            for (var i = 0; i < 3; i++) const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: SkSkeleton(height: 56))
+            const SkSkeletonList(count: 3, height: 60)
           else if (_list!.items.isEmpty)
             const EmptyState(text: 'No sales yet today. Tap “New sale” after each customer.', icon: Icons.content_cut_rounded)
           else
-            SkGlass(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Column(children: [
-                for (final s in _list!.items) SaleRow(sale: s, fmt: fmt, onTap: () => _after(() => widget.onOpenSale(s))),
-              ]),
-            ),
+            SkFlatList(children: [
+              for (final s in _list!.items) SaleRow(sale: s, fmt: fmt, onTap: () => _after(() => widget.onOpenSale(s))),
+            ]),
         ],
       ]),
     );
-  }
-}
-
-class _Tiles extends StatelessWidget {
-  const _Tiles({required this.today, required this.fmt});
-  final Totals? today;
-  final Fmt fmt;
-
-  @override
-  Widget build(BuildContext context) {
-    final d = today;
-    final cs = Theme.of(context).colorScheme;
-    Widget tile(String label, int? value, {String? hint, bool big = false, Color? color}) => SkGlass(
-          padding: const EdgeInsets.all(16),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
-            const SizedBox(height: 6),
-            value == null
-                ? SkSkeleton(height: big ? 30 : 22, width: 90)
-                : CountUp(
-                    value: value,
-                    format: fmt.money,
-                    style: SkText.mono.copyWith(fontSize: big ? 28 : 18, fontWeight: FontWeight.w700, color: color),
-                  ),
-            if (hint != null) ...[const SizedBox(height: 2), Text(hint, style: Theme.of(context).textTheme.bodySmall)],
-          ]),
-        );
-    return Column(children: [
-      SizedBox(
-        width: double.infinity,
-        child: tile('My sales today', d?.sales, big: true, hint: d == null ? null : '${d.count} customer${d.count == 1 ? '' : 's'}'),
-      ),
-      const SizedBox(height: 12),
-      Row(children: [
-        Expanded(child: tile('My commission', d?.commission)),
-        const SizedBox(width: 12),
-        Expanded(child: tile('Sales − expense', d?.net, color: d != null && d.net < 0 ? cs.error : null)),
-      ]),
-    ]);
   }
 }

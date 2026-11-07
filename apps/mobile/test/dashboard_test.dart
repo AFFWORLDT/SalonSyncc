@@ -49,7 +49,8 @@ void main() {
     expect(find.text('Dashboard'), findsOneWidget);
     expect(find.textContaining('Today, '), findsOneWidget);
     expect(find.text('Sales today'), findsOneWidget);
-    expect(find.text('2 customers · +233% vs yesterday'), findsOneWidget);
+    expect(find.text('2 customers'), findsOneWidget);
+    expect(find.text('233% vs yesterday'), findsOneWidget); // the green ▲ chip
     expect(find.text('incl. AED 200 company'), findsOneWidget);
     expect(find.text('Commission today'), findsOneWidget);
     expect(find.text('Profit today'), findsOneWidget);
@@ -89,7 +90,7 @@ void main() {
     expect(q['from'], '${from.year}-${from.month.toString().padLeft(2, '0')}-${from.day.toString().padLeft(2, '0')}');
     expect(q['to'], me.today);
     expect(find.text('Sales in range'), findsOneWidget);
-    expect(find.text('By day'), findsOneWidget);
+    expect(find.text('By day · sales and profit'), findsOneWidget);
   });
 
   testWidgets('no sales: empty text', (t) async {
