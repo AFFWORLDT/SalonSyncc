@@ -7,6 +7,7 @@ import '../../core/ui/states.dart';
 import '../../data/ratings_api.dart';
 import '../../models/me.dart';
 import '../../models/ratings.dart';
+import '../../shell/nav.dart';
 import '../dashboard/dashboard_screen.dart' show ymd;
 
 String _ratings(int n) => '$n rating${n == 1 ? '' : 's'}';
@@ -83,6 +84,19 @@ class _RatingsScreenState extends State<RatingsScreen> {
           child: InputChip(avatar: const Icon(Icons.date_range_outlined, size: 18), label: Text('${fmt.dayLabel(_from)} – ${fmt.dayLabel(_to)}'), onPressed: _range),
         ),
         const SizedBox(height: 10),
+        if (((widget.me.settings['google_review_url'] as String?) ?? '').isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: SkGlass(
+              blur: false,
+              child: Row(children: [
+                Icon(Icons.link_off_rounded, color: cs.error),
+                const SizedBox(width: 12),
+                const Expanded(child: Text('No Google review link yet, so happy customers have nowhere to go. Add it in Settings → Reviews & links.')),
+                TextButton(onPressed: () => openModule('settings'), child: const Text('Add')),
+              ]),
+            ),
+          ),
         if (_error != null && r == null)
           ErrorState(error: _error!, onRetry: _load)
         else if (r == null)

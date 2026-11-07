@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/format/fmt.dart';
+import '../../core/ui/route.dart';
 import '../../data/sales_api.dart';
 import '../../data/staff_api.dart';
 import '../../models/role.dart';
@@ -12,7 +13,7 @@ import 'share_buttons.dart';
 
 /// One bill: the bill itself, sharing, and Edit for the barber's own bills of today (the server refuses older ones).
 Future<void> openBill(BuildContext context, {required Me me, required SalesApi sales, required Sale sale}) =>
-    Navigator.of(context).push<void>(MaterialPageRoute(builder: (_) => BillScreen(me: me, sales: sales, sale: sale)));
+    Navigator.of(context).push<void>(SkRoute(builder: (_) => BillScreen(me: me, sales: sales, sale: sale)));
 
 class BillScreen extends StatefulWidget {
   const BillScreen({super.key, required this.me, required this.sales, required this.sale});

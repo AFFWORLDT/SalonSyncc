@@ -364,6 +364,7 @@ describe("GET /api/public/receipt/:token", () => {
         trn: "100000000000003",
         licence_no: "L-1",
         receipt_footer: "Thanks!",
+        google_maps_url: null,
         logo_url: "/api/public/logo/3?org=rc-a",
         currency: "AED",
         currency_minor: 100,

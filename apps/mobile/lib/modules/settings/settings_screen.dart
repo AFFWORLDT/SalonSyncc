@@ -237,7 +237,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ]),
       if (_has('whatsapp')) _WhatsAppSection(me: widget.me, api: widget.api, settings: s, field: _field, switchTile: _switch, pick: _pick, hours: _hours, onChanged: () => setState(() {})),
-      if (!_has('whatsapp') && _has('ratings')) _section('Reviews', [_field('google_review_url', 'Google review link', keyboard: TextInputType.url)]),
+      _section('Reviews & links', sub: 'Links customers get from you. Each must start with https://', [
+        _field('google_review_url', 'Google review link', keyboard: TextInputType.url, hint: 'Where "Rate your visit" sends happy customers'),
+        _field('google_maps_url', 'Google Maps link', keyboard: TextInputType.url, hint: 'Directions to the salon; a button on the bill link'),
+        _field('instagram_url', 'Instagram link', keyboard: TextInputType.url, hint: 'On the PDF bill'),
+      ]),
       _section('WhatsApp thank-you', [
         _field('thank_you_text', 'Message', maxLines: 4, hint: 'You can use {name} {amount} {salon} {barber} {link}'),
         Text('Preview', style: t.labelLarge),
@@ -449,9 +453,7 @@ class _WhatsAppSectionState extends State<_WhatsAppSection> {
                   child: OutlinedButton(onPressed: () => _run(widget.api.runFeedback, 'Rating requests', 'No bills are due for a rating request yet'), child: const Text('Send due requests now')),
                 ),
               ],
-              f('google_review_url', 'Google review link', keyboard: TextInputType.url),
             ],
-            f('instagram_url', 'Instagram link', keyboard: TextInputType.url, hint: 'On the PDF bill'),
             ExpansionTile(
               tilePadding: EdgeInsets.zero,
               title: const Text('Message templates (advanced)'),

@@ -35,6 +35,7 @@ const receipt = (over: { sale?: Partial<Receipt["sale"]>; salon?: Partial<Receip
   },
   salon: {
     salon_name: "Faizan Mohammed Gents Salon",
+    google_maps_url: null,
     display_name: "Faizan Mohammed Gents Salon",
     salon_name_ar: "صالون",
     tagline: "Love to have a special appearance… just come to us ✂️",

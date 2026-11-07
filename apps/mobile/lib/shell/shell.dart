@@ -1,15 +1,19 @@
 import 'package:animations/animations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../core/api/api_error.dart';
 import '../core/auth/auth_controller.dart';
 import '../core/features/feature_gate.dart';
-import '../core/features/feature_module.dart';
 import '../core/features/registry.dart';
 import '../core/push/deep_link.dart';
+import '../core/ui/route.dart';
 import '../models/me.dart';
+import 'profile_screen.dart';
+import 'search_screen.dart';
+import 'top_bar.dart';
 
 const kSwitchedOff = 'That feature was switched off for your salon';
 
@@ -76,7 +80,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   }
 
   void _onMe(Me? me) {
-    if (me == null || _tab.isEmpty || _tab == '_more') return;
+    if (me == null || _tab.isEmpty) return;
     if (!widget.registry.isVisible(_tab, me)) {
       setState(() => _tab = '');
       if (!mounted) return;
@@ -94,7 +98,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       Navigator.of(context).popUntil((r) => r.isFirst);
       setState(() => _tab = id);
     } else if (widget.registry.isVisible(id, me)) {
-      Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => FeatureGate(registry: widget.registry, id: id)));
+      Navigator.of(context).push(SkRoute<void>(builder: (_) => FeatureGate(registry: widget.registry, id: id)));
     }
   }
 
@@ -105,54 +109,44 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       if (me == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
       final tabs = widget.registry.tabsFor(me);
       final more = widget.registry.moreFor(me);
-      final ids = [...tabs.map((m) => m.id), if (more.isNotEmpty) '_more'];
+      // Everything that isn't a tab lives in the profile (the photo in the top bar), Groww-style.
+      final ids = [for (final m in tabs) m.id];
       final current = ids.contains(_tab) ? _tab : ids.first;
       final index = ids.indexOf(current);
-      final body = current == '_more' ? _MoreList(registry: widget.registry, modules: more) : tabs[index].builder(context);
       return Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
           bottom: false,
-          child: PageTransitionSwitcher(
-            duration: MediaQuery.of(context).disableAnimations ? Duration.zero : const Duration(milliseconds: 250),
-            transitionBuilder: (child, a, b) => FadeThroughTransition(animation: a, secondaryAnimation: b, fillColor: Colors.transparent, child: child),
-            child: KeyedSubtree(key: ValueKey(current), child: body),
-          ),
+          child: Column(children: [
+            SkTopBar(
+              me: me,
+              badge: [for (final m in more) ?m.badge],
+              onSearch: () => openSearch(context, widget.registry),
+              onAi: () => showAiSoon(context),
+              onProfile: () => openProfile(context, widget.registry),
+            ),
+            Expanded(
+              child: PageTransitionSwitcher(
+                duration: MediaQuery.of(context).disableAnimations ? Duration.zero : const Duration(milliseconds: 160),
+                transitionBuilder: (child, a, b) => FadeThroughTransition(animation: a, secondaryAnimation: b, fillColor: Colors.transparent, child: child),
+                child: KeyedSubtree(key: ValueKey(current), child: tabs[index].builder(context)),
+              ),
+            ),
+          ]),
         ),
         bottomNavigationBar: ids.length < 2
             ? null
             : NavigationBar(
                 selectedIndex: index,
-                onDestinationSelected: (i) => setState(() => _tab = ids[i]),
-                destinations: [
-                  for (final m in tabs) NavigationDestination(icon: _Badged(icon: m.icon, counts: [?m.badge]), label: m.title),
-                  if (more.isNotEmpty) NavigationDestination(icon: _Badged(icon: Icons.menu, counts: [for (final m in more) ?m.badge]), label: 'More'),
-                ],
+                onDestinationSelected: (i) {
+                  if (i != index) HapticFeedback.selectionClick();
+                  setState(() => _tab = ids[i]);
+                },
+                destinations: [for (final m in tabs) NavigationDestination(icon: _Badged(icon: m.icon, counts: [?m.badge]), label: m.title)],
               ),
       );
     });
   }
-}
-
-class _MoreList extends StatelessWidget {
-  const _MoreList({required this.registry, required this.modules});
-  final FeatureRegistry registry;
-  final List<FeatureModule> modules;
-
-  @override
-  Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        children: [
-          Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 12), child: Text('More', style: Theme.of(context).textTheme.headlineSmall)),
-          for (final m in modules)
-            ListTile(
-              leading: _Badged(icon: m.icon, counts: [?m.badge]),
-              title: Text(m.title),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => FeatureGate(registry: registry, id: m.id))),
-            ),
-        ],
-      );
 }
 
 /// An icon with a count bubble: the sum of [counts], hidden at 0.

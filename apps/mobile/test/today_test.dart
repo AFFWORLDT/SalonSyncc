@@ -38,6 +38,7 @@ Map<String, Handler> ok() => {
     };
 
 void main() {
+  setUp(todayCache.clear);
   final barber = meWith(barber: true);
 
   testWidgets('skeleton while loading', (t) async {

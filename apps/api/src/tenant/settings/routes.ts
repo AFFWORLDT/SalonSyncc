@@ -143,6 +143,8 @@ export function parseSettings(raw: unknown): SettingsInput {
     notify_barber_changes: bool(b, "notify_barber_changes", "Barber change alerts"),
     google_review_url: link(b, "google_review_url", "Google review"),
     instagram_url: link(b, "instagram_url", "Instagram"),
+    // Older apps don't send this one yet: undefined means "keep what is saved" (filled in by the PUT handler).
+    google_maps_url: b.google_maps_url === undefined ? (undefined as unknown as null) : link(b, "google_maps_url", "Google Maps"),
     timezone,
     day_start_hour: int(b, "day_start_hour", "Day start hour", 0, 12),
     currency,
@@ -196,6 +198,7 @@ settings.put("/", requireAdmin, async (c) => {
   const { org, user } = c.var.tenant;
   const repo = settingsRepo(c.env.DB, org.id);
   const cur = await repo.get();
+  if (next.google_maps_url === undefined) next.google_maps_url = cur.google_maps_url;
   if (next.currency !== cur.currency && currencyDigits(next.currency) !== Math.round(Math.log10(cur.currency_minor))) {
     throw bad("That currency uses different decimals; contact support to change it");
   }

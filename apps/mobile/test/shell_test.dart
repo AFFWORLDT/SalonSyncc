@@ -10,6 +10,7 @@ import 'package:salonkit/core/features/feature_gate.dart';
 import 'package:salonkit/core/features/feature_module.dart';
 import 'package:salonkit/core/features/registry.dart';
 import 'package:salonkit/core/push/deep_link.dart';
+import 'package:salonkit/core/theme/theme_controller.dart';
 import 'package:salonkit/models/role.dart';
 import 'package:salonkit/shell/shell.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -39,13 +40,14 @@ Widget app() => GetMaterialApp(home: Shell(registry: registry));
 void main() {
   tearDown(Get.reset);
 
-  testWidgets('builds tabs and More from the switches', (t) async {
+  testWidgets('builds tabs from the switches; the rest is in the profile', (t) async {
     auth().me.value = meWith(features: ['core_sales', 'ledger', 'audit_log']);
+    Get.put(ThemeController());
     await t.pumpWidget(app());
     expect(find.text('HOME BODY'), findsOneWidget);
     expect(find.text('Ledger'), findsOneWidget);
-    expect(find.text('More'), findsOneWidget);
-    await t.tap(find.text('More'));
+    expect(find.text('More'), findsNothing);
+    await t.tap(find.byKey(const ValueKey('top-profile')));
     await t.pumpAndSettle();
     expect(find.text('Audit log'), findsOneWidget);
   });

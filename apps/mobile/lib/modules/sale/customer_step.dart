@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../core/format/fmt.dart';
@@ -7,7 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/ui/haptics.dart';
 import '../../core/ui/motion.dart';
 import '../../data/sales_api.dart';
-import '../../models/sale.dart';
+import 'customer_picker.dart';
 
 const kBadPhone = "Mobile number doesn't look right";
 
@@ -91,55 +89,6 @@ class CustomerStep extends StatefulWidget {
 }
 
 class _CustomerStepState extends State<CustomerStep> {
-  List<CustomerHint> _hints = const [];
-  Timer? _debounce;
-  int _seq = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _lookup('');
-    widget.name.addListener(_typed);
-    widget.phone.addListener(_typed);
-  }
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    widget.name.removeListener(_typed);
-    widget.phone.removeListener(_typed);
-    super.dispose();
-  }
-
-  String _last = '';
-  void _typed() {
-    final q = widget.phone.text.trim().isNotEmpty ? widget.phone.text.trim() : widget.name.text.trim();
-    if (q == _last) return;
-    _last = q;
-    _debounce?.cancel();
-    if (q.isNotEmpty && q.length < 3) return;
-    _debounce = Timer(const Duration(milliseconds: 250), () => _lookup(q));
-  }
-
-  Future<void> _lookup(String q) async {
-    final n = ++_seq;
-    try {
-      final h = await widget.sales.customers(q);
-      if (mounted && n == _seq) setState(() => _hints = h);
-    } catch (_) {
-      // Suggestions are a convenience; a failed lookup just shows none.
-    }
-  }
-
-  void _pick(CustomerHint h) {
-    Haptic.select();
-    widget.name.text = h.name;
-    widget.phone.text = h.phone ?? '';
-    _last = widget.phone.text.trim().isNotEmpty ? widget.phone.text.trim() : h.name;
-    setState(() => _hints = const []);
-    FocusScope.of(context).unfocus();
-  }
-
   Widget _noteField() => TextField(
         key: const ValueKey('note'),
         controller: widget.note,
@@ -161,27 +110,7 @@ class _CustomerStepState extends State<CustomerStep> {
     return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
       Text('Customer (optional)', style: t.labelLarge),
       const SizedBox(height: 8),
-      TextField(
-        key: const ValueKey('customer-name'),
-        controller: widget.name,
-        textCapitalization: TextCapitalization.words,
-        maxLength: 80,
-        decoration: const InputDecoration(labelText: 'Name', counterText: ''),
-      ),
-      const SizedBox(height: 10),
-      TextField(
-        key: const ValueKey('customer-phone'),
-        controller: widget.phone,
-        keyboardType: TextInputType.phone,
-        decoration: const InputDecoration(labelText: 'Mobile', hintText: 'Local number, or with + and country code'),
-      ),
-      if (_hints.isNotEmpty) ...[
-        const SizedBox(height: 10),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          for (final h in _hints)
-            ActionChip(avatar: const Icon(Icons.person_outline_rounded, size: 18), label: Text(h.name), tooltip: h.phone, onPressed: () => _pick(h)),
-        ]),
-      ],
+      CustomerPicker(sales: widget.sales, name: widget.name, phone: widget.phone, phoneCountry: widget.phoneCountry, formatPhone: widget.fmt.phone),
       const SizedBox(height: 20),
       Text('Payment', style: t.labelLarge),
       const SizedBox(height: 8),

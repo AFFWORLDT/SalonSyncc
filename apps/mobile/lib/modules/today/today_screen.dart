@@ -18,6 +18,9 @@ import 'sale_row.dart';
 const kReadOnly = 'Your subscription has ended. Upgrade to add or change sales.';
 
 /// The barber's day: totals, today's expense, "New sale", and today's bills (tap to edit).
+/// The last answer per user and day, so the tab opens filled and refreshes quietly (tests clear it).
+final todayCache = <String, (Totals?, Paged<Sale>)>{};
+
 class TodayScreen extends StatefulWidget {
   const TodayScreen({super.key, required this.me, required this.sales, required this.report, required this.onNewSale, required this.onOpenSale, this.onRefreshMe});
   final Me me;
@@ -40,9 +43,16 @@ class TodayScreenState extends State<TodayScreen> {
   Paged<Sale>? _list;
   Object? _error;
 
+  String get _key => '${widget.me.org.slug}|${widget.me.user.id}|${widget.me.today}';
+
   @override
   void initState() {
     super.initState();
+    final c = todayCache[_key];
+    if (c != null) {
+      _today = c.$1;
+      _list = c.$2;
+    }
     load();
   }
 
@@ -72,6 +82,7 @@ class TodayScreenState extends State<TodayScreen> {
       setState(() {
         _today = (r[0] as MyReport).today;
         _list = r[1] as Paged<Sale>;
+        todayCache[_key] = (_today, _list!);
         _error = null;
       });
     } catch (e) {

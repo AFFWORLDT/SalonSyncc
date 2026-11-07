@@ -6,6 +6,7 @@ import '../../core/features/feature_module.dart';
 import '../../core/format/fmt.dart';
 import '../../data/customers_api.dart';
 import '../../data/sales_api.dart';
+import '../../core/ui/route.dart';
 import '../../models/role.dart';
 import '../sale/bill_screen.dart';
 import 'customers_screen.dart';
@@ -26,7 +27,7 @@ final customersModule = FeatureModule(
     return CustomersScreen(
       me: me,
       api: api,
-      onOpen: (c) => Navigator.of(context).push<void>(MaterialPageRoute(
+      onOpen: (c) => Navigator.of(context).push<void>(SkRoute(
         builder: (_) => CustomerProfile(me: me, api: api, id: c.id, onOpenSale: (s) => openBill(context, me: me, sales: sales, sale: s)),
       )),
     );

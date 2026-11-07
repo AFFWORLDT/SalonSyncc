@@ -57,6 +57,23 @@ Future<void> pickBarber(WidgetTester t, String name) async {
   await t.pumpAndSettle();
 }
 
+/// Opens the customer dropdown, "Add new customer", types what is given and adds.
+Future<void> addCustomer(WidgetTester t, {String? name, String? phone, bool done = true}) async {
+  await t.tap(find.byKey(const ValueKey('customer-picker')));
+  await t.pumpAndSettle();
+  await t.tap(find.byKey(const ValueKey('customer-add')));
+  await t.pumpAndSettle();
+  if (name != null) await t.enterText(find.byKey(const ValueKey('customer-name')), name);
+  if (phone != null) await t.enterText(find.byKey(const ValueKey('customer-phone')), phone);
+  if (done) {
+    await t.tap(find.byKey(const ValueKey('customer-add-done')));
+    await t.pumpAndSettle();
+  }
+}
+
+/// Text shown in the customer dropdown's trigger.
+Finder inPicker(String text) => find.descendant(of: find.byKey(const ValueKey('customer-picker')), matching: find.text(text));
+
 void main() {
   testWidgets('tapping a service twice makes qty 2 and the total follows', (t) async {
     await pumpHost(t, host(FakeAdapter(base())));
@@ -117,8 +134,7 @@ void main() {
     await t.tap(find.byKey(const ValueKey('service-109')));
     await t.pumpAndSettle();
     await toCustomer(t);
-    await t.enterText(find.byKey(const ValueKey('customer-name')), 'Omar');
-    await t.enterText(find.byKey(const ValueKey('customer-phone')), '0501234567');
+    await addCustomer(t, name: 'Omar', phone: '0501234567');
     await t.tap(find.text('Card'));
     await t.tap(find.text('More (note)'));
     await t.pumpAndSettle();
@@ -144,10 +160,7 @@ void main() {
     await typeAmount(t, '25');
     await t.pumpAndSettle();
     await toCustomer(t);
-    await t.enterText(find.byKey(const ValueKey('customer-phone')), '12');
-    await t.tap(find.text('Cash'));
-    await t.tap(find.byKey(const ValueKey('save')));
-    await t.pumpAndSettle();
+    await addCustomer(t, phone: '12');
     expect(find.text("Mobile number doesn't look right"), findsOneWidget);
     expect(posts(a), isEmpty);
   });
@@ -158,10 +171,14 @@ void main() {
     await typeAmount(t, '25');
     await t.pumpAndSettle();
     await toCustomer(t);
-    await t.tap(find.widgetWithText(ActionChip, 'Omar'));
+    await t.tap(find.byKey(const ValueKey('customer-picker')));
     await t.pumpAndSettle();
-    expect(find.widgetWithText(TextField, 'Omar'), findsOneWidget);
-    expect(find.widgetWithText(TextField, '0501234567'), findsOneWidget);
+    expect(find.text('Recent customers'), findsOneWidget);
+    await t.tap(find.text('Omar'));
+    await t.pumpAndSettle();
+    expect(inPicker('Omar'), findsOneWidget);
+    expect(inPicker('050 123 4567'), findsOneWidget);
+    expect(find.byKey(const ValueKey('customer-search')), findsNothing);
   });
 
   testWidgets('double tap saves once', (t) async {
@@ -188,12 +205,12 @@ void main() {
     await typeAmount(t, '25');
     await t.pumpAndSettle();
     await toCustomer(t);
-    await t.enterText(find.byKey(const ValueKey('customer-name')), 'Sam');
+    await addCustomer(t, name: 'Sam');
     await t.tap(find.text('Cash'));
     await t.tap(find.byKey(const ValueKey('save')));
     await t.pumpAndSettle();
     expect(find.text('Pick a service or enter the amount (e.g. 25)'), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'Sam'), findsOneWidget);
+    expect(inPicker('Sam'), findsOneWidget);
   });
 
   testWidgets('offline save says so and keeps the sheet', (t) async {
@@ -264,7 +281,7 @@ void main() {
       expect(find.text('Edit E2E-20261104-001'), findsOneWidget);
       expect(totalText(t), 'AED 65');
       await toCustomer(t);
-      expect(find.widgetWithText(TextField, 'Omar'), findsOneWidget);
+      expect(inPicker('Omar'), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('save')));
       await t.pumpAndSettle();
       final put = a.calls.singleWhere((c) => c.method == 'PUT');
@@ -283,11 +300,11 @@ void main() {
       await pumpHost(t, host(a, edit: sale));
       await t.pumpAndSettle();
       await toCustomer(t);
-      await t.enterText(find.byKey(const ValueKey('customer-name')), 'Omar K');
+      await addCustomer(t, name: 'Omar K');
       await t.tap(find.byKey(const ValueKey('save')));
       await t.pumpAndSettle();
       expect(find.text('This sale was changed by someone else. Reload and try again.'), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Omar K'), findsOneWidget);
+      expect(inPicker('Omar K'), findsOneWidget);
     });
 
     testWidgets('delete asks first, then deletes', (t) async {

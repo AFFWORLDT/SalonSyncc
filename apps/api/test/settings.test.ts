@@ -45,6 +45,7 @@ const valid = (over: Record<string, unknown> = {}) => ({
   notify_barber_changes: true,
   google_review_url: "https://g.page/x",
   instagram_url: null,
+  google_maps_url: "https://maps.app.goo.gl/abc",
   timezone: "Asia/Dubai",
   day_start_hour: 4,
   currency: "AED",
@@ -100,6 +101,17 @@ describe("settings", () => {
     expect(JSON.parse(a.results[0].after).display_name).toBe("Fresh Cuts");
   });
 
+  it("an older client without google_maps_url keeps the saved link", async () => {
+    const { owner } = await setup("st-maps");
+    expect((await call("PUT", "/settings", owner, valid())).status).toBe(200);
+    const { google_maps_url: _gone, ...old } = valid();
+    const r = await call("PUT", "/settings", owner, { ...old, display_name: "Older App" });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ display_name: "Older App", google_maps_url: "https://maps.app.goo.gl/abc" });
+    const cleared: any = await (await call("PUT", "/settings", owner, { ...valid(), google_maps_url: null })).json();
+    expect(cleared.google_maps_url).toBeNull();
+  });
+
   it("a barber PUT gets 403", async () => {
     const { barber } = await setup("st-403");
     const r = await call("PUT", "/settings", barber, valid());
@@ -121,6 +133,7 @@ describe("settings", () => {
     ["quick amount huge", { quick_amounts: [1_000_001] }],
     ["vat 101", { vat_rate: 101 }],
     ["http link", { google_review_url: "http://x.y" }],
+    ["http maps link", { google_maps_url: "http://x.y" }],
     ["missing field", { locale: undefined }],
     ["non-boolean flag", { notify_sales: "yes" }],
     ["template with capitals", { wa_bill_template: "FM_Bill" }],

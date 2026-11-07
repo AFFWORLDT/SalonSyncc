@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Printer } from "lucide-react";
+import { MapPin, Printer } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { setFormat, getFormat } from "@/lib/format";
 import type { Receipt } from "@/lib/types";
@@ -55,6 +55,12 @@ export default function ReceiptPage() {
           <Button variant="outline" className="mt-4 h-11 w-full print:hidden" onClick={printBill}>
             <Printer />
             Print / save PDF
+          </Button>
+        )}
+        {data?.salon.google_maps_url && (
+          <Button variant="outline" className="mt-2 h-11 w-full print:hidden" nativeButton={false} render={<a href={data.salon.google_maps_url} target="_blank" rel="noopener noreferrer" />}>
+            <MapPin />
+            Directions to {data.salon.display_name}
           </Button>
         )}
       </div>

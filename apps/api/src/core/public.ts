@@ -84,6 +84,7 @@ export function receiptOf(sale: Sale, s: Settings): Receipt {
       trn: s.trn,
       licence_no: s.licence_no,
       receipt_footer: s.receipt_footer,
+      google_maps_url: s.google_maps_url,
       logo_url: s.logo_url,
       currency: s.currency,
       currency_minor: s.currency_minor,

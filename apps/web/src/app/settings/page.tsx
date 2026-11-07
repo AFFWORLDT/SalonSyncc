@@ -384,6 +384,9 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
           <Field label="Address" htmlFor="s-addr">
             <Input id="s-addr" value={s.address ?? ""} onChange={(e) => set("address", e.target.value || null)} className="h-11" />
           </Field>
+          <Field label="Google Maps link" htmlFor="s-maps" hint="Directions to the salon; a button on the bill link">
+            <Input id="s-maps" inputMode="url" placeholder="https://maps.app.goo.gl/…" value={s.google_maps_url ?? ""} onChange={(e) => set("google_maps_url", e.target.value.trim() || null)} className="h-11" />
+          </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Phone" htmlFor="s-phone">
               <Input id="s-phone" type="tel" value={s.phone ?? ""} onChange={(e) => set("phone", e.target.value || null)} className="h-11" />

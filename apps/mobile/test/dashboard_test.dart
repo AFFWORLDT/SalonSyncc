@@ -20,7 +20,10 @@ Me owner({List<String>? features}) {
 }
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    dashboardCache.clear();
+  });
 
   Future<FakeAdapter> pump(WidgetTester t, Me me, {Map<String, Handler> extra = const {}, Object? setup}) async {
     final a = FakeAdapter({
