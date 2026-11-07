@@ -408,9 +408,10 @@ class _SwipeHintState extends State<_SwipeHint> {
             ),
           ),
         ),
+        // Bottom-right, below the names, so it never covers a barber's header.
         Positioned(
           right: 6,
-          top: 0,
+          bottom: 4,
           child: AnimatedOpacity(
             opacity: _more ? 1 : 0,
             duration: const Duration(milliseconds: 160),
