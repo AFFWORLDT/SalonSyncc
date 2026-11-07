@@ -32,7 +32,7 @@ class SkFilterPill extends StatelessWidget {
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             const SizedBox(width: 12),
             if (icon != null) ...[Icon(icon, size: 16, color: fg), const SizedBox(width: 6)],
-            Text(label, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: fg)),
+            Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: fg))),
             if (onClear != null && active)
               IconButton(
                 tooltip: clearTooltip,

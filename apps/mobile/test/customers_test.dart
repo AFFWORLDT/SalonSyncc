@@ -40,7 +40,7 @@ void main() {
     await t.pumpWidget(MaterialApp(home: Scaffold(body: CustomersScreen(me: owner(), api: CustomersApi(client(a)), onOpen: (_) async {}))));
     await t.pumpAndSettle();
     expect(find.text('Customers'), findsOneWidget);
-    expect(find.text('Saved automatically when a barber enters a mobile number. Tap one for their visit history.'), findsOneWidget);
+    expect(find.text('Saved when a mobile number is on a bill. Tap one for their visits.'), findsOneWidget);
     expect(find.text('1 customers'), findsOneWidget);
     expect(find.text('Omar'), findsOneWidget);
     await t.enterText(find.byType(TextField), 'om');
@@ -68,7 +68,7 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('Omar'), findsWidgets);
     expect(find.text('Visits'), findsOneWidget);
-    expect(find.text('1 cash · 0 card'), findsOneWidget);
+    expect(find.text('1 visit · 1 cash · 0 card'), findsOneWidget);
     expect(find.text('Total spent'), findsOneWidget);
     expect(find.text('Average bill'), findsOneWidget);
     expect(find.text('Haircut ×1'), findsOneWidget);

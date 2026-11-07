@@ -59,9 +59,13 @@ class SkDeltaChip extends StatelessWidget {
 
 /// One cell of an [SkStatStrip].
 class SkStat {
-  const SkStat({required this.label, required this.value, this.hint, this.color, this.action});
+  const SkStat({required this.label, this.value, this.text, this.hint, this.color, this.action, this.loading = false});
   final String label;
   final int? value;
+
+  /// Shown as is instead of a money [value] (a count, a date).
+  final String? text;
+  final bool loading;
   final String? hint;
   final Color? color;
 
@@ -106,13 +110,20 @@ class SkStatStrip extends StatelessWidget {
             child: Text(s.label, maxLines: 2, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant, fontWeight: FontWeight.w500)),
           ),
           const SizedBox(height: SkSpace.xs),
-          s.value == null
-              ? const SkSkeleton(height: 18, width: 64)
-              : FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: CountUp(value: s.value!, format: format, style: SkText.mono.copyWith(fontSize: 16, fontWeight: FontWeight.w700, color: s.color)),
-                ),
+          if (s.text != null)
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(s.text!, style: SkText.mono.copyWith(fontSize: 16, fontWeight: FontWeight.w700, color: s.color)),
+            )
+          else if (s.value == null || s.loading)
+            const SkSkeleton(height: 18, width: 64)
+          else
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: CountUp(value: s.value!, format: format, style: SkText.mono.copyWith(fontSize: 16, fontWeight: FontWeight.w700, color: s.color)),
+            ),
           if (s.hint != null) ...[const SizedBox(height: 2), Text(s.hint!, maxLines: 2, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant))],
         ]),
       ),
@@ -143,6 +154,28 @@ class SkFlatList extends StatelessWidget {
           children[i],
         ],
       ]),
+    );
+  }
+}
+
+/// A plain flat card (the look of [SkFlatList]) for content that draws its own rows and dividers.
+class SkCard extends StatelessWidget {
+  const SkCard({super.key, required this.child, this.padding = EdgeInsets.zero});
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: padding,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(SkRadius.lg),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
+      ),
+      child: child,
     );
   }
 }

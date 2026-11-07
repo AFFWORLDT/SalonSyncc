@@ -35,9 +35,9 @@ class SkHeading extends StatelessWidget {
 
 /// A section label inside a screen ("Barbers today", "Owner"), with an optional text action on the right.
 class SkSection extends StatelessWidget {
-  const SkSection(this.label, {super.key, this.action, this.onAction, this.top = SkSpace.xl});
+  const SkSection(this.label, {super.key, this.action, this.onAction, this.actionTooltip, this.top = SkSpace.xl});
   final String label;
-  final String? action;
+  final String? action, actionTooltip;
   final VoidCallback? onAction;
   final double top;
 
@@ -49,10 +49,13 @@ class SkSection extends StatelessWidget {
       child: Row(children: [
         Expanded(child: Text(label, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
         if (action != null && onAction != null)
-          TextButton(
-            style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: SkSpace.sm)),
-            onPressed: onAction,
-            child: Text(action!, style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600)),
+          Tooltip(
+            message: actionTooltip ?? action!,
+            child: TextButton(
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: SkSpace.sm)),
+              onPressed: onAction,
+              child: Text(action!, style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600)),
+            ),
           ),
       ]),
     );

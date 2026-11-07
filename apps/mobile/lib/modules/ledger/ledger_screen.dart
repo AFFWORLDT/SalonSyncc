@@ -1,5 +1,8 @@
 import 'dart:typed_data';
 
+import '../../core/ui/avatar.dart';
+import '../../core/theme/scale.dart';
+import '../../core/ui/stats.dart';
 import '../../core/ui/toast.dart';
 import '../../core/ui/heading.dart';
 import 'package:flutter/material.dart';
@@ -11,7 +14,6 @@ import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/filter_chip_menu.dart';
 import '../../core/ui/form_sheet.dart';
-import '../../core/ui/glass.dart';
 import '../../core/ui/states.dart';
 import '../../data/ledger_api.dart';
 import '../../models/ledger.dart';
@@ -148,22 +150,25 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).textTheme;
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-        SkHeading('Ledger'),
-        Text('Every money movement, newest first. Nothing here is ever rewritten.', style: t.bodySmall),
-        const SizedBox(height: 12),
-        SegmentedButton<bool>(
-          segments: const [ButtonSegment(value: false, label: Text('Shop')), ButtonSegment(value: true, label: Text('Barbers'))],
-          selected: {_barbersTab},
-          onSelectionChanged: (s) => _set(() {
-            _barbersTab = s.first;
-            _error = null;
-          }),
-        ),
-        const SizedBox(height: 12),
+      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+        const SkHeading('Ledger', subtitle: 'Every money movement, newest first. Nothing here is ever rewritten.'),
+        Row(children: [
+          for (final (tab, label, icon) in const [(false, 'Shop', Icons.storefront_outlined), (true, 'Barbers', Icons.content_cut_rounded)]) ...[
+            SkFilterPill(
+              label: label,
+              icon: icon,
+              active: _barbersTab == tab,
+              onTap: () => _set(() {
+                _barbersTab = tab;
+                _error = null;
+              }),
+            ),
+            const SizedBox(width: SkSpace.sm),
+          ],
+        ]),
+        const SizedBox(height: SkSpace.lg),
         if (_error != null && (_barbersTab ? _barbers : _shop) == null)
           ErrorState(error: _error!, onRetry: _load)
         else if (_barbersTab)
@@ -174,24 +179,11 @@ class _LedgerScreenState extends State<LedgerScreen> {
     );
   }
 
-  Widget _tile(String label, int? v, {String? hint, Color? color}) {
-    final t = Theme.of(context).textTheme, fmt = widget.me.fmt;
-    return SkGlass(
-      blur: false,
-      padding: const EdgeInsets.all(14),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: t.labelMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 4),
-        v == null ? const SkSkeleton(height: 20, width: 80) : Text(fmt.money(v), style: SkText.mono.copyWith(fontSize: 17, fontWeight: FontWeight.w700, color: color)),
-        if (hint != null) Text(hint, style: t.bodySmall),
-      ]),
-    );
-  }
-
-  Widget _rangeChip() => InputChip(
-        avatar: const Icon(Icons.date_range_outlined, size: 18),
-        label: Text('${widget.me.fmt.dayLabel(_from)} – ${widget.me.fmt.dayLabel(_to)}'),
-        onPressed: _range,
+  Widget _rangeChip() => SkFilterPill(
+        icon: Icons.date_range_outlined,
+        label: '${widget.me.fmt.dayLabel(_from)} – ${widget.me.fmt.dayLabel(_to)}',
+        dropdown: true,
+        onTap: _range,
       );
 
   Widget _line(LedgerLine l, {VoidCallback? onTap}) {
@@ -220,17 +212,16 @@ class _LedgerScreenState extends State<LedgerScreen> {
     final me = widget.me, fmt = me.fmt, ro = me.readOnly, s = _shop, b = _bal;
     final t = Theme.of(context).textTheme;
     return [
-      Row(children: [
-        Expanded(child: _tile('Cash drawer', b?.cash, hint: 'Should be in the drawer now')),
-        const SizedBox(width: 10),
-        Expanded(child: _tile('Bank', b?.bank, hint: 'Card payments and deposits')),
+      SkHero(label: 'Total', value: b == null ? null : b.cash + b.bank, format: fmt.money),
+      const SizedBox(height: SkSpace.lg),
+      SkStatStrip(format: fmt.money, stats: [
+        SkStat(label: 'Cash drawer', value: b?.cash, hint: 'Should be in the drawer now'),
+        SkStat(label: 'Bank', value: b?.bank, hint: 'Card payments and deposits'),
       ]),
-      const SizedBox(height: 10),
-      _tile('Total', b == null ? null : b.cash + b.bank),
-      const SizedBox(height: 10),
+      const SizedBox(height: SkSpace.md),
       Wrap(spacing: 8, runSpacing: 8, children: [
         FilledButton.icon(onPressed: ro ? null : () => _sheet((_) => TransferSheet(api: widget.api, me: me)), icon: const Icon(Icons.swap_horiz_rounded), label: const Text('Move money')),
-        OutlinedButton(onPressed: ro || b == null ? null : () => _sheet((_) => BalancesSheet(api: widget.api, me: me, current: b)), child: const Text('Set balances')),
+        FilledButton.tonal(onPressed: ro || b == null ? null : () => _sheet((_) => BalancesSheet(api: widget.api, me: me, current: b)), child: const Text('Set balances')),
         if (me.features.contains('excel_export')) OutlinedButton.icon(onPressed: s == null ? null : _excel, icon: const Icon(Icons.table_view_outlined), label: const Text('Excel')),
       ]),
       const SizedBox(height: 10),
@@ -247,8 +238,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       if (s == null)
         const SkSkeleton(height: 240, radius: 24)
       else
-        SkGlass(
-          blur: false,
+        SkCard(
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(children: [
             // Newest first: where the money stands now on top, each line with its balance after it, the start below.
@@ -289,12 +279,10 @@ class _LedgerScreenState extends State<LedgerScreen> {
           ),
         ]),
         const SizedBox(height: 10),
-        Row(children: [
-          Expanded(child: _tile('Earned', st?.barber.earned)),
-          const SizedBox(width: 8),
-          Expanded(child: _tile('Paid', st?.barber.paid)),
-          const SizedBox(width: 8),
-          Expanded(child: _tile('Owed now', st?.barber.balance, color: st != null && st.barber.balance < 0 ? cs.error : null)),
+        SkStatStrip(format: fmt.money, stats: [
+          SkStat(label: 'Earned', value: st?.barber.earned),
+          SkStat(label: 'Paid', value: st?.barber.paid),
+          SkStat(label: 'Owed now', value: st?.barber.balance, color: st != null && st.barber.balance < 0 ? cs.error : null),
         ]),
         const SizedBox(height: 10),
         Align(alignment: Alignment.centerLeft, child: _rangeChip()),
@@ -302,8 +290,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
         if (st == null)
           const SkSkeleton(height: 200, radius: 24)
         else
-          SkGlass(
-            blur: false,
+          SkCard(
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Column(children: [
               if (st.lines.isEmpty)
@@ -317,17 +304,15 @@ class _LedgerScreenState extends State<LedgerScreen> {
       ];
     }
     return [
-      Row(children: [
-        Expanded(child: _tile('Owed to barbers', list?.fold<int>(0, (s, b) => s + b.balance), hint: 'Commission earned minus payouts')),
-        const SizedBox(width: 10),
+      Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Expanded(child: SkHero(label: 'Owed to barbers', value: list?.fold<int>(0, (s, b) => s + b.balance), format: fmt.money, notes: const ['Commission earned minus payouts'])),
         FilledButton(onPressed: ro || list == null || list.isEmpty ? null : () => _sheet((_) => PayoutSheet(api: widget.api, me: me, barbers: list)), child: const Text('Pay barber')),
       ]),
-      const SizedBox(height: 12),
+      const SizedBox(height: SkSpace.lg),
       if (list == null)
         const SkSkeleton(height: 160, radius: 24)
       else
-        SkGlass(
-          blur: false,
+        SkCard(
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(children: [
             ListTile(dense: true, title: Text('Barber', style: t.labelSmall), trailing: Text('Earned · Paid · Owed', style: t.labelSmall)),
@@ -335,7 +320,8 @@ class _LedgerScreenState extends State<LedgerScreen> {
               Opacity(
                 opacity: b.active ? 1 : 0.6,
                 child: ListTile(
-                  title: Text(b.name),
+                  leading: SkAvatar(slug: me.org.slug, name: b.name, url: b.avatarUrl, size: 40),
+                  title: Text(b.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: Text('${fmt.money(b.earned)} earned · ${fmt.money(b.paid)} paid'),
                   trailing: Text(fmt.money(b.balance), style: SkText.mono.copyWith(fontWeight: FontWeight.w700, color: b.balance < 0 ? cs.error : null)),
                   onTap: () => _set(() => _statementId = b.id),

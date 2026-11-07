@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/scale.dart';
+import '../../core/ui/stats.dart';
 import '../../core/ui/toast.dart';
 import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/form_sheet.dart';
-import '../../core/ui/glass.dart';
 import '../../core/ui/states.dart';
 import '../../data/services_admin_api.dart';
 import '../../models/me.dart';
@@ -114,24 +115,24 @@ class _ServicesScreenState extends State<ServicesScreen> {
     for (final l in groups.values) {
       l.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     }
+    final cs = Theme.of(context).colorScheme;
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-        Row(children: [
-          Expanded(child: SkHeading('Services')),
-          if (!ro && all != null && all.isNotEmpty) FilledButton.icon(onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: const Text('Add service')),
-        ]),
-        Text('What barbers pick on a new sale, and what prints on the bill.', style: t.bodySmall),
-        const SizedBox(height: 12),
+      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+        SkHeading(
+          'Services',
+          subtitle: 'What barbers pick on a new sale, and what prints on the bill.',
+          action: !ro && all != null && all.isNotEmpty ? FilledButton.icon(onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: const Text('Add service')) : null,
+        ),
         if (_error != null && all == null)
           ErrorState(error: _error!, onRetry: _load)
         else if (all == null)
-          for (var i = 0; i < 3; i++) const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: SkSkeleton(height: 90))
+          const SkSkeletonList(count: 5, height: 60)
         else if (all.isEmpty)
-          SkGlass(
-            blur: false,
+          SkCard(
+            padding: const EdgeInsets.all(SkSpace.xl),
             child: Column(children: [
-              Text('No services yet', style: t.titleMedium),
+              Text('No services yet', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
               const SizedBox(height: 6),
               const Text('Start from a ready-made price list (haircuts, beard, colour…) and change the prices, or add your own.', textAlign: TextAlign.center),
               const SizedBox(height: 14),
@@ -140,44 +141,54 @@ class _ServicesScreenState extends State<ServicesScreen> {
             ]),
           )
         else
-          for (final e in groups.entries)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: SkGlass(
-                blur: false,
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Column(children: [
-                  ListTile(
-                    title: Text(e.key, style: t.titleSmall),
-                    trailing: ro ? null : IconButton(tooltip: 'Add to ${e.key}', onPressed: () => _edit(group: e.key), icon: const Icon(Icons.add_rounded)),
-                  ),
-                  for (final s in e.value)
-                    Opacity(
-                      opacity: s.active ? 1 : 0.55,
-                      child: ListTile(
-                        title: Row(children: [
-                          Flexible(child: Text(s.name)),
-                          if (!s.active) Padding(padding: const EdgeInsets.only(left: 6), child: Text('Hidden', style: t.labelSmall)),
-                        ]),
-                        subtitle: (s.description ?? '').isEmpty ? null : Text(s.description!),
-                        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Text(fmt.money(s.price), style: SkText.mono.copyWith(fontWeight: FontWeight.w600)),
-                          if (!ro)
-                            PopupMenuButton<String>(
-                              tooltip: 'Actions for ${s.name}',
-                              onSelected: (v) => switch (v) { 'edit' => _edit(s: s), 'toggle' => _toggle(s), _ => _delete(s) },
-                              itemBuilder: (_) => [
-                                const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                                PopupMenuItem(value: 'toggle', child: Text(s.active ? 'Hide from new sales' : 'Show again')),
-                                const PopupMenuItem(value: 'delete', child: Text('Delete')),
-                              ],
-                            ),
-                        ]),
-                      ),
+          for (final e in groups.entries) ...[
+            SkSection(e.key, action: ro ? null : '+ Add', actionTooltip: 'Add to ${e.key}', onAction: () => _edit(group: e.key), top: SkSpace.md),
+            SkFlatList(indent: SkSpace.lg, children: [
+              for (final s in e.value)
+                Opacity(
+                  opacity: s.active ? 1 : 0.55,
+                  child: InkWell(
+                    onTap: ro ? null : () => _edit(s: s),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(SkSpace.lg, SkSpace.md, SkSpace.xs, SkSpace.md),
+                      child: Row(children: [
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Row(children: [
+                              Flexible(child: Text(s.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
+                              if (!s.active)
+                                Container(
+                                  margin: const EdgeInsets.only(left: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                  decoration: BoxDecoration(color: cs.outlineVariant.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(6)),
+                                  child: Text('Hidden', style: t.labelSmall),
+                                ),
+                            ]),
+                            if ((s.description ?? '').isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(s.description!, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
+                            ],
+                          ]),
+                        ),
+                        Text(fmt.money(s.price), style: SkText.mono.copyWith(fontWeight: FontWeight.w700)),
+                        if (!ro)
+                          PopupMenuButton<String>(
+                            tooltip: 'Actions for ${s.name}',
+                            onSelected: (v) => switch (v) { 'edit' => _edit(s: s), 'toggle' => _toggle(s), _ => _delete(s) },
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                              PopupMenuItem(value: 'toggle', child: Text(s.active ? 'Hide from new sales' : 'Show again')),
+                              const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                            ],
+                          )
+                        else
+                          const SizedBox(width: SkSpace.md),
+                      ]),
                     ),
-                ]),
-              ),
-            ),
+                  ),
+                ),
+            ]),
+          ],
       ]),
     );
   }

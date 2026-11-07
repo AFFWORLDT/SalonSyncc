@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/theme/scale.dart';
+import '../../core/ui/stats.dart';
 import '../../core/ui/confirm_sign_out.dart';
 import '../../core/ui/avatar.dart';
 import '../../core/ui/heading.dart';
@@ -52,48 +54,50 @@ class AccountScreen extends StatelessWidget {
     final auth = Get.find<AuthController>();
     final theme = Get.find<ThemeController>();
     final me = auth.me.value!;
-    return ListView(padding: const EdgeInsets.symmetric(vertical: 12), children: [
-        const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: SkHeading('My account')),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-        child: Row(children: [
-          SkAvatar(slug: me.org.slug, name: me.user.name, url: me.user.avatarUrl, size: 56),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(me.user.name, style: Theme.of(context).textTheme.titleLarge),
-              Text('@${me.user.username} · ${me.role == Role.barber ? 'Barber' : 'Admin'} · ${me.salonName}', style: Theme.of(context).textTheme.bodySmall),
-            ]),
-          ),
-        ]),
-      ),
-      const Divider(),
-      ListTile(
-        leading: const Icon(Icons.lock_reset_rounded),
-        title: const Text('Change password'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => showChangePassword(context, AccountApi(auth.api)),
-      ),
-      Obx(() => ListTile(
-            leading: const Icon(Icons.brightness_6_outlined),
-            title: const Text('Appearance'),
-            trailing: DropdownButton<ThemeMode>(
-              value: theme.mode.value,
-              underline: const SizedBox(),
-              onChanged: (m) => m == null ? null : theme.setMode(m),
-              items: const [
-                DropdownMenuItem(value: ThemeMode.system, child: Text('Like my phone')),
-                DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
-                DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark')),
-              ],
-            ),
-          )),
-      for (final b in accountExtras) b(context),
-      const Divider(),
-      ListTile(leading: const Icon(Icons.logout), title: const Text('Sign out'), onTap: () async {
-        if (await confirmSignOut(context)) await auth.signOut();
-      }),
-      ListTile(leading: const Icon(Icons.swap_horiz), title: const Text('Switch salon'), onTap: () => auth.switchSalon()),
+    return ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+      const SkHeading('My account'),
+      Row(children: [
+        SkAvatar(slug: me.org.slug, name: me.user.name, url: me.user.avatarUrl, size: 56),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(me.user.name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+            Text('@${me.user.username} · ${me.role == Role.barber ? 'Barber' : 'Admin'} · ${me.salonName}', style: Theme.of(context).textTheme.bodySmall),
+          ]),
+        ),
+      ]),
+      const SizedBox(height: SkSpace.lg),
+      SkFlatList(children: [
+        ListTile(
+          leading: const Icon(Icons.lock_reset_rounded),
+          title: const Text('Change password'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => showChangePassword(context, AccountApi(auth.api)),
+        ),
+        Obx(() => ListTile(
+              leading: const Icon(Icons.brightness_6_outlined),
+              title: const Text('Appearance'),
+              trailing: DropdownButton<ThemeMode>(
+                value: theme.mode.value,
+                underline: const SizedBox(),
+                onChanged: (m) => m == null ? null : theme.setMode(m),
+                items: const [
+                  DropdownMenuItem(value: ThemeMode.system, child: Text('Like my phone')),
+                  DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
+                  DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark')),
+                ],
+              ),
+            )),
+        for (final b in accountExtras) b(context),
+        ListTile(leading: const Icon(Icons.swap_horiz), title: const Text('Switch salon'), onTap: () => auth.switchSalon()),
+        ListTile(
+          leading: Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
+          title: Text('Sign out', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          onTap: () async {
+            if (await confirmSignOut(context)) await auth.signOut();
+          },
+        ),
+      ]),
     ]);
   }
 }

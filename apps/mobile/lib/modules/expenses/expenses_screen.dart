@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/avatar.dart';
+import '../../core/theme/scale.dart';
+import '../../core/ui/stats.dart';
 import '../../core/ui/toast.dart';
 import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/filter_chip_menu.dart';
-import '../../core/ui/glass.dart';
 import '../../core/ui/states.dart';
 import '../../data/expenses_api.dart';
 import '../../data/staff_api.dart';
@@ -87,7 +89,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final pick = await showModalBottomSheet<(Staff, String)>(
       context: context,
       showDragHandle: true,
-      builder: (_) => _PickBarberDay(staff: _staff.where((s) => s.active).toList(), today: widget.me.today, fmt: widget.me.fmt),
+      builder: (_) => _PickBarberDay(staff: _staff.where((s) => s.active).toList(), today: widget.me.today, fmt: widget.me.fmt, slug: widget.me.org.slug),
     );
     if (pick == null || !mounted) return;
     final (s, day) = pick;
@@ -110,110 +112,120 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final fmt = widget.me.fmt, t = Theme.of(context).textTheme;
+    final fmt = widget.me.fmt, t = Theme.of(context).textTheme, cs = Theme.of(context).colorScheme;
     final ro = widget.me.readOnly;
+    final rows = _company ? _companyRows : _barberRows;
+    final total = _company ? _companyRows?.fold<int>(0, (s, e) => s + e.amount) : _barberRows?.fold<int>(0, (s, e) => s + e.amount);
+    final avatars = {for (final x in _staff) x.id: x.avatarUrl};
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-        Row(children: [
-          Expanded(child: SkHeading('Expenses')),
-          if (!ro)
-            FilledButton.icon(
-              onPressed: _company ? () => _editCompany(null) : _addBarber,
-              icon: const Icon(Icons.add_rounded),
-              label: Text(_company ? 'Add company expense' : 'Add expense'),
+      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+        SkHeading(
+          'Expenses',
+          action: ro
+              ? null
+              : FilledButton.icon(
+                  onPressed: _company ? () => _editCompany(null) : _addBarber,
+                  icon: const Icon(Icons.add_rounded),
+                  label: Text(_company ? 'Add company expense' : 'Add expense'),
+                ),
+        ),
+        Wrap(spacing: SkSpace.sm, runSpacing: SkSpace.sm, children: [
+          SkFilterPill(label: 'Barbers', icon: Icons.content_cut_rounded, active: !_company, onTap: () => _set(() => _company = false)),
+          SkFilterPill(label: 'Company', icon: Icons.storefront_outlined, active: _company, onTap: () => _set(() => _company = true)),
+          if (!_company)
+            ChipMenu<int?>(
+              value: _barber,
+              icon: Icons.person_outline_rounded,
+              items: [(null, 'All barbers'), for (final s in _staff) (s.id, s.active ? s.name : '${s.name} (inactive)')],
+              onChanged: (v) => _set(() => _barber = v),
             ),
         ]),
-        const SizedBox(height: 12),
-        SegmentedButton<bool>(
-          segments: const [ButtonSegment(value: false, label: Text('Barbers')), ButtonSegment(value: true, label: Text('Company'))],
-          selected: {_company},
-          onSelectionChanged: (s) => _set(() => _company = s.first),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: SkSpace.sm),
         Row(children: [
           IconButton(tooltip: 'Previous month', onPressed: () => _set(() => _month = prevMonth(_month)), icon: const Icon(Icons.chevron_left_rounded)),
-          Expanded(child: Text(fmt.monthLabel(_month), textAlign: TextAlign.center, style: t.titleMedium)),
+          Expanded(child: Text(fmt.monthLabel(_month), textAlign: TextAlign.center, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
           IconButton(
             tooltip: 'Next month',
             onPressed: _month == _current ? null : () => _set(() => _month = nextMonth(_month)),
             icon: const Icon(Icons.chevron_right_rounded),
           ),
         ]),
-        if (!_company)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ChipMenu<int?>(
-              value: _barber,
-              icon: Icons.person_outline_rounded,
-              items: [(null, 'All barbers'), for (final s in _staff) (s.id, s.active ? s.name : '${s.name} (inactive)')],
-              onChanged: (v) => _set(() => _barber = v),
-            ),
-          ),
-        const SizedBox(height: 8),
-        if (_error != null && (_company ? _companyRows : _barberRows) == null)
+        const SizedBox(height: SkSpace.sm),
+        if (_error != null && rows == null)
           ErrorState(error: _error!, onRetry: _load)
-        else if ((_company ? _companyRows : _barberRows) == null)
-          for (var i = 0; i < 4; i++) const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: SkSkeleton(height: 52))
-        else if (_company)
-          _list(
-            context,
-            title: 'Company expenses',
-            total: _companyRows!.fold(0, (s, e) => s + e.amount),
-            empty: 'No company expenses this month. Add rent, bills or supplies here.',
-            rows: [
+        else ...[
+          SkHero(
+            label: _company ? 'Company expenses' : 'Barbers\' expenses',
+            value: total,
+            format: fmt.money,
+            notes: [if (rows != null) '${rows.length} entr${rows.length == 1 ? 'y' : 'ies'}'],
+          ),
+          const SizedBox(height: SkSpace.lg),
+          if (rows == null)
+            const SkSkeletonList(count: 4, height: 60)
+          else if (rows.isEmpty)
+            EmptyState(text: _company ? 'No company expenses this month. Add rent, bills or supplies here.' : 'No expenses this month.', icon: Icons.receipt_outlined)
+          else if (_company)
+            SkFlatList(children: [
               for (final e in _companyRows!)
-                ListTile(
-                  title: Text(e.note),
-                  subtitle: Text('${fmt.dayLabel(e.day)} · ${e.paidFrom == 'bank' ? 'Bank' : 'Cash'}'),
-                  trailing: Text(fmt.money(e.amount), style: SkText.mono.copyWith(fontWeight: FontWeight.w600)),
+                _row(
+                  leading: CircleAvatar(
+                    radius: 20,
+                    backgroundColor: cs.primary.withValues(alpha: 0.12),
+                    foregroundColor: cs.primary,
+                    child: Icon(e.paidFrom == 'bank' ? Icons.account_balance_outlined : Icons.payments_outlined, size: 20),
+                  ),
+                  title: e.note,
+                  sub: '${fmt.dayLabel(e.day)} · ${e.paidFrom == 'bank' ? 'Bank' : 'Cash'}',
+                  amount: fmt.money(e.amount),
                   onTap: ro ? null : () => _editCompany(e),
                 ),
-            ],
-          )
-        else
-          _list(
-            context,
-            title: 'Expenses',
-            total: _barberRows!.fold(0, (s, e) => s + e.amount),
-            empty: 'No expenses this month.',
-            rows: [
+            ])
+          else
+            SkFlatList(children: [
               for (final e in _barberRows!)
-                ListTile(
-                  title: Text(e.barberName),
-                  subtitle: Text([fmt.dayLabel(e.day), if ((e.note ?? '').isNotEmpty) e.note!].join(' · ')),
-                  trailing: Text(fmt.money(e.amount), style: SkText.mono.copyWith(fontWeight: FontWeight.w600)),
+                _row(
+                  leading: SkAvatar(slug: widget.me.org.slug, name: e.barberName, url: avatars[e.barberId], size: 40),
+                  title: e.barberName,
+                  sub: [fmt.dayLabel(e.day), if ((e.note ?? '').isNotEmpty) e.note!].join(' · '),
+                  amount: fmt.money(e.amount),
                   onTap: ro ? null : () => _editBarber(e, barberId: e.barberId, barberName: e.barberName, day: e.day),
                 ),
-            ],
-          ),
+            ]),
+        ],
       ]),
     );
   }
 
-  Widget _list(BuildContext context, {required String title, required int total, required String empty, required List<Widget> rows}) {
-    if (rows.isEmpty) return EmptyState(text: empty, icon: Icons.receipt_outlined);
-    return SkGlass(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-          child: Row(children: [
-            Expanded(child: Text(title, style: Theme.of(context).textTheme.titleSmall)),
-            Text(widget.me.fmt.money(total), style: SkText.mono.copyWith(fontWeight: FontWeight.w700)),
-          ]),
-        ),
-        ...rows,
-      ]),
+  Widget _row({required Widget leading, required String title, required String sub, required String amount, VoidCallback? onTap}) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(SkSpace.lg, SkSpace.md, SkSpace.lg, SkSpace.md),
+        child: Row(children: [
+          leading,
+          const SizedBox(width: SkSpace.lg),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              const SizedBox(height: 2),
+              Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
+            ]),
+          ),
+          Text(amount, style: SkText.mono.copyWith(fontWeight: FontWeight.w700, color: cs.error)),
+        ]),
+      ),
     );
   }
 }
 
 /// "Add expense for": pick the barber and the day, then the entry opens (an existing one in edit).
 class _PickBarberDay extends StatefulWidget {
-  const _PickBarberDay({required this.staff, required this.today, required this.fmt});
+  const _PickBarberDay({required this.staff, required this.today, required this.fmt, required this.slug});
   final List<Staff> staff;
-  final String today;
+  final String today, slug;
   final Fmt fmt;
 
   @override
@@ -232,7 +244,13 @@ class _PickBarberDayState extends State<_PickBarberDay> {
           Text('Pick the barber and the day.', style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: 14),
           Wrap(spacing: 8, runSpacing: 8, children: [
-            for (final s in widget.staff) ChoiceChip(label: Text(s.name), selected: _who?.id == s.id, onSelected: (_) => setState(() => _who = s)),
+            for (final s in widget.staff)
+              ChoiceChip(
+                avatar: SkAvatar(slug: widget.slug, name: s.name, url: s.avatarUrl, size: 24),
+                label: Text(s.name),
+                selected: _who?.id == s.id,
+                onSelected: (_) => setState(() => _who = s),
+              ),
           ]),
           const SizedBox(height: 12),
           Align(

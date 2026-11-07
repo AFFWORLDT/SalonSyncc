@@ -103,7 +103,7 @@ void main() {
     expect(find.text('The ledger says AED -20'), findsOneWidget);
     await t.enterText(find.byKey(const ValueKey('bal-cash')), '0');
     await t.enterText(find.byKey(const ValueKey('bal-bank')), '90');
-    await t.tap(find.widgetWithText(FilledButton, 'Set balances'));
+    await t.tap(find.widgetWithText(FilledButton, 'Set balances').last); // the sheet's button
     await t.pumpAndSettle();
     expect(a.calls.singleWhere((c) => c.method == 'PUT').data, {'cash': '0', 'bank': '90'});
     expect(find.text('Balances set'), findsOneWidget);

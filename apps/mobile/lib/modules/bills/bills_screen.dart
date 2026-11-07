@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import '../../core/ui/filter_chip_menu.dart';
+import '../../core/ui/search_field.dart';
+import '../../core/theme/scale.dart';
+import '../../core/ui/stats.dart';
 import '../../core/ui/heading.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/format/fmt.dart';
-import '../../core/ui/glass.dart';
 import '../../core/ui/states.dart';
 import '../../data/sales_api.dart';
 import '../../models/me.dart';
@@ -88,68 +91,77 @@ class _BillsScreenState extends State<BillsScreen> {
     _load();
   }
 
+  /// Next page when the list is scrolled near its end.
+  bool _onScroll(ScrollNotification n) {
+    final list = _list;
+    if (list != null && !_more && list.total > _items.length && n.metrics.extentAfter < 400) {
+      setState(() => _more = true);
+      _load(page: _page + 1);
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final fmt = widget.me.fmt;
     final list = _list;
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
-        SkHeading(widget.admin ? 'Bills' : 'My bills'),
-        if (widget.admin) Text('Every sale makes a bill. Open one to see or print it.', style: Theme.of(context).textTheme.bodySmall),
-        const SizedBox(height: 12),
-        TextField(
-          key: const ValueKey('bill-search'),
-          controller: _q,
-          onChanged: _typed,
-          textInputAction: TextInputAction.search,
-          decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Bill no., customer or phone'),
-        ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: InputChip(
-            avatar: const Icon(Icons.calendar_today_outlined, size: 18),
-            label: Text(_day == null ? 'Any day' : fmt.dayLabel(_day!)),
-            onPressed: _pickDay,
-            onDeleted: _day == null
-                ? null
-                : () {
-                    setState(() => _day = null);
-                    _load();
-                  },
+    return NotificationListener<ScrollNotification>(
+      onNotification: _onScroll,
+      child: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+          SkHeading(widget.admin ? 'Bills' : 'My bills', subtitle: widget.admin ? 'Every sale makes a bill. Open one to see or print it.' : null),
+          SkSearchField(key: const ValueKey('bill-search'), controller: _q, onChanged: _typed, hint: 'Bill no., customer or phone'),
+          const SizedBox(height: SkSpace.md),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SkFilterPill(
+              label: _day == null ? 'Any day' : fmt.dayLabel(_day!),
+              icon: Icons.calendar_today_outlined,
+              active: _day != null,
+              onTap: _pickDay,
+              clearTooltip: 'Any day',
+              onClear: () {
+                setState(() => _day = null);
+                _load();
+              },
+            ),
           ),
-        ),
-        const SizedBox(height: 8),
-        if (_error != null && list == null)
-          ErrorState(error: _error!, onRetry: _load)
-        else if (list == null)
-          for (var i = 0; i < 5; i++) const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: SkSkeleton(height: 56))
-        else if (_items.isEmpty)
-          EmptyState(text: widget.admin ? 'No bills match.' : 'No bills found', icon: Icons.receipt_long_outlined)
-        else ...[
-          SkGlass(
-            padding: const EdgeInsets.symmetric(vertical: 6),
-            child: Column(children: [
+          const SizedBox(height: SkSpace.lg),
+          if (_error != null && list == null)
+            ErrorState(error: _error!, onRetry: _load)
+          else if (list == null)
+            const SkSkeletonList(count: 6, height: 60)
+          else if (_items.isEmpty)
+            EmptyState(text: widget.admin ? 'No bills match.' : 'No bills found', icon: Icons.receipt_long_outlined)
+          else ...[
+            Padding(
+              padding: const EdgeInsets.only(left: SkSpace.xs, bottom: SkSpace.sm),
+              child: Text('${list.total} bill${list.total == 1 ? '' : 's'}', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            ),
+            SkFlatList(children: [
               for (final s in _items)
                 SaleRow(sale: s, fmt: fmt, showDay: true, showBarber: widget.admin, onTap: () => widget.onOpen(s).then((_) => _load())),
             ]),
-          ),
-          if (list.total > _items.length && list.items.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: OutlinedButton(
-                onPressed: _more
-                    ? null
-                    : () {
-                        setState(() => _more = true);
-                        _load(page: _page + 1);
-                      },
-                child: const Text('Show more'),
+            if (_more)
+              const Padding(padding: EdgeInsets.all(SkSpace.lg), child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)))
+            // Loads by itself on scroll; the button is for a list too short to scroll.
+            else if (list.total > _items.length && list.items.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: SkSpace.md),
+                child: Center(
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() => _more = true);
+                      _load(page: _page + 1);
+                    },
+                    child: const Text('Show more'),
+                  ),
+                ),
               ),
-            ),
-        ],
-      ]),
+          ],
+        ]),
+      ),
     );
   }
 }
