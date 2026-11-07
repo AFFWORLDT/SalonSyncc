@@ -55,13 +55,15 @@ void main() {
   testWidgets('shop: tiles, opening, lines, closing; account filter', (t) async {
     final (a, _) = await pump(t);
     expect(find.text('Ledger'), findsOneWidget);
-    expect(find.text('Every money movement, in order. Nothing here is ever rewritten.'), findsOneWidget);
+    expect(find.text('Every money movement, newest first. Nothing here is ever rewritten.'), findsOneWidget);
     expect(find.text('Cash drawer'), findsWidgets);
     expect(find.text('AED -20'), findsWidgets);
     expect(find.text('AED 90'), findsWidgets);
     expect(find.text('Opening balance'), findsOneWidget);
     expect(find.text('Closing balance'), findsOneWidget);
     expect(find.textContaining('Bill E2E-20261104-001'), findsOneWidget);
+    // Newest first: closing balance on top, opening balance at the bottom.
+    expect(t.getTopLeft(find.text('Closing balance')).dy, lessThan(t.getTopLeft(find.text('Opening balance')).dy));
     expect(shopQueries(a).first['account'], 'all');
     await t.tap(find.text('Cash + Bank'));
     await t.pumpAndSettle();

@@ -97,15 +97,16 @@ export function LedgerShop() {
           </div>
         ) : (
           <>
+            {/* Newest first: where the money stands now on top, the start of the range at the bottom. */}
             <Row
-              label="Opening balance"
-              sub={dayLabel(data.from)}
-              balance={data.account === "all" ? data.opening.cash + data.opening.bank : data.opening[data.account]}
+              label="Closing balance"
+              sub={dayLabel(data.to)}
+              balance={data.account === "all" ? data.closing.cash + data.closing.bank : data.closing[data.account]}
               strong
             />
             {data.lines.length ? (
               <ul className="divide-y border-y">
-                {data.lines.map((l) => (
+                {[...data.lines].reverse().map((l) => (
                   <li key={l.id}>
                     <button
                       type="button"
@@ -133,9 +134,9 @@ export function LedgerShop() {
               <p className="border-y px-4 py-8 text-center text-sm text-muted-foreground">No money moved in these days.</p>
             )}
             <Row
-              label="Closing balance"
-              sub={dayLabel(data.to)}
-              balance={data.account === "all" ? data.closing.cash + data.closing.bank : data.closing[data.account]}
+              label="Opening balance"
+              sub={dayLabel(data.from)}
+              balance={data.account === "all" ? data.opening.cash + data.opening.bank : data.opening[data.account]}
               strong
             />
           </>

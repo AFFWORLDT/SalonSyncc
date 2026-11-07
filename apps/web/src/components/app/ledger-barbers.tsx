@@ -160,13 +160,9 @@ function Statement({
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between bg-muted/40 px-4 py-3 text-sm font-semibold">
-              <span>Owed on {dayLabel(data.from)}</span>
-              <span className="num">{money(data.opening)}</span>
-            </div>
             {data.lines.length ? (
               <ul className="divide-y border-y">
-                {data.lines.map((l) => (
+                {[...data.lines].reverse().map((l) => (
                   <li key={l.id}>
                     <button
                       type="button"
@@ -193,6 +189,10 @@ function Statement({
             ) : (
               <p className="border-y px-4 py-8 text-center text-sm text-muted-foreground">Nothing in these days.</p>
             )}
+            <div className="flex items-center justify-between bg-muted/40 px-4 py-3 text-sm font-semibold">
+              <span>Owed on {dayLabel(data.from)}</span>
+              <span className="num">{money(data.opening)}</span>
+            </div>
           </>
         )}
       </Card>

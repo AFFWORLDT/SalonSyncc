@@ -14,7 +14,7 @@ function LedgerPageInner() {
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="text-2xl">Ledger</h1>
-        <p className="text-sm text-muted-foreground">Every money movement, in order. Nothing here is ever rewritten.</p>
+        <p className="text-sm text-muted-foreground">Every money movement, newest first. Nothing here is ever rewritten.</p>
       </div>
       <Tabs value={tab} onValueChange={(v) => setTab(v as "shop" | "barbers")}>
         <TabsList>

@@ -153,7 +153,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
         SkHeading('Ledger'),
-        Text('Every money movement, in order. Nothing here is ever rewritten.', style: t.bodySmall),
+        Text('Every money movement, newest first. Nothing here is ever rewritten.', style: t.bodySmall),
         const SizedBox(height: 12),
         SegmentedButton<bool>(
           segments: const [ButtonSegment(value: false, label: Text('Shop')), ButtonSegment(value: true, label: Text('Barbers'))],
@@ -251,14 +251,15 @@ class _LedgerScreenState extends State<LedgerScreen> {
           blur: false,
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Column(children: [
-            _edge('Opening balance', fmt.dayLabel(s.from), s.opening),
+            // Newest first: where the money stands now on top, each line with its balance after it, the start below.
+            _edge('Closing balance', fmt.dayLabel(s.to), s.closing),
             const Divider(height: 1),
             if (s.lines.isEmpty)
               const EmptyState(text: 'No money moved in these days.', icon: Icons.account_balance_wallet_outlined)
             else
-              for (final l in s.lines) _line(l, onTap: l.openableTransfer && !ro ? () => _openTransfer(l) : null),
+              for (final l in s.lines.reversed) _line(l, onTap: l.openableTransfer && !ro ? () => _openTransfer(l) : null),
             const Divider(height: 1),
-            _edge('Closing balance', fmt.dayLabel(s.to), s.closing),
+            _edge('Opening balance', fmt.dayLabel(s.from), s.opening),
           ]),
         ),
       const SizedBox(height: 10),
@@ -305,12 +306,12 @@ class _LedgerScreenState extends State<LedgerScreen> {
             blur: false,
             padding: const EdgeInsets.symmetric(vertical: 6),
             child: Column(children: [
-              _edge('Owed on ${fmt.dayLabel(st.from)}', '', st.opening),
-              const Divider(height: 1),
               if (st.lines.isEmpty)
                 const EmptyState(text: 'Nothing in these days.')
               else
-                for (final l in st.lines) _line(l, onTap: l.openablePayout && !ro ? () => _openPayout(l) : null),
+                for (final l in st.lines.reversed) _line(l, onTap: l.openablePayout && !ro ? () => _openPayout(l) : null),
+              const Divider(height: 1),
+              _edge('Owed on ${fmt.dayLabel(st.from)}', '', st.opening),
             ]),
           ),
       ];
