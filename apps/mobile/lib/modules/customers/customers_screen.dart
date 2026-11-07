@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../core/ui/toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -237,7 +238,7 @@ class _CustomerProfileState extends State<CustomerProfile> {
                       SkGlass(
                         blur: false,
                         padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
-                        child: SwitchListTile(
+                        child: SkSwitchTile(
                           contentPadding: EdgeInsets.zero,
                           title: const Text('WhatsApp reminders and announcements'),
                           subtitle: const Text('Turn off if the customer asked not to get messages. Bills still go out.'),

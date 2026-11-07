@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/ui/toggle.dart';
 import 'package:get/get.dart';
 
 import '../../core/auth/auth_controller.dart';
@@ -33,7 +34,7 @@ Widget _lockToggle(BuildContext context) {
   final lock = Get.find<LockController>();
   return Obx(() => !lock.available.value
       ? const SizedBox.shrink()
-      : SwitchListTile(
+      : SkSwitchTile(
           secondary: const Icon(Icons.fingerprint),
           title: const Text('Unlock with Face ID / fingerprint'),
           value: lock.enabled.value,

@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../../core/ui/toggle.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/format/fmt.dart';
@@ -377,7 +378,7 @@ class _StaffFormState extends State<_StaffForm> {
           const SizedBox(height: 10),
           TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: dec('Mobile (optional)')),
           if (_role == 'barber')
-            SwitchListTile(
+            SkSwitchTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Can add expenses'),
               subtitle: const Text('On: adds their own expense from the Today screen. Off: only you add it, from Expenses.'),

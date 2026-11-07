@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/ui/toggle.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/format/fmt.dart';
@@ -177,7 +178,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
 
-  Widget _switch(String key, String label, [String? sub]) => SwitchListTile(
+  Widget _switch(String key, String label, [String? sub]) => SkSwitchTile(
         contentPadding: EdgeInsets.zero,
         title: Text(label),
         subtitle: sub == null ? null : Text(sub),

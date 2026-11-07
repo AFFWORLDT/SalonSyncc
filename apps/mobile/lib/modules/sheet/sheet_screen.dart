@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../../core/ui/toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -157,7 +158,7 @@ class _SheetScreenState extends State<SheetScreen> {
             Expanded(child: tile('Total profit', d?.totals.profit, color: d != null && d.totals.profit < 0 ? cs.error : null)),
           ]),
           const SizedBox(height: 8),
-          SwitchListTile(
+          SkSwitchTile(
             contentPadding: EdgeInsets.zero,
             title: const Text("Show each barber's expense"),
             value: _showExp,

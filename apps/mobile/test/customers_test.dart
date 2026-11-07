@@ -1,3 +1,4 @@
+import 'package:salonkit/core/ui/toggle.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -73,7 +74,7 @@ void main() {
     expect(find.text('Haircut ×1'), findsOneWidget);
     expect(find.text('Visit history'), findsOneWidget);
     expect(a.calls.where((c) => c.path == '/api/sales').single.queryParameters, {'customer_id': 3, 'page_size': 30});
-    await t.tap(find.byType(Switch));
+    await t.tap(find.byType(SkToggle));
     await t.pumpAndSettle();
     expect(a.calls.singleWhere((c) => c.method == 'PUT').data, {'opt_out': true});
     expect(find.text('No more WhatsApp reminders or announcements'), findsOneWidget);
