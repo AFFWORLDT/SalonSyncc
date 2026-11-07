@@ -27,7 +27,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final c = ThemeController();
     await c.load();
-    expect(c.mode.value, ThemeMode.system);
+    expect(c.mode.value, ThemeMode.light); // light until the person picks otherwise
     await c.setMode(ThemeMode.dark);
     final again = ThemeController();
     await again.load();
