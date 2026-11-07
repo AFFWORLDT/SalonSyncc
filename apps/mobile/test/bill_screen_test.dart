@@ -54,4 +54,16 @@ void main() {
     await pump(t, {...raw('sale.json'), 'day': '2020-01-01', 'barber_id': me.user.id});
     expect(find.text('Edit'), findsNothing);
   });
+
+  testWidgets('on a phone the bill shows, with the share buttons pinned under it (not filling the screen)', (t) async {
+    t.view.physicalSize = const Size(1080, 2400);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    final me = meWith(barber: true);
+    await pump(t, {...raw('sale.json'), 'day': me.today, 'barber_id': me.user.id});
+    expect(find.text('BILL').hitTestable(), findsOneWidget);
+    final share = t.getRect(find.text('Share link'));
+    expect(share.top, greaterThan(800 - 120)); // at the bottom of an 800-tall screen
+    expect(t.getRect(find.text('BILL')).top, lessThan(share.top));
+  });
 }

@@ -88,7 +88,7 @@ class _ShareButtonsState extends State<ShareButtons> {
   @override
   Widget build(BuildContext context) {
     final b = _b, s = widget.sale;
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
         Expanded(
           child: FilledButton.tonalIcon(
