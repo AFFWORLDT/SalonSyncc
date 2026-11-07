@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/staff_api.dart';
 import 'package:get/get.dart';
 
 import '../../core/auth/auth_controller.dart';
@@ -22,6 +23,7 @@ final sheetModule = FeatureModule(
     return SheetScreen(
       me: auth.me.value!,
       reports: AdminReportsApi(auth.api),
+      staff: StaffApi(auth.api),
       onDay: (day) {
         salesDayRequest.value = day;
         openModule('sales');

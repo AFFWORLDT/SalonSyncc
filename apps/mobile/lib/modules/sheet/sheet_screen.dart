@@ -1,5 +1,11 @@
 import 'dart:typed_data';
 
+import '../../data/staff_api.dart';
+import '../../core/ui/haptics.dart';
+import '../../core/ui/avatar.dart';
+import '../../core/ui/filter_chip_menu.dart';
+import '../../core/theme/scale.dart';
+import '../../core/ui/stats.dart';
 import '../../core/ui/toast.dart';
 import '../../core/ui/heading.dart';
 import '../../core/ui/toggle.dart';
@@ -9,8 +15,6 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/export/daily_xlsx.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/ui/count_up.dart';
-import '../../core/ui/glass.dart';
 import '../../core/ui/states.dart';
 import '../../data/admin_reports_api.dart';
 import '../../models/daily_sheet.dart';
@@ -29,13 +33,16 @@ const kSheetNote =
 
 /// The month day by day: each barber's sale and commission (and expense), the shop's totals and profit; Excel export.
 class SheetScreen extends StatefulWidget {
-  const SheetScreen({super.key, required this.me, required this.reports, required this.onDay, this.shareFile = _shareXlsx});
+  const SheetScreen({super.key, required this.me, required this.reports, required this.onDay, this.shareFile = _shareXlsx, this.staff});
   final Me me;
   final AdminReportsApi reports;
 
   /// A date was tapped: show that day's sales.
   final ValueChanged<String> onDay;
   final ShareFile shareFile;
+
+  /// For the barbers' photos in "By barber" (optional: initials without it).
+  final StaffApi? staff;
 
   @override
   State<SheetScreen> createState() => _SheetScreenState();
@@ -47,6 +54,11 @@ class _SheetScreenState extends State<SheetScreen> {
   DailySheet? _d;
   Object? _error;
   bool _showExp = false, _exporting = false;
+
+  /// What the table shows: everything, the shop's columns only, or one barber.
+  String _view = 'all';
+  int? _barberId;
+  Map<int, String?> _avatars = const {};
   int _seq = 0;
 
   @override
@@ -56,6 +68,7 @@ class _SheetScreenState extends State<SheetScreen> {
     sheetMonthRequest.value = null;
     sheetMonthRequest.addListener(_asked);
     _load();
+    widget.staff?.list().then((l) => mounted ? setState(() => _avatars = {for (final x in l) x.id: x.avatarUrl}) : null, onError: (_) {});
   }
 
   @override
@@ -114,62 +127,85 @@ class _SheetScreenState extends State<SheetScreen> {
   Widget build(BuildContext context) {
     final me = widget.me, fmt = me.fmt, t = Theme.of(context).textTheme, cs = Theme.of(context).colorScheme;
     final d = _d;
-    Widget tile(String label, int? v, {String? hint, Color? color}) => SkGlass(blur: false, 
-          padding: const EdgeInsets.all(14),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: t.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
-            const SizedBox(height: 4),
-            v == null
-                ? const SkSkeleton(height: 20, width: 80)
-                : CountUp(value: v, format: fmt.money, style: SkText.mono.copyWith(fontSize: 17, fontWeight: FontWeight.w700, color: color)),
-            if (hint != null) Text(hint, style: t.bodySmall),
-          ]),
-        );
+    final barber = d == null ? null : d.barbers.where((b) => b.id == _barberId).firstOrNull ?? (d.barbers.isEmpty ? null : d.barbers.first);
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
-        Row(children: [
-          Expanded(child: SkHeading('Daily sheet')),
-          if (me.features.contains('excel_export'))
-            OutlinedButton.icon(
-              onPressed: d == null || _exporting ? null : _excel,
-              icon: const Icon(Icons.table_view_outlined),
-              label: Text(_exporting ? 'Preparing…' : 'Excel'),
-            ),
-        ]),
+      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+        SkHeading(
+          'Daily sheet',
+          action: !me.features.contains('excel_export')
+              ? null
+              : OutlinedButton.icon(
+                  onPressed: d == null || _exporting ? null : _excel,
+                  icon: const Icon(Icons.table_view_outlined),
+                  label: Text(_exporting ? 'Preparing…' : 'Excel'),
+                ),
+        ),
         Row(children: [
           IconButton(tooltip: 'Previous month', onPressed: () => _go(prevMonth(_month)), icon: const Icon(Icons.chevron_left_rounded)),
-          Expanded(child: Text(fmt.monthLabel(_month), textAlign: TextAlign.center, style: t.titleMedium)),
+          Expanded(child: Text(fmt.monthLabel(_month), textAlign: TextAlign.center, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
           IconButton(tooltip: 'Next month', onPressed: _month == _current ? null : () => _go(nextMonth(_month)), icon: const Icon(Icons.chevron_right_rounded)),
         ]),
+        const SizedBox(height: SkSpace.sm),
         if (_error != null && d == null)
           ErrorState(error: _error!, onRetry: _load)
         else ...[
-          Row(children: [
-            Expanded(child: tile('Total sale', d?.totals.sales)),
-            const SizedBox(width: 10),
-            Expanded(
-              child: tile('Expense', d?.totals.expense,
-                  hint: d == null || d.totals.companyExpense == 0 ? null : 'incl. ${fmt.money(d.totals.companyExpense)} company'),
-            ),
+          SkHero(label: 'Total sale', value: d?.totals.sales, format: fmt.money),
+          const SizedBox(height: SkSpace.lg),
+          SkStatStrip(format: fmt.money, stats: [
+            SkStat(label: 'Expense', value: d?.totals.expense, hint: d == null || d.totals.companyExpense == 0 ? null : 'incl. ${fmt.money(d.totals.companyExpense)} company'),
+            SkStat(label: 'Total commission', value: d?.totals.commission),
+            SkStat(label: 'Total profit', value: d?.totals.profit, color: d == null ? null : (d.totals.profit < 0 ? cs.error : skPalette(context).success)),
           ]),
-          const SizedBox(height: 10),
-          Row(children: [
-            Expanded(child: tile('Total commission', d?.totals.commission)),
-            const SizedBox(width: 10),
-            Expanded(child: tile('Total profit', d?.totals.profit, color: d != null && d.totals.profit < 0 ? cs.error : null)),
-          ]),
-          const SizedBox(height: 8),
-          SkSwitchTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text("Show each barber's expense"),
-            value: _showExp,
-            onChanged: (v) => setState(() => _showExp = v),
+          const SizedBox(height: SkSpace.lg),
+          // What the table shows.
+          SizedBox(
+            height: 38,
+            child: ListView(scrollDirection: Axis.horizontal, children: [
+              for (final (id, label, icon) in const [('all', 'Full sheet', Icons.grid_on_rounded), ('shop', 'Shop', Icons.storefront_outlined), ('barber', 'By barber', Icons.person_outline_rounded)]) ...[
+                SkFilterPill(key: ValueKey('view-$id'), label: label, icon: icon, active: _view == id, onTap: () => setState(() => _view = id)),
+                const SizedBox(width: SkSpace.sm),
+              ],
+            ]),
           ),
-          if (d == null)
-            const SkSkeleton(height: 240, radius: 24)
+          if (_view == 'barber' && d != null && d.barbers.isNotEmpty) ...[
+            const SizedBox(height: SkSpace.md),
+            SizedBox(
+              height: 76,
+              child: ListView(scrollDirection: Axis.horizontal, children: [
+                for (final b in d.barbers)
+                  _BarberChoice(slug: me.org.slug, b: b, url: _avatars[b.id], on: b.id == barber?.id, onTap: () => setState(() => _barberId = b.id)),
+              ]),
+            ),
+          ],
+          if (_view != 'shop')
+            SkSwitchTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("Show each barber's expense"),
+              value: _showExp,
+              onChanged: (v) => setState(() => _showExp = v),
+            )
           else
-            SkGlass(blur: false, padding: const EdgeInsets.symmetric(vertical: 8), child: _Table(d: d, me: me, showExp: _showExp, onDay: widget.onDay)),
+            const SizedBox(height: SkSpace.md),
+          if (d == null)
+            const SkSkeleton(height: 240, radius: 18)
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerLowest.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(SkRadius.lg),
+                border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
+              ),
+              child: _Table(
+                d: d,
+                me: me,
+                showExp: _showExp && _view != 'shop',
+                onDay: widget.onDay,
+                barbers: switch (_view) { 'shop' => const [], 'barber' => [?barber], _ => d.barbers },
+                shop: _view != 'barber',
+              ),
+            ),
           const SizedBox(height: 10),
           Text(kSheetNote.replaceAll('{CUR}', fmt.currency), style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
         ],
@@ -178,12 +214,50 @@ class _SheetScreenState extends State<SheetScreen> {
   }
 }
 
+/// A barber to show in "By barber": photo and name, ringed when picked.
+class _BarberChoice extends StatelessWidget {
+  const _BarberChoice({required this.slug, required this.b, required this.url, required this.on, required this.onTap});
+  final String slug;
+  final SheetBarber b;
+  final String? url;
+  final bool on;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(SkRadius.md),
+      onTap: () {
+        Haptic.select();
+        onTap();
+      },
+      child: SizedBox(
+        width: 68,
+        child: Column(children: [
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: on ? cs.primary : Colors.transparent, width: 2)),
+            child: SkAvatar(slug: slug, name: b.name, url: url, size: 44),
+          ),
+          const SizedBox(height: 4),
+          Text(b.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, fontWeight: on ? FontWeight.w700 : FontWeight.w500, color: on ? cs.primary : null)),
+        ]),
+      ),
+    );
+  }
+}
+
 class _Table extends StatelessWidget {
-  const _Table({required this.d, required this.me, required this.showExp, required this.onDay});
+  const _Table({required this.d, required this.me, required this.showExp, required this.onDay, required this.barbers, this.shop = true});
   final DailySheet d;
   final Me me;
   final bool showExp;
   final ValueChanged<String> onDay;
+
+  /// The barber columns to show, and whether the shop's four columns follow them.
+  final List<SheetBarber> barbers;
+  final bool shop;
 
   static const _dateW = 92.0, _colW = 64.0, _rowH = 38.0, _headH = 26.0;
 
@@ -212,15 +286,17 @@ class _Table extends StatelessWidget {
       return Container(
         color: isToday ? cs.primary.withValues(alpha: 0.08) : null,
         child: Row(children: [
-          for (final b in d.barbers) ...[
+          for (final b in barbers) ...[
             num(r.cellFor(b.id).sales, bold: total, color: muted ?? (b.active ? null : dim)),
             num(r.cellFor(b.id).commission, bold: total, color: muted ?? (b.active ? null : dim)),
             if (showExp) num(r.cellFor(b.id).expense, bold: total, color: muted ?? (b.active ? null : dim)),
           ],
-          num(r.sales, bold: true, color: muted),
-          num(r.expense, bold: total, color: muted),
-          num(r.commission, bold: total, color: muted),
-          num(r.profit, bold: true, color: muted ?? (r.profit < 0 ? cs.error : null)),
+          if (shop) ...[
+            num(r.sales, bold: true, color: muted),
+            num(r.expense, bold: total, color: muted),
+            num(r.commission, bold: total, color: muted),
+            num(r.profit, bold: true, color: muted ?? (r.profit < 0 ? cs.error : null)),
+          ],
           const SizedBox(width: 12),
         ]),
       );
@@ -243,7 +319,7 @@ class _Table extends StatelessWidget {
     ]);
     final body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        for (final b in d.barbers)
+        for (final b in barbers)
           SizedBox(
             width: _colW * perBarber,
             height: _headH,
@@ -252,18 +328,15 @@ class _Table extends StatelessWidget {
               child: Text(b.name, style: t.labelMedium?.copyWith(fontWeight: FontWeight.w600, color: b.active ? null : dim), maxLines: 1, overflow: TextOverflow.ellipsis),
             ),
           ),
-        SizedBox(width: _colW * 4, height: _headH, child: Align(alignment: Alignment.centerRight, child: Text('Shop', style: t.labelMedium?.copyWith(fontWeight: FontWeight.w600)))),
+        if (shop) SizedBox(width: _colW * 4, height: _headH, child: Align(alignment: Alignment.centerRight, child: Text('Shop', style: t.labelMedium?.copyWith(fontWeight: FontWeight.w600)))),
       ]),
       Row(children: [
-        for (final b in d.barbers) ...[
+        for (final b in barbers) ...[
           head('Sale', color: b.active ? null : dim),
           head('Com.', color: b.active ? null : dim),
           if (showExp) head('Exp.', color: b.active ? null : dim),
         ],
-        head('Sale'),
-        head('Exp.'),
-        head('Com.'),
-        head('Profit'),
+        if (shop) ...[head('Sale'), head('Exp.'), head('Com.'), head('Profit')],
         const SizedBox(width: 12),
       ]),
       for (final r in rows) line(r),
@@ -273,7 +346,91 @@ class _Table extends StatelessWidget {
       padding: const EdgeInsets.only(left: 12),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         dates,
-        Expanded(child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: body)),
+        Expanded(child: _SwipeHint(child: body)),
+      ]),
+    );
+  }
+}
+
+/// A sideways scroller that says so: while there is more to the right, the edge fades and "Swipe for more" shows.
+class _SwipeHint extends StatefulWidget {
+  const _SwipeHint({required this.child});
+  final Widget child;
+
+  @override
+  State<_SwipeHint> createState() => _SwipeHintState();
+}
+
+class _SwipeHintState extends State<_SwipeHint> {
+  final _c = ScrollController();
+  bool _more = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _c.addListener(_check);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _check() {
+    if (!_c.hasClients) return;
+    final more = _c.position.extentAfter > 8;
+    if (more != _more && mounted) setState(() => _more = more);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final bg = cs.surface;
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (_) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _check());
+        return false;
+      },
+      child: Stack(children: [
+        SingleChildScrollView(controller: _c, scrollDirection: Axis.horizontal, child: widget.child),
+        IgnorePointer(
+          child: AnimatedOpacity(
+            opacity: _more ? 1 : 0,
+            duration: const Duration(milliseconds: 160),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                width: 36,
+                decoration: BoxDecoration(gradient: LinearGradient(colors: [bg.withValues(alpha: 0), bg.withValues(alpha: 0.95)])),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          right: 6,
+          top: 0,
+          child: AnimatedOpacity(
+            opacity: _more ? 1 : 0,
+            duration: const Duration(milliseconds: 160),
+            child: IgnorePointer(
+              ignoring: !_more,
+              child: GestureDetector(
+                onTap: () => _c.animateTo(_c.position.maxScrollExtent, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic),
+                child: Container(
+                  key: const ValueKey('swipe-hint'),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: cs.primary, borderRadius: BorderRadius.circular(999)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Text('Swipe for more', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.onPrimary)),
+                    Icon(Icons.chevron_right_rounded, size: 14, color: cs.onPrimary),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
       ]),
     );
   }

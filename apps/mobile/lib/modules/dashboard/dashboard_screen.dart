@@ -187,7 +187,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       visualDensity: VisualDensity.compact,
                       iconSize: 20,
                       onPressed: () => widget.onAddCompanyExpense!().then((_) => _load()),
-                      icon: const Icon(Icons.add_circle_outline_rounded),
+                      icon: Icon(Icons.add_circle_rounded, color: cs.primary),
                     ),
             ),
             SkStat(label: 'Commission $word', value: o?.totals.commission),

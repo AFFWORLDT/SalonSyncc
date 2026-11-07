@@ -37,7 +37,7 @@ void main() {
     final a = await pump(t);
     expect(find.text('Sales'), findsOneWidget);
     expect(find.text('All days'), findsOneWidget);
-    expect(find.textContaining('3 sales · AED'), findsOneWidget);
+    expect(find.text('3 sales'), findsOneWidget);
     expect(find.textContaining('Barber Sam'), findsWidgets);
     await t.tap(find.text('All barbers'));
     await t.pumpAndSettle();

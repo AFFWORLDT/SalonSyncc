@@ -112,5 +112,21 @@ void main() {
     expect(e.rows[1][4]?.value.toString(), '215');
   });
 
+  testWidgets('views: Shop shows only the shop columns; By barber shows one barber; the wide sheet says it scrolls', (t) async {
+    t.view.physicalSize = const Size(1080, 2400);
+    t.view.devicePixelRatio = 3;
+    addTearDown(t.view.reset);
+    await pump(t);
+    expect(find.byKey(const ValueKey('swipe-hint')), findsOneWidget);
+    await t.tap(find.byKey(const ValueKey('view-shop')));
+    await t.pumpAndSettle();
+    expect(find.text('Barber Ali'), findsNothing);
+    expect(find.text('Shop'), findsWidgets);
+    await t.tap(find.byKey(const ValueKey('view-barber')));
+    await t.pumpAndSettle();
+    expect(find.text('Barber Ali'), findsWidgets); // the picker and the one column
+    expect(find.text('Shop'), findsOneWidget); // only the view pill
+  });
+
   test('file name drops characters a file system refuses', () => expect(workbookName('A/B: Salon', 'November 2026'), 'A B Salon November 2026.xlsx'));
 }
