@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/filter_chip_menu.dart';
 import '../../core/screen_cache.dart';
 import '../../core/theme/scale.dart';
-import '../../core/ui/haptics.dart';
 import '../../core/ui/avatar.dart';
 import '../../core/ui/stats.dart';
 import '../../core/ui/tour.dart';
@@ -147,11 +147,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         SkHeading('Dashboard', subtitle: subtitle, mono: true),
         // Range: 1D 7D 30D 1Y Custom, as small pills.
         SizedBox(
-          height: 34,
+          height: 48,
           child: ListView(scrollDirection: Axis.horizontal, children: [
-            for (final (id, days) in advanced ? _presets : _presets.take(1))
-              _RangePill(label: id, on: _preset == id, onTap: () => _pickPreset(id, days)),
-            if (advanced) _RangePill(label: 'Custom', icon: Icons.date_range_rounded, on: _preset == 'Custom', onTap: _custom),
+            for (final (id, days) in advanced ? _presets : _presets.take(1)) ...[
+              SkFilterPill(label: id, active: _preset == id, onTap: () => _pickPreset(id, days)),
+              const SizedBox(width: SkSpace.sm),
+            ],
+            if (advanced) SkFilterPill(label: 'Custom', icon: Icons.date_range_rounded, active: _preset == 'Custom', onTap: _custom),
           ]),
         ),
         const SizedBox(height: SkSpace.xl),
@@ -229,42 +231,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ]),
         ],
       ]),
-    );
-  }
-}
-
-/// A range pill: dark when picked (Groww's tabs), muted otherwise.
-class _RangePill extends StatelessWidget {
-  const _RangePill({required this.label, required this.on, required this.onTap, this.icon});
-  final String label;
-  final bool on;
-  final VoidCallback onTap;
-  final IconData? icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final fg = on ? cs.surface : cs.onSurfaceVariant;
-    return Padding(
-      padding: const EdgeInsets.only(right: SkSpace.sm),
-      child: Material(
-        color: on ? cs.onSurface : cs.surfaceContainerHighest.withValues(alpha: 0.6),
-        shape: const StadiumBorder(),
-        child: InkWell(
-          customBorder: const StadiumBorder(),
-          onTap: () {
-            Haptic.tap();
-            onTap();
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              if (icon != null) ...[Icon(icon, size: 15, color: fg), const SizedBox(width: 4)],
-              Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: fg)),
-            ]),
-          ),
-        ),
-      ),
     );
   }
 }

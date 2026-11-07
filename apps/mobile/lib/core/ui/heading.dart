@@ -52,7 +52,7 @@ class SkSection extends StatelessWidget {
           Tooltip(
             message: actionTooltip ?? action!,
             child: TextButton(
-              style: TextButton.styleFrom(visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(horizontal: SkSpace.sm)),
+              style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: SkSpace.sm), tapTargetSize: MaterialTapTargetSize.padded),
               onPressed: onAction,
               child: Text(action!, style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600)),
             ),
