@@ -109,6 +109,8 @@ export interface MailMessage {
 export interface MailClient {
   /** Sends one email; true when the provider accepted it. Never throws. */
   send(env: Env, m: MailMessage): Promise<boolean>;
+  /** Sends up to 100 emails in one request (Resend batch); true when the provider accepted them. Never throws. */
+  sendBatch(env: Env, ms: MailMessage[]): Promise<boolean>;
 }
 
 /** Resend's HTTP API (1 subrequest). Off without RESEND_API_KEY or MAIL_FROM. */
@@ -128,7 +130,28 @@ const resendMail: MailClient = {
       return false;
     }
   },
+  async sendBatch(env, ms) {
+    if (!ms.length) return true;
+    if (!env.RESEND_API_KEY || !env.MAIL_FROM) return false;
+    try {
+      const r = await fetch("https://api.resend.com/emails/batch", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify(
+          ms.slice(0, MAIL_BATCH).map((m) => ({ from: env.MAIL_FROM, to: [m.to], subject: m.subject, html: m.html, text: m.text, ...(m.replyTo ? { reply_to: m.replyTo } : {}) })),
+        ),
+      });
+      if (!r.ok) console.error("mail batch failed", r.status);
+      return r.ok;
+    } catch (e) {
+      console.error("mail batch failed", (e as Error).message);
+      return false;
+    }
+  },
 };
+
+/** Resend's batch cap. */
+export const MAIL_BATCH = 100;
 
 /** Stripe's REST API (1 subrequest per call), pinned to one API version. Throws StripeError on a non-2xx answer. */
 export interface StripeClient {

@@ -11,9 +11,12 @@ enum StaffDeleted { deleted, deactivated }
 
 /// The add / edit staff form, as the API takes it. [commissionPct] is the typed text ('' = shop default).
 class StaffForm {
-  const StaffForm({required this.name, required this.username, this.phone, required this.role, this.commissionPct = '', this.sortOrder, this.canAddExpense = false});
+  const StaffForm({required this.name, required this.username, this.phone, this.email, required this.role, this.commissionPct = '', this.sortOrder, this.canAddExpense = false});
   final String name, username, role, commissionPct;
   final String? phone;
+
+  /// Where they get their daily / monthly report and announcements ('' clears it).
+  final String? email;
   /// Column in the daily sheet; null = the server puts a new person last.
   final int? sortOrder;
   final bool canAddExpense;
@@ -22,6 +25,7 @@ class StaffForm {
         'name': name.trim(),
         'username': username.trim(),
         'phone': (phone ?? '').trim().isEmpty ? null : phone!.trim(),
+        'email': (email ?? '').trim().isEmpty ? null : email!.trim(),
         'role': role,
         'commission_pct': commissionPct.trim().isEmpty ? null : commissionPct.trim(),
         'sort_order': ?sortOrder,

@@ -189,6 +189,7 @@ function UserForm({ user, onDone, defaultPct, maxStaff }: { user: User | null; o
   const [username, setUsername] = useState(user?.username ?? "");
   const [touched, setTouched] = useState(!!user);
   const [phone, setPhone] = useState(user?.phone ? phoneLabel(user.phone) : "");
+  const [email, setEmail] = useState(user?.email ?? "");
   const [password, setPassword] = useState("");
   const [pct, setPct] = useState(user?.commission_pct === null || user?.commission_pct === undefined ? "" : String(user.commission_pct));
   const [role, setRole] = useState(user?.role ?? "barber");
@@ -205,6 +206,7 @@ function UserForm({ user, onDone, defaultPct, maxStaff }: { user: User | null; o
         name,
         username,
         phone: phone || null,
+        email: email.trim() || null,
         role,
         commission_pct: pct === "" ? null : Number(pct),
         sort_order: order === "" ? undefined : Number(order),
@@ -280,6 +282,9 @@ function UserForm({ user, onDone, defaultPct, maxStaff }: { user: User | null; o
           <Input id="u-order" inputMode="numeric" value={order} onChange={(e) => setOrder(e.target.value.replace(/\D/g, ""))} className="h-11" />
         </Field>
       </div>
+      <Field label="Email (optional)" htmlFor="u-email" hint="Their daily and monthly report, announcements, and a note when you change their sale">
+        <Input id="u-email" type="email" inputMode="email" autoComplete="off" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className="h-11" />
+      </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Mobile (optional)" htmlFor="u-phone">
           <Input id="u-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-11" />

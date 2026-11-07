@@ -70,6 +70,10 @@ export function fakeServices(
         mails.push(m);
         return opts.mailOk ?? true;
       },
+      async sendBatch(_env: Env, ms) {
+        mails.push(...ms);
+        return opts.mailOk ?? true;
+      },
     },
     stripe: {
       async post(_env: Env, path: string, params: Record<string, string>, o?: { idempotencyKey?: string }) {

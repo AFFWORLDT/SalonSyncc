@@ -10,6 +10,7 @@ import { dateTimeLabel } from "@/lib/format";
 import type { Announcement, User } from "@/lib/types";
 import { UserAvatar } from "@/components/app/user-avatar";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -60,6 +61,7 @@ function TeamAnnouncements() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [byEmail, setByEmail] = useState(false);
 
   const barbers = useMemo(
     () => (users.data ?? []).filter((u) => u.role === "barber" && u.active),
@@ -77,7 +79,7 @@ function TeamAnnouncements() {
     setSending(true);
     try {
       const made = await api<Announcement>("/api/announcements", {
-        body: { title: title.trim(), body: body.trim(), audience, barber_id: audience === "barber" ? barberId : undefined },
+        body: { title: title.trim(), body: body.trim(), audience, barber_id: audience === "barber" ? barberId : undefined, email: byEmail },
       });
       const who = made.audience === "all" ? "everyone" : made.target_name ?? "the barber";
       toast.success(`Sent to ${who} · ${made.recipients} ${made.recipients === 1 ? "person" : "people"}`);
@@ -181,6 +183,14 @@ function TeamAnnouncements() {
             className="min-h-24"
           />
         </Field>
+
+        <label htmlFor="ann-email" className="flex items-center gap-3 text-sm">
+          <Switch id="ann-email" checked={byEmail} onCheckedChange={setByEmail} />
+          <span>
+            Also send by email
+            <span className="block text-xs text-muted-foreground">To the staff who have an email in their profile.</span>
+          </span>
+        </label>
 
         <Button onClick={send} disabled={!ready || sending} className="self-end">
           <Send className="size-4" />

@@ -188,6 +188,7 @@ StaffForm _formOf(Staff s) => StaffForm(
       name: s.name,
       username: s.username,
       phone: s.phone,
+      email: s.email,
       role: s.role,
       commissionPct: s.commissionPct == null ? '' : '${s.commissionPct}',
       sortOrder: s.sortOrder,
@@ -213,6 +214,7 @@ class _StaffFormState extends State<_StaffForm> {
   late final _pct = TextEditingController(text: s?.commissionPct == null ? '' : '${s!.commissionPct}');
   late final _order = TextEditingController(text: s == null ? '' : '${s!.sortOrder}');
   late final _phone = TextEditingController(text: s?.phone ?? '');
+  late final _email = TextEditingController(text: s?.email ?? '');
   late String _role = s?.role ?? 'barber';
   late bool _canExpense = s?.canAddExpense ?? false;
   bool _userTouched = false, _busy = false;
@@ -236,7 +238,7 @@ class _StaffFormState extends State<_StaffForm> {
 
   @override
   void dispose() {
-    for (final c in [_name, _user, _pass, _pct, _order, _phone]) {
+    for (final c in [_name, _user, _pass, _pct, _order, _phone, _email]) {
       c.dispose();
     }
     super.dispose();
@@ -250,6 +252,7 @@ class _StaffFormState extends State<_StaffForm> {
       name: _name.text,
       username: _user.text,
       phone: _phone.text,
+      email: _email.text,
       role: _role,
       commissionPct: _pct.text,
       sortOrder: int.tryParse(_order.text.trim()) ?? s?.sortOrder,
@@ -377,6 +380,14 @@ class _StaffFormState extends State<_StaffForm> {
           TextField(controller: _order, keyboardType: TextInputType.number, decoration: dec('Order on the daily sheet', s == null ? 'Their column number; leave empty to add them last' : 'Their column number, from the left')),
           const SizedBox(height: 10),
           TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: dec('Mobile (optional)')),
+          const SizedBox(height: 10),
+          TextField(
+            key: const ValueKey('st-email'),
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
+            decoration: dec('Email (optional)', 'Their daily and monthly report, announcements, and a note when you change their sale'),
+          ),
           if (_role == 'barber')
             SkSwitchTile(
               contentPadding: EdgeInsets.zero,

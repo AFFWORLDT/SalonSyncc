@@ -7,6 +7,7 @@ class Staff {
     required this.name,
     required this.username,
     this.phone,
+    this.email,
     required this.role,
     this.commissionPct,
     required this.sortOrder,
@@ -16,7 +17,7 @@ class Staff {
   });
   final int id, sortOrder;
   final String name, username, role;
-  final String? phone, avatarUrl;
+  final String? phone, email, avatarUrl;
   final num? commissionPct;
   final bool active, canAddExpense;
 
@@ -29,6 +30,7 @@ class Staff {
         name: str(j, 'name'),
         username: str(j, 'username'),
         phone: strOrNull(j, 'phone'),
+        email: strOrNull(j, 'email'),
         role: str(j, 'role'),
         commissionPct: numOrNull(j, 'commission_pct'),
         sortOrder: j['sort_order'] is int ? j['sort_order'] as int : 0,

@@ -8,6 +8,7 @@ export interface StaffRow {
   username: string;
   name: string;
   phone: string | null;
+  email: string | null;
   role: "owner" | "admin" | "barber";
   commission_pct: number | null;
   sort_order: number;
@@ -22,6 +23,7 @@ export interface StaffWrite {
   name: string;
   username: string;
   phone: string | null;
+  email: string | null;
   role: "admin" | "barber" | "owner";
   commission_pct: number | null;
   sort_order: number;
@@ -30,7 +32,7 @@ export interface StaffWrite {
 }
 
 const COLS =
-  "id, org_id, username, name, phone, role, commission_pct, sort_order, active, can_add_expense, avatar_v, created_at, updated_at";
+  "id, org_id, username, name, phone, email, role, commission_pct, sort_order, active, can_add_expense, avatar_v, created_at, updated_at";
 
 /**
  * Where the browser fetches a user's photo; null when there is none or the user is inactive (the public route 404s then).
@@ -51,6 +53,7 @@ export const staffAudit = (r: StaffRow | StaffWrite) => ({
   name: r.name,
   username: r.username,
   phone: r.phone,
+  email: r.email,
   role: r.role,
   commission_pct: r.commission_pct,
   sort_order: r.sort_order,
@@ -125,10 +128,10 @@ export function usersRepo(db: D1Database, orgId: string) {
       const [ins] = await db.batch([
         db
           .prepare(
-            `INSERT INTO users (org_id, name, username, phone, password_hash, role, commission_pct, sort_order, active, can_add_expense, created_at, updated_at)
-             SELECT ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?${guard} RETURNING ${COLS}`,
+            `INSERT INTO users (org_id, name, username, phone, email, password_hash, role, commission_pct, sort_order, active, can_add_expense, created_at, updated_at)
+             SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?${guard} RETURNING ${COLS}`,
           )
-          .bind(orgId, w.name, w.username, w.phone, passwordHash, w.role, w.commission_pct, w.sort_order, w.can_add_expense ? 1 : 0, at, at, ...(maxStaff === null ? [] : [orgId, maxStaff])),
+          .bind(orgId, w.name, w.username, w.phone, w.email, passwordHash, w.role, w.commission_pct, w.sort_order, w.can_add_expense ? 1 : 0, at, at, ...(maxStaff === null ? [] : [orgId, maxStaff])),
         audit.stmt({
           actor,
           entity: "user",
@@ -153,10 +156,10 @@ export function usersRepo(db: D1Database, orgId: string) {
       const [upd] = await db.batch([
         db
           .prepare(
-            `UPDATE users SET name = ?, username = ?, phone = ?, role = ?, commission_pct = ?, sort_order = ?, active = ?, can_add_expense = ?,
+            `UPDATE users SET name = ?, username = ?, phone = ?, email = ?, role = ?, commission_pct = ?, sort_order = ?, active = ?, can_add_expense = ?,
                     session_version = session_version + ?, updated_at = ? WHERE org_id = ? AND id = ?${guarded ? ` AND ${COUNT_STAFF} < ?` : ""} RETURNING ${COLS}`,
           )
-          .bind(w.name, w.username, w.phone, w.role, w.commission_pct, w.sort_order, w.active ? 1 : 0, w.can_add_expense ? 1 : 0, bumpSession ? 1 : 0, Date.now(), orgId, id, ...(guarded ? [orgId, reactivateLimit!.max] : [])),
+          .bind(w.name, w.username, w.phone, w.email, w.role, w.commission_pct, w.sort_order, w.active ? 1 : 0, w.can_add_expense ? 1 : 0, bumpSession ? 1 : 0, Date.now(), orgId, id, ...(guarded ? [orgId, reactivateLimit!.max] : [])),
         audit.stmt({
           actor,
           entity: "user",
@@ -224,6 +227,16 @@ export function usersRepo(db: D1Database, orgId: string) {
     },
     async clearAvatar(id: number): Promise<void> {
       await db.prepare("UPDATE users SET avatar = NULL, avatar_type = NULL, avatar_v = -(abs(avatar_v) + 1), updated_at = ? WHERE org_id = ? AND id = ?").bind(Date.now(), orgId, id).run();
+    },
+    /** Name and email of the given active staff who have an email (at most 90 ids; 1 statement). */
+    async emailsFor(ids: number[]): Promise<{ name: string; email: string }[]> {
+      const list = ids.slice(0, 90);
+      if (!list.length) return [];
+      const { results } = await db
+        .prepare(`SELECT name, email FROM users WHERE org_id = ? AND active = 1 AND email IS NOT NULL AND email != '' AND id IN (${list.map(() => "?").join(",")})`)
+        .bind(orgId, ...list)
+        .all<{ name: string; email: string }>();
+      return results;
     },
     /** Stores a profile banner and returns the new version, or null when the user isn't in this org. */
     async setBanner(id: number, bytes: ArrayBuffer, type: string): Promise<number | null> {

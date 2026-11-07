@@ -4,6 +4,8 @@ import type { AppEnv } from "../../env";
 import { isAdmin } from "../../core/roles";
 import { notificationsRepo, settingsRepo } from "../../data/tenant";
 import { notifyUsers } from "../notifications/notify";
+import { emailStaff } from "../notifications/staff-email";
+import { staffSaleChangedEmail } from "../../emails/staff";
 import { moneyText } from "../../lib/money";
 import { deliverBill } from "../whatsapp/bill";
 import { waSetup } from "../whatsapp/ready";
@@ -87,19 +89,24 @@ export async function afterSale(c: Context<AppEnv>, sale: Sale, s?: Settings): P
 /** An admin changed or deleted another barber's sale and the org wants barbers told (FM notify_barber_changes). */
 async function barberChangeSettings(c: Context<AppEnv>, sale: Sale, known?: Settings): Promise<Settings | null> {
   const me = c.var.tenant.user;
-  if (!hasFeature(c, "push") || !isAdmin(me) || sale.barber_id === me.id) return null;
+  if (!isAdmin(me) || sale.barber_id === me.id) return null;
   const s = known ?? (await settingsRepo(c.env.DB, c.var.tenant.org.id).get());
   return s.notify_barber_changes ? s : null;
 }
 
-/** Devices per barber-change push: one send (tokens + OAuth) within the request's FREE_SUBREQUESTS. */
-const CHANGE_MAX_TOKENS = FREE_SUBREQUESTS - 1;
+/** Devices per barber-change push: one send (tokens + OAuth) plus the email, within the request's FREE_SUBREQUESTS. */
+const CHANGE_MAX_TOKENS = FREE_SUBREQUESTS - 2;
 
 /** Runs in waitUntil after an edit took effect (never after a 409 stale). `before` is the version the edit replaced; `s` the route's settings. */
 export async function afterSaleEdit(c: Context<AppEnv>, before: Sale, after: Sale, s?: Settings): Promise<void> {
   const set = await barberChangeSettings(c, before, s);
   if (!set) return;
   const moved = after.barber_id !== before.barber_id ? " · moved to another barber" : "";
+  const detail = `${moneyText(before.amount, set)} → ${moneyText(after.amount, set)}${moved}`;
+  await emailStaff(c, set, [before.barber_id], (b) =>
+    staffSaleChangedEmail({ ...b, admin: c.var.tenant.user.name, billNo: before.bill_no, action: "changed", detail }),
+  );
+  if (!hasFeature(c, "push")) return;
   await notifyUsers(
     c,
     c.var.tenant.org.id,
@@ -118,6 +125,10 @@ export async function afterSaleEdit(c: Context<AppEnv>, before: Sale, after: Sal
 export async function afterSaleDelete(c: Context<AppEnv>, sale: Sale): Promise<void> {
   const s = await barberChangeSettings(c, sale);
   if (!s) return;
+  await emailStaff(c, s, [sale.barber_id], (b) =>
+    staffSaleChangedEmail({ ...b, admin: c.var.tenant.user.name, billNo: sale.bill_no, action: "deleted", detail: `${moneyText(sale.amount, s)} · ${sale.customer_label}` }),
+  );
+  if (!hasFeature(c, "push")) return;
   await notifyUsers(
     c,
     c.var.tenant.org.id,

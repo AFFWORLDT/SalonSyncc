@@ -1,4 +1,7 @@
 import { Hono } from "hono";
+import { settingsRepo } from "../../data/tenant";
+import { emailStaff } from "../notifications/staff-email";
+import { staffAnnouncementEmail } from "../../emails/staff";
 import type { AppEnv } from "../../env";
 import { HttpError } from "../../core/errors";
 import { requireAdmin } from "../../core/roles";
@@ -45,5 +48,10 @@ announcements.post("/announcements", ...gate, async (c) => {
   const out = await repo.create({ senderId: user.id, audience: b.audience, targetId, title, body, recipients: recipientIds.length });
   // Feed rows + push only when the org has `push` (notifyUsers checks); otherwise the announcement is just stored.
   await notifyUsers(c, org.id, recipientIds, { title, body, path: "/", tag: `announcement-${out.id}` });
+  // "Also send by email": to the recipients who have an email address, after the reply (waitUntil).
+  if (b.email === true) {
+    const settings = await settingsRepo(c.env.DB, org.id).get();
+    c.executionCtx.waitUntil(emailStaff(c, settings, recipientIds, (base) => staffAnnouncementEmail({ ...base, from: user.name, title, message: body })));
+  }
   return c.json(out, 201);
 });

@@ -229,6 +229,45 @@ export function reportsRepo(db: D1Database, orgId: string) {
       return { ...totals, profit: shopProfit(totals), top };
     },
 
+    /**
+     * Each staff member with an email, their sales on `day` and on `prev` (1 statement). Barbers always (a quiet day
+     * is worth telling them); admins and the owner only when they sold that day.
+     */
+    async staffDay(day: string, prev: string): Promise<{ id: number; name: string; email: string; count: number; sales: number; commission: number; prev_sales: number }[]> {
+      const { results } = await db
+        .prepare(
+          `SELECT u.id, u.name, u.email,
+                  COUNT(s.id) AS count, COALESCE(SUM(s.amount), 0) AS sales, COALESCE(SUM(s.commission), 0) AS commission,
+                  (SELECT COALESCE(SUM(p.amount), 0) FROM sales p WHERE p.org_id = ?1 AND p.barber_id = u.id AND p.day = ?3 AND p.deleted_at IS NULL) AS prev_sales
+           FROM users u LEFT JOIN sales s ON s.org_id = ?1 AND s.barber_id = u.id AND s.day = ?2 AND s.deleted_at IS NULL
+           WHERE u.org_id = ?1 AND u.active = 1 AND u.email IS NOT NULL AND u.email != ''
+           GROUP BY u.id HAVING (u.role = 'barber') + (COUNT(s.id) > 0) > 0
+           ORDER BY u.sort_order, u.id LIMIT 100`,
+        )
+        .bind(orgId, day, prev)
+        .all<{ id: number; name: string; email: string; count: number; sales: number; commission: number; prev_sales: number }>();
+      return results;
+    },
+
+    /** Each staff member with an email who sold in [from, to]: totals, working days and their best day (1 statement). */
+    async staffMonth(from: string, to: string): Promise<{ id: number; name: string; email: string; count: number; sales: number; commission: number; days: number; best_day: string | null; best_sales: number }[]> {
+      const { results } = await db
+        .prepare(
+          `WITH d AS (
+             SELECT barber_id, day, COUNT(*) AS n, SUM(amount) AS amt, SUM(commission) AS com
+             FROM sales WHERE org_id = ?1 AND day BETWEEN ?2 AND ?3 AND deleted_at IS NULL GROUP BY barber_id, day)
+           SELECT u.id, u.name, u.email, SUM(d.n) AS count, SUM(d.amt) AS sales, SUM(d.com) AS commission, COUNT(d.day) AS days,
+                  (SELECT d2.day FROM d d2 WHERE d2.barber_id = u.id ORDER BY d2.amt DESC, d2.day LIMIT 1) AS best_day,
+                  MAX(d.amt) AS best_sales
+           FROM users u JOIN d ON d.barber_id = u.id
+           WHERE u.org_id = ?1 AND u.active = 1 AND u.email IS NOT NULL AND u.email != ''
+           GROUP BY u.id ORDER BY u.sort_order, u.id LIMIT 100`,
+        )
+        .bind(orgId, from, to)
+        .all<{ id: number; name: string; email: string; count: number; sales: number; commission: number; days: number; best_day: string | null; best_sales: number }>();
+      return results;
+    },
+
     /** Dashboard for a date range (default: today), compared with the same number of days just before it. */
     async overview(slug: string, clock: OrgClock, now: number, fromQ?: string, toQ?: string): Promise<Overview> {
       const today = businessDay(now, clock);

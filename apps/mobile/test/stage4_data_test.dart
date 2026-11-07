@@ -125,8 +125,8 @@ void main() {
     await api.list();
     await api.send(title: 'Hi', body: 'There', barberId: 66);
     await api.send(title: 'Hi', body: 'All');
-    expect(a.calls[1].data, {'title': 'Hi', 'body': 'There', 'audience': 'barber', 'barber_id': 66});
-    expect(a.calls[2].data, {'title': 'Hi', 'body': 'All', 'audience': 'all'});
+    expect(a.calls[1].data, {'title': 'Hi', 'body': 'There', 'audience': 'barber', 'barber_id': 66, 'email': false});
+    expect(a.calls[2].data, {'title': 'Hi', 'body': 'All', 'audience': 'all', 'email': false});
   });
 
   test('settings: save sends every input key from the loaded settings, nothing else', () async {

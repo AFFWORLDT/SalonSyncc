@@ -46,6 +46,8 @@ const valid = (over: Record<string, unknown> = {}) => ({
   google_review_url: "https://g.page/x",
   instagram_url: null,
   google_maps_url: "https://maps.app.goo.gl/abc",
+  email_staff_daily: true,
+  email_staff_monthly: false,
   timezone: "Asia/Dubai",
   day_start_hour: 4,
   currency: "AED",

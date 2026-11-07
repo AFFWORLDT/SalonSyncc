@@ -260,8 +260,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (s['notify_summary'] == true) _pick<int>('summary_hour', 'Send at', _hours),
           _switch('notify_reminder', 'Reminder to barbers'),
           if (s['notify_reminder'] == true) _pick<int>('reminder_hour', 'Send at', _hours),
-          _switch('notify_barber_changes', 'Tell a barber when you change or delete their sale'),
+          _switch('notify_barber_changes', 'Tell a barber when you change or delete their sale', 'A push, and an email if they have one.'),
         ]),
+      _section('Emails to staff', sub: 'For staff who have an email in their profile (Staff → edit). Each sees only their own numbers.', [
+        _switch('email_staff_daily', 'Their day, every evening', 'Customers, sales and commission, at the summary hour.'),
+        _switch('email_staff_monthly', 'Their month, on the 1st', "Last month's customers, sales, commission and best day."),
+      ]),
       _section('Region', [
         _field('timezone', 'Time zone', hint: 'e.g. Asia/Dubai'),
         _pick<int>('day_start_hour', 'Day starts at', [for (var h = 0; h <= 12; h++) (h, _hourLabel(h))]),

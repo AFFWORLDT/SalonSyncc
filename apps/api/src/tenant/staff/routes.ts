@@ -18,6 +18,8 @@ const ownerLocked = () => bad("The owner can't be changed here");
 const USERNAME_RE = /^[A-Za-z0-9._@+-]{2,60}$/;
 const AVATAR_TYPES = ["image/webp", "image/jpeg", "image/png"];
 const AVATAR_MAX = 300 * 1024;
+/** A plain, practical email check (one @, a dot in the domain, no spaces). */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 function clean(v: unknown, max = 200): string | null {
   if (v === undefined || v === null) return null;
@@ -42,6 +44,7 @@ const toUser = (r: StaffRow, slug: string): User => ({
   name: r.name,
   username: r.username,
   phone: r.phone,
+  email: r.email,
   role: r.role,
   commission_pct: r.commission_pct,
   sort_order: r.sort_order,
@@ -77,6 +80,13 @@ async function readInput(c: Context<AppEnv>, raw: Record<string, unknown>, creat
     phone = canonicalPhone(b.phone, phone_country);
     if (!phone) throw bad("Mobile number doesn't look right");
   }
+  // Email: optional; omitted = keep (PUT), null or "" = clear.
+  let email: string | null | undefined = b.email === undefined ? undefined : null;
+  const typedEmail = clean(b.email, 120);
+  if (typedEmail) {
+    if (!EMAIL_RE.test(typedEmail)) throw bad("Email doesn't look right");
+    email = typedEmail.toLowerCase();
+  }
   if (creating && (typeof b.password !== "string" || b.password.length < 4)) throw bad("Password must be at least 4 characters");
   if (b.role !== undefined && b.role !== "admin" && b.role !== "barber" && b.role !== "owner") throw bad("Choose a role");
   const commission =
@@ -86,6 +96,7 @@ async function readInput(c: Context<AppEnv>, raw: Record<string, unknown>, creat
     name,
     username,
     phone,
+    email,
     role: b.role,
     commission,
     sort,
@@ -118,6 +129,7 @@ staff.post("/users", gate, requireAdmin, async (c) => {
     name: u.name,
     username: u.username,
     phone: u.phone ?? null,
+    email: u.email ?? null,
     role: u.role ?? "barber",
     commission_pct: u.commission ?? null,
     sort_order: u.sort ?? (await repo.nextSortOrder()),
@@ -159,6 +171,7 @@ staff.put("/users/:id", gate, requireAdmin, async (c) => {
     username: existing.role === "owner" ? existing.username : u.username,
     // Omitted = keep (only explicit null or "" clears), like the other optional fields.
     phone: u.phone === undefined ? existing.phone : u.phone,
+    email: u.email === undefined ? existing.email : u.email,
     role: existing.role === "owner" ? "owner" : (u.role ?? existing.role),
     commission_pct: u.commission === undefined ? existing.commission_pct : u.commission,
     sort_order: u.sort ?? existing.sort_order,

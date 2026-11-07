@@ -59,7 +59,7 @@ void main() {
     await s.update(36, form, active: false);
     await s.resetPassword(36, 'newpass1');
     expect(await s.delete(36), StaffDeleted.deactivated);
-    expect(a.calls[1].data, {'name': 'Ali', 'username': 'ali', 'phone': null, 'role': 'barber', 'commission_pct': '30', 'sort_order': 1, 'can_add_expense': true, 'password': 'pass1234'});
+    expect(a.calls[1].data, {'name': 'Ali', 'username': 'ali', 'phone': null, 'email': null, 'role': 'barber', 'commission_pct': '30', 'sort_order': 1, 'can_add_expense': true, 'password': 'pass1234'});
     expect((a.calls[2].data as Map)['active'], false);
     expect((a.calls[2].data as Map).containsKey('password'), isFalse);
     expect(a.calls[3].data, {'password': 'newpass1'});

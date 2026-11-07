@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/toggle.dart';
 import '../../core/ui/toast.dart';
 import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
@@ -26,7 +27,7 @@ class SendAnnouncementScreen extends StatefulWidget {
 
 class _SendAnnouncementScreenState extends State<SendAnnouncementScreen> {
   final _title = TextEditingController(), _body = TextEditingController();
-  bool _everyone = true, _sending = false;
+  bool _everyone = true, _sending = false, _byEmail = false;
   int? _barber;
   List<Staff> _barbers = const [];
   List<Announcement>? _sent;
@@ -64,7 +65,7 @@ class _SendAnnouncementScreenState extends State<SendAnnouncementScreen> {
   Future<void> _send() async {
     setState(() => _sending = true);
     try {
-      final a = await widget.api.send(title: _title.text, body: _body.text, barberId: _everyone ? null : _barber);
+      final a = await widget.api.send(title: _title.text, body: _body.text, barberId: _everyone ? null : _barber, email: _byEmail);
       if (!mounted) return;
       _title.clear();
       _body.clear();
@@ -120,6 +121,14 @@ class _SendAnnouncementScreenState extends State<SendAnnouncementScreen> {
               minLines: 3,
               maxLines: 6,
               decoration: const InputDecoration(labelText: 'Message', hintText: 'Write the message your team will see…'),
+            ),
+            SkSwitchTile(
+              key: const ValueKey('ann-email'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Also send by email'),
+              subtitle: const Text('To the staff who have an email in their profile'),
+              value: _byEmail,
+              onChanged: (v) => setState(() => _byEmail = v),
             ),
             const SizedBox(height: 8),
             FilledButton(onPressed: _ready ? _send : null, child: Text(_sending ? 'Sending…' : _everyone ? 'Send to everyone' : 'Send')),

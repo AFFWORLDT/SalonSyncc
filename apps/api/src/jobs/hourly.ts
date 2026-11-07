@@ -22,8 +22,10 @@
  *   visit reminders: 3 + 2L (due 1, claim 1, 1 per item + 1 more for a failed one's release, release 1)
  *   rating requests / rating reminders: 3 + L each (due 1, claim 1, 1 per item, release 1)
  *   summary: SUMMARY_STMTS (7) | barber reminder: BARBER_REMINDER_STMTS (5); 0 once already run today
+ *   staff emails (daily / monthly): STAFF_EMAIL_STMTS (2) and 1 subrequest each (jobs/email-jobs.ts)
  * Due work the budget cannot reach stays due: the jobs' claims make every step safe to run again on the next tick.
  */
+import { runStaffDaily, runStaffMonthly, staffDailyDue, staffMonthlyDue, STAFF_EMAIL_STMTS } from "./email-jobs";
 import type { Env } from "../env";
 import { platformRepo, type CronOrg } from "../data/platform";
 import { clockOf, PUSH_MAX_TOKENS } from "../data/tenant";
@@ -131,6 +133,11 @@ export async function hourly(rawEnv: Env, at: number): Promise<HourlyResult> {
     if (budget.stmts < BARBER_REMINDER_STMTS) break;
     await guarded("push jobs", o.org.id, () => runPushJobs(env, ctxOf(o), at, budget));
   }
+  // Pass 1b, staff emails (each barber's day / month): due once a day per org, one request per org.
+  for (const o of rotated) {
+    if (budget.stmts < STAFF_EMAIL_STMTS || budget.left <= 0) break;
+    await guarded("staff emails", o.org.id, () => runEmailJobs(env, ctxOf(o), at, budget));
+  }
   // Pass 2, WhatsApp: open campaign batch, visit reminders, rating requests and their reminder.
   for (const o of rotated) {
     if (budget.stmts < MIN_STEP_STMTS || budget.left <= 0) break;
@@ -179,6 +186,19 @@ async function runPushJobs(env: Env, c: OrgCtx, at: number, budget: CronBudget):
   const reminderDay = s.notify_reminder ? due(s.reminder_hour, "barber_reminder") : null;
   if (reminderDay && budget.stmts >= BARBER_REMINDER_STMTS) {
     await guarded("barber reminder", org.id, () => runBarberReminder(env, org, reminderDay, at, budget, TOKEN_CAP));
+  }
+}
+
+/** The staff emails due now: each barber's day at summary_hour, and last month on the 1st. */
+async function runEmailJobs(env: Env, c: OrgCtx, at: number, budget: CronBudget): Promise<void> {
+  const { org, settings: s, doneRuns } = c.o;
+  const daily = staffDailyDue(at, s);
+  if (daily && !doneRuns.has(`staff_daily ${daily}`) && budget.stmts >= STAFF_EMAIL_STMTS && budget.left >= 1) {
+    await guarded("staff daily email", org.id, () => runStaffDaily(env, org, s, daily, at, budget));
+  }
+  const first = staffMonthlyDue(at, s);
+  if (first && !doneRuns.has(`staff_monthly ${first}`) && budget.stmts >= STAFF_EMAIL_STMTS && budget.left >= 1) {
+    await guarded("staff monthly email", org.id, () => runStaffMonthly(env, org, s, first, at, budget));
   }
 }
 

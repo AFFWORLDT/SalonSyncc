@@ -5,7 +5,7 @@ import '../core/api/api_client.dart';
 const kSettingsInputKeys = [
   'display_name', 'salon_name_ar', 'tagline', 'address', 'phone', 'licence_no', 'trn', 'vat_enabled', 'vat_rate',
   'default_commission_pct', 'quick_amounts', 'thank_you_text', 'receipt_footer', 'notify_sales', 'notify_sale_min',
-  'notify_summary', 'summary_hour', 'notify_reminder', 'reminder_hour', 'notify_barber_changes', 'google_review_url',
+  'notify_summary', 'summary_hour', 'notify_reminder', 'reminder_hour', 'notify_barber_changes', 'email_staff_daily', 'email_staff_monthly', 'google_review_url',
   'instagram_url', 'google_maps_url', 'timezone', 'day_start_hour', 'currency', 'locale', 'phone_country', 'bill_prefix', 'wa_bill_auto',
   'wa_bill_template', 'wa_bill_pdf_template', 'wa_reminder_enabled', 'wa_reminder_days', 'wa_reminder_hour',
   'wa_reminder_template', 'wa_language', 'wa_feedback_enabled', 'wa_feedback_delay_min', 'wa_feedback_template',

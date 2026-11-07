@@ -321,10 +321,22 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
           <NotifyRow id="n-reminder" label="Reminder to barbers" hint="Only barbers with no sale logged yet that day." checked={s.notify_reminder} onChange={(v) => set("notify_reminder", v)}>
             <HourPicker id="n-reminder-h" value={s.reminder_hour} onChange={(h) => set("reminder_hour", h)} />
           </NotifyRow>
-          <NotifyRow id="n-changes" label="Tell a barber when you change or delete their sale" checked={s.notify_barber_changes} onChange={(v) => set("notify_barber_changes", v)} />
+          <NotifyRow id="n-changes" label="Tell a barber when you change or delete their sale" hint="A push, and an email if they have one." checked={s.notify_barber_changes} onChange={(v) => set("notify_barber_changes", v)} />
         </CardContent>
       </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Emails to staff</CardTitle>
+          <CardDescription>For staff who have an email in their profile (Staff → edit). Each one sees only their own numbers.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <NotifyRow id="e-daily" label="Their day, every evening" hint={`Customers, sales and commission, at the summary hour (${s.summary_hour}:00).`} checked={s.email_staff_daily} onChange={(v) => set("email_staff_daily", v)} />
+          <NotifyRow id="e-monthly" label="Their month, on the 1st" hint="Last month's customers, sales, commission and best day." checked={s.email_staff_monthly} onChange={(v) => set("email_staff_monthly", v)} />
+        </CardContent>
+      </Card>
+
 
       <Card>
         <CardHeader>

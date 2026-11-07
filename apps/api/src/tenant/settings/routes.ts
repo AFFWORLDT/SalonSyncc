@@ -141,6 +141,9 @@ export function parseSettings(raw: unknown): SettingsInput {
     notify_reminder: bool(b, "notify_reminder", "Reminders"),
     reminder_hour: int(b, "reminder_hour", "Reminder hour", 0, 23),
     notify_barber_changes: bool(b, "notify_barber_changes", "Barber change alerts"),
+    // Newer than some apps: undefined means "keep what is saved" (filled in by the PUT handler).
+    email_staff_daily: b.email_staff_daily === undefined ? (undefined as unknown as boolean) : bool(b, "email_staff_daily", "Daily email to staff"),
+    email_staff_monthly: b.email_staff_monthly === undefined ? (undefined as unknown as boolean) : bool(b, "email_staff_monthly", "Monthly email to staff"),
     google_review_url: link(b, "google_review_url", "Google review"),
     instagram_url: link(b, "instagram_url", "Instagram"),
     // Older apps don't send this one yet: undefined means "keep what is saved" (filled in by the PUT handler).
@@ -199,6 +202,8 @@ settings.put("/", requireAdmin, async (c) => {
   const repo = settingsRepo(c.env.DB, org.id);
   const cur = await repo.get();
   if (next.google_maps_url === undefined) next.google_maps_url = cur.google_maps_url;
+  if (next.email_staff_daily === undefined) next.email_staff_daily = cur.email_staff_daily;
+  if (next.email_staff_monthly === undefined) next.email_staff_monthly = cur.email_staff_monthly;
   if (next.currency !== cur.currency && currencyDigits(next.currency) !== Math.round(Math.log10(cur.currency_minor))) {
     throw bad("That currency uses different decimals; contact support to change it");
   }

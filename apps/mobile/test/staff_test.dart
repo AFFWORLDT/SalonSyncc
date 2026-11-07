@@ -60,10 +60,13 @@ void main() {
     expect(find.text('Password must be at least 4 characters'), findsOneWidget);
     expect(a.calls.where((c) => c.method == 'POST'), isEmpty);
     await t.enterText(find.byKey(const ValueKey('st-password')), 'pass1234');
+    await t.ensureVisible(find.byKey(const ValueKey('st-email')));
+    await t.enterText(find.byKey(const ValueKey('st-email')), ' omar@mail.com ');
     await t.tap(find.text('Save'));
     await t.pumpAndSettle();
     final body = a.calls.singleWhere((c) => c.method == 'POST').data as Map;
     expect(body['username'], 'omarkhan');
+    expect(body['email'], 'omar@mail.com');
     expect(body.containsKey('sort_order'), isFalse, reason: 'blank = the server puts them last in the sheet');
     expect(find.text('Your plan allows 10 active staff. Upgrade your plan to add more.'), findsOneWidget);
   });

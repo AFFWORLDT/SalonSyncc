@@ -55,7 +55,7 @@ void main() {
     await t.pump();
     await t.tap(find.widgetWithText(FilledButton, 'Send to everyone'));
     await t.pumpAndSettle();
-    expect(a.calls.singleWhere((c) => c.method == 'POST').data, {'title': 'Team meeting', 'body': '9 am sharp.', 'audience': 'all'});
+    expect(a.calls.singleWhere((c) => c.method == 'POST').data, {'title': 'Team meeting', 'body': '9 am sharp.', 'audience': 'all', 'email': false});
     expect(find.text('Sent to everyone · 2 people'), findsOneWidget);
     expect(find.text('Team meeting'), findsOneWidget);
   });
