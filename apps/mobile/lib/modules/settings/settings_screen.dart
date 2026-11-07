@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../core/ui/haptics.dart';
+import '../../core/theme/scale.dart';
+import '../../core/ui/stats.dart';
 import '../../core/ui/toast.dart';
 import '../../core/ui/heading.dart';
 import '../../core/ui/toggle.dart';
@@ -44,6 +47,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Object? _loadError;
   String? _error;
   bool _saving = false;
+
+  /// The settings page open now (null: the menu).
+  String? _page;
+  String? _pageTitle;
 
   Fmt get fmt => widget.me.fmt;
   bool _has(String f) => widget.me.features.contains(f);
@@ -205,7 +212,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: SkGlass(
           blur: false,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            // The page heading already names a section that is the whole page.
+            if (title != _pageTitle) Text(title, style: Theme.of(context).textTheme.titleMedium),
             if (sub != null) Text(sub, style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 12),
             ...children,
@@ -227,77 +235,204 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     final money = TextInputType.numberWithOptions(decimal: true);
     const number = TextInputType.number;
-    return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-      SkHeading('Settings'),
-      const SizedBox(height: 12),
-      _section('Billing', sub: 'Applies to new sales. Old sales keep the commission and VAT they were made with.', [
-        _field('default_commission_pct', 'Default commission %', keyboard: money, hint: 'Used for barbers without their own % (set per barber on the Barbers page).'),
-        _field('quick_amounts', 'Quick amounts (${fmt.currency})', hint: 'Buttons on the New sale screen, separated by commas.', show: (v) => v is List ? v.join(', ') : ''),
-        _switch('vat_enabled', 'VAT on receipts', 'On: receipts are tax invoices with TRN and VAT included in the price. Off: simple receipt.'),
-        if (s['vat_enabled'] == true) ...[
-          _field('vat_rate', 'VAT %', keyboard: money),
-          _field('trn', s['phone_country'] == '971' ? 'TRN (15 digits)' : 'Tax registration no.', maxLength: 40),
-        ],
-      ]),
-      if (_has('whatsapp')) _WhatsAppSection(me: widget.me, api: widget.api, settings: s, field: _field, switchTile: _switch, pick: _pick, hours: _hours, onChanged: () => setState(() {})),
-      _section('Reviews & links', sub: 'Links customers get from you. Each must start with https://', [
-        _field('google_review_url', 'Google review link', keyboard: TextInputType.url, hint: 'Where "Rate your visit" sends happy customers'),
-        _field('google_maps_url', 'Google Maps link', keyboard: TextInputType.url, hint: 'Directions to the salon; a button on the bill link'),
-        _field('instagram_url', 'Instagram link', keyboard: TextInputType.url, hint: 'On the PDF bill'),
-      ]),
-      _section('WhatsApp thank-you', [
-        _field('thank_you_text', 'Message', maxLines: 4, hint: 'You can use {name} {amount} {salon} {barber} {link}'),
-        Text('Preview', style: t.labelLarge),
-        const SizedBox(height: 4),
-        Text(_preview),
-      ]),
-      if (_has('push'))
-        _section('Notifications', [
-          _switch('notify_sales', 'New bill created'),
-          if (s['notify_sales'] == true)
-            _field('notify_sale_min', 'Only sales of at least (${fmt.currency})', keyboard: money, hint: 'Empty = every sale', show: (v) => v is int && v > 0 ? fmt.toInput(v) : ''),
-          _switch('notify_summary', 'End-of-day summary'),
-          if (s['notify_summary'] == true) _pick<int>('summary_hour', 'Send at', _hours),
-          _switch('notify_reminder', 'Reminder to barbers'),
-          if (s['notify_reminder'] == true) _pick<int>('reminder_hour', 'Send at', _hours),
-          _switch('notify_barber_changes', 'Tell a barber when you change or delete their sale', 'A push, and an email if they have one.'),
-        ]),
-      _section('Emails to staff', sub: 'For staff who have an email in their profile (Staff → edit). Each sees only their own numbers.', [
-        _switch('email_staff_daily', 'Their day, every evening', 'Customers, sales and commission, at the summary hour.'),
-        _switch('email_staff_monthly', 'Their month, on the 1st', "Last month's customers, sales, commission and best day."),
-      ]),
-      _section('Region', [
-        _field('timezone', 'Time zone', hint: 'e.g. Asia/Dubai'),
-        _pick<int>('day_start_hour', 'Day starts at', [for (var h = 0; h <= 12; h++) (h, _hourLabel(h))]),
-        _field('currency', 'Currency', maxLength: 3),
-        _field('locale', 'Number format', hint: 'e.g. en-AE'),
-        _field('phone_country', 'Phone country code', keyboard: number, maxLength: 4),
-        _field('bill_prefix', 'Bill number prefix', maxLength: 6),
-      ]),
-      _section('Salon details', sub: 'Shown on receipts.', [
-        Row(children: [
-          SalonLogo(slug: widget.me.org.slug, name: '${s['display_name'] ?? ''}', logoUrl: s['logo_url'] as String?, size: 56),
-          const SizedBox(width: 12),
-          OutlinedButton(onPressed: widget.me.readOnly ? null : _logo, child: Text(s['logo_url'] == null ? 'Upload logo' : 'Change logo')),
-          if (s['logo_url'] != null) TextButton(onPressed: widget.me.readOnly ? null : _removeLogo, child: const Text('Remove')),
-        ]),
-        Padding(padding: const EdgeInsets.only(top: 4, bottom: 10), child: Text('PNG, JPEG or WebP, up to 200 KB. PNGs up to 512 × 512 px.', style: t.bodySmall)),
-        _field('display_name', 'Salon name', maxLength: 80),
-        _field('salon_name_ar', 'Name in Arabic', dir: TextDirection.rtl),
-        _field('tagline', 'Tagline'),
-        _field('address', 'Address', maxLines: 2),
-        _field('phone', 'Phone', keyboard: TextInputType.phone),
-        _field('licence_no', 'Licence no.'),
-        _field('receipt_footer', 'Receipt footer', maxLines: 2),
-      ]),
-      if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 10), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
-      FilledButton(
-        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-        onPressed: _saving || widget.me.readOnly ? null : _save,
-        child: Text(_saving ? 'Saving…' : 'Save settings'),
+    final cs = Theme.of(context).colorScheme;
+    String? str(String k) => (s[k] as String?)?.trim().isEmpty ?? true ? null : (s[k] as String).trim();
+
+    // Each page: its rows on the menu (title, one-line summary, icon) and its sections.
+    final pages = <(String id, String title, IconData icon, String summary, List<Widget> Function() body)>[
+      (
+        'details',
+        'Salon details',
+        Icons.storefront_outlined,
+        [str('display_name'), str('address')].whereType<String>().join(' · '),
+        () => [
+              _section('Salon details', sub: 'Shown on receipts.', [
+                Row(children: [
+                  SalonLogo(slug: widget.me.org.slug, name: '${s['display_name'] ?? ''}', logoUrl: s['logo_url'] as String?, size: 56),
+                  const SizedBox(width: 12),
+                  OutlinedButton(onPressed: widget.me.readOnly ? null : _logo, child: Text(s['logo_url'] == null ? 'Upload logo' : 'Change logo')),
+                  if (s['logo_url'] != null) TextButton(onPressed: widget.me.readOnly ? null : _removeLogo, child: const Text('Remove')),
+                ]),
+                Padding(padding: const EdgeInsets.only(top: 4, bottom: 10), child: Text('PNG, JPEG or WebP, up to 200 KB. PNGs up to 512 × 512 px.', style: t.bodySmall)),
+                _field('display_name', 'Salon name', maxLength: 80),
+                _field('salon_name_ar', 'Name in Arabic', dir: TextDirection.rtl),
+                _field('tagline', 'Tagline'),
+                _field('address', 'Address', maxLines: 2),
+                _field('phone', 'Phone', keyboard: TextInputType.phone),
+                _field('licence_no', 'Licence no.'),
+                _field('receipt_footer', 'Receipt footer', maxLines: 2),
+              ]),
+            ],
       ),
-    ]);
+      (
+        'billing',
+        'Billing & VAT',
+        Icons.receipt_long_outlined,
+        s['vat_enabled'] == true ? 'VAT ${s['vat_rate']}%${str('trn') == null ? '' : ' · TRN ${str('trn')}'}' : 'VAT off · commission ${s['default_commission_pct'] ?? 0}%',
+        () => [
+              _section('Billing & VAT', sub: 'Applies to new sales. Old sales keep the commission and VAT they were made with.', [
+                _field('default_commission_pct', 'Default commission %', keyboard: money, hint: 'Used for barbers without their own % (set per barber on the Barbers page).'),
+                _field('quick_amounts', 'Quick amounts (${fmt.currency})', hint: 'Buttons on the New sale screen, separated by commas.', show: (v) => v is List ? v.join(', ') : ''),
+                _switch('vat_enabled', 'VAT on receipts', 'On: receipts are tax invoices with TRN and VAT included in the price. Off: simple receipt.'),
+                if (s['vat_enabled'] == true) ...[
+                  _field('vat_rate', 'VAT %', keyboard: money),
+                  _field('trn', s['phone_country'] == '971' ? 'TRN (15 digits)' : 'Tax registration no.', maxLength: 40),
+                ],
+              ]),
+            ],
+      ),
+      (
+        'links',
+        'Reviews & links',
+        Icons.link_rounded,
+        [if (str('google_review_url') != null) 'Google review', if (str('google_maps_url') != null) 'Maps', if (str('instagram_url') != null) 'Instagram'].join(' · ').ifEmpty('None added yet'),
+        () => [
+              _section('Reviews & links', sub: 'Links customers get from you. Each must start with https://', [
+                _field('google_review_url', 'Google review link', keyboard: TextInputType.url, hint: 'Where "Rate your visit" sends happy customers'),
+                _field('google_maps_url', 'Google Maps link', keyboard: TextInputType.url, hint: 'Directions to the salon; a button on the bill link'),
+                _field('instagram_url', 'Instagram link', keyboard: TextInputType.url, hint: 'On the PDF bill'),
+              ]),
+            ],
+      ),
+      (
+        'message',
+        'Thank-you message',
+        Icons.chat_bubble_outline_rounded,
+        'Sent with the bill on WhatsApp',
+        () => [
+              _section('Thank-you message', [
+                _field('thank_you_text', 'Message', maxLines: 4, hint: 'You can use {name} {amount} {salon} {barber} {link}'),
+                Text('Preview', style: t.labelLarge),
+                const SizedBox(height: 4),
+                Text(_preview),
+              ]),
+            ],
+      ),
+      (
+        'notify',
+        'Notifications & emails',
+        Icons.notifications_none_rounded,
+        [if (_has('push')) 'Phone alerts', 'Staff emails ${s['email_staff_daily'] == false && s['email_staff_monthly'] == false ? 'off' : 'on'}'].join(' · '),
+        () => [
+              if (_has('push'))
+                _section('Notifications', [
+                  _switch('notify_sales', 'New bill created'),
+                  if (s['notify_sales'] == true)
+                    _field('notify_sale_min', 'Only sales of at least (${fmt.currency})', keyboard: money, hint: 'Empty = every sale', show: (v) => v is int && v > 0 ? fmt.toInput(v) : ''),
+                  _switch('notify_summary', 'End-of-day summary'),
+                  if (s['notify_summary'] == true) _pick<int>('summary_hour', 'Send at', _hours),
+                  _switch('notify_reminder', 'Reminder to barbers'),
+                  if (s['notify_reminder'] == true) _pick<int>('reminder_hour', 'Send at', _hours),
+                  _switch('notify_barber_changes', 'Tell a barber when you change or delete their sale', 'A push, and an email if they have one.'),
+                ]),
+              _section('Emails to staff', sub: 'For staff who have an email in their profile (Staff → edit). Each sees only their own numbers.', [
+                _switch('email_staff_daily', 'Their day, every evening', 'Customers, sales and commission, at the summary hour.'),
+                _switch('email_staff_monthly', 'Their month, on the 1st', "Last month's customers, sales, commission and best day."),
+              ]),
+            ],
+      ),
+      if (_has('whatsapp'))
+        (
+          'whatsapp',
+          'WhatsApp Business',
+          Icons.forum_outlined,
+          s['wa_ready'] == true ? 'Connected' : 'Not connected',
+          () => [_WhatsAppSection(me: widget.me, api: widget.api, settings: s, field: _field, switchTile: _switch, pick: _pick, hours: _hours, onChanged: () => setState(() {}))],
+        ),
+      (
+        'region',
+        'Region & numbers',
+        Icons.public_rounded,
+        '${s['timezone'] ?? ''} · ${s['currency'] ?? ''} · bills ${s['bill_prefix'] ?? ''}',
+        () => [
+              _section('Region & numbers', [
+                _field('timezone', 'Time zone', hint: 'e.g. Asia/Dubai'),
+                _pick<int>('day_start_hour', 'Day starts at', [for (var h = 0; h <= 12; h++) (h, _hourLabel(h))]),
+                _field('currency', 'Currency', maxLength: 3),
+                _field('locale', 'Number format', hint: 'e.g. en-AE'),
+                _field('phone_country', 'Phone country code', keyboard: number, maxLength: 4),
+                _field('bill_prefix', 'Bill number prefix', maxLength: 6),
+              ]),
+            ],
+      ),
+    ];
+
+    final open = pages.where((x) => x.$1 == _page).firstOrNull;
+    _pageTitle = open?.$2;
+    if (open == null) {
+      // The menu: one row per page with what is set there now.
+      return ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+        const SkHeading('Settings', subtitle: 'Your salon, billing, messages and alerts'),
+        SkFlatList(indent: 60, children: [
+          for (final (id, title, icon, summary, _) in pages)
+            InkWell(
+              key: ValueKey('settings-$id'),
+              onTap: () {
+                Haptic.tap();
+                setState(() {
+                  _page = id;
+                  _error = null;
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(SkSpace.lg, SkSpace.md, SkSpace.sm, SkSpace.md),
+                child: Row(children: [
+                  Icon(icon, size: 26, color: cs.onSurfaceVariant),
+                  const SizedBox(width: SkSpace.lg),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      if (summary.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(summary, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
+                      ],
+                    ]),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant.withValues(alpha: 0.6)),
+                ]),
+              ),
+            ),
+        ]),
+      ]);
+    }
+
+    // One page: its sections, Save pinned at the bottom; back returns to the menu.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) setState(() => _page = null);
+      },
+      child: Column(children: [
+        Expanded(
+          child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xl), children: [
+            Row(children: [
+              IconButton(tooltip: 'All settings', onPressed: () => setState(() => _page = null), icon: const Icon(Icons.arrow_back_rounded)),
+              const SizedBox(width: SkSpace.xs),
+              Expanded(child: SkHeading(open.$2)),
+            ]),
+            ...open.$5(),
+          ]),
+        ),
+        if (open.$1 != 'whatsapp')
+          Container(
+            decoration: BoxDecoration(border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)))),
+            padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.md, SkSpace.gutter, SkSpace.md),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(_error!, style: TextStyle(color: cs.error, fontWeight: FontWeight.w500))),
+              FilledButton(
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                onPressed: _saving || widget.me.readOnly ? null : _save,
+                child: Text(_saving ? 'Saving…' : 'Save settings'),
+              ),
+            ]),
+          ),
+      ]),
+    );
   }
+}
+
+extension on String {
+  String ifEmpty(String other) => isEmpty ? other : this;
 }
 
 typedef _Field = Widget Function(String key, String label, {String? hint, int? maxLength, TextInputType? keyboard, int maxLines, String Function(Object?)? show, TextDirection? dir});
@@ -407,7 +542,6 @@ class _WhatsAppSectionState extends State<_WhatsAppSection> {
       child: SkGlass(
         blur: false,
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text('WhatsApp Business', style: t.titleMedium),
           Text(
             _ready
                 ? 'Messages go from the salon\'s WhatsApp number using templates approved by Meta. Save to apply changes.'

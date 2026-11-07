@@ -163,6 +163,19 @@ class _StaffScreenState extends State<StaffScreen> {
                   if (!s.active) badge('Inactive', cs.outline),
                 ]),
                 Text(line, style: t.bodySmall),
+                // Who gets the daily / monthly report by email.
+                Row(children: [
+                  Icon((s.email ?? '').isEmpty ? Icons.mail_outline_rounded : Icons.mark_email_read_outlined, size: 14, color: (s.email ?? '').isEmpty ? cs.onSurfaceVariant.withValues(alpha: 0.6) : cs.primary),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      (s.email ?? '').isEmpty ? 'No email · add one for their reports' : s.email!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.bodySmall?.copyWith(color: (s.email ?? '').isEmpty ? cs.onSurfaceVariant.withValues(alpha: 0.7) : cs.primary),
+                    ),
+                  ),
+                ]),
               ]),
             ),
             if (!me.readOnly)

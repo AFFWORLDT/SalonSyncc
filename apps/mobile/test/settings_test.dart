@@ -37,11 +37,22 @@ void main() {
     return (a, out);
   }
 
+  /// Opens a settings page from the menu (back to the menu first if another is open).
+  Future<void> open(WidgetTester t, String id) async {
+    if (find.byTooltip('All settings').evaluate().isNotEmpty) {
+      await t.tap(find.byTooltip('All settings'));
+      await t.pumpAndSettle();
+    }
+    await t.tap(find.byKey(ValueKey('settings-$id')));
+    await t.pumpAndSettle();
+  }
+
   Map body(FakeAdapter a) => a.calls.singleWhere((c) => c.method == 'PUT' && c.path == '/api/settings').data as Map;
 
   testWidgets('save sends every key; untouched ones go back as loaded', (t) async {
     final loaded = raw('settings.json') as Map<String, dynamic>;
     final (a, out) = await pump(t);
+    await open(t, 'details');
     await t.enterText(find.byKey(const ValueKey('set-receipt_footer')), 'See you soon!');
     await t.tap(find.text('Save settings'));
     await t.pumpAndSettle();
@@ -57,6 +68,7 @@ void main() {
 
   testWidgets('VAT on shows the rate and TRN (UAE)', (t) async {
     await pump(t);
+    await open(t, 'billing');
     expect(find.text('VAT %'), findsNothing);
     await t.tap(find.text('VAT on receipts'));
     await t.pumpAndSettle();
@@ -66,7 +78,9 @@ void main() {
 
   testWidgets('quick amounts and sale-alert minimum are converted like the web', (t) async {
     final (a, _) = await pump(t);
+    await open(t, 'billing');
     await t.enterText(find.byKey(const ValueKey('set-quick_amounts')), '20, 35 50');
+    await open(t, 'notify');
     await t.enterText(find.byKey(const ValueKey('set-notify_sale_min')), '50');
     await t.tap(find.text('Save settings'));
     await t.pumpAndSettle();
@@ -77,10 +91,12 @@ void main() {
   testWidgets('a number typed wrong once still goes as a number when corrected; 0 minimum is 0', (t) async {
     var n = 0;
     final (a, _) = await pump(t, extra: {'PUT /api/settings': (o) => n++ == 0 ? const FakeReply(400, {'error': 'Default commission % must be between 0 and 100'}) : raw('settings.json')});
+    await open(t, 'billing');
     await t.enterText(find.byKey(const ValueKey('set-default_commission_pct')), '5%');
     await t.tap(find.text('Save settings'));
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('set-default_commission_pct')), '12,5');
+    await open(t, 'notify');
     await t.enterText(find.byKey(const ValueKey('set-notify_sale_min')), '0');
     await t.tap(find.text('Save settings'));
     await t.pumpAndSettle();
@@ -91,6 +107,7 @@ void main() {
 
   testWidgets('thank-you preview fills the tokens', (t) async {
     await pump(t);
+    await open(t, 'message');
     expect(find.textContaining('Thank you Ali for visiting E2E Salon! Your bill: AED 25.'), findsOneWidget);
   });
 
@@ -99,11 +116,13 @@ void main() {
     expect(find.text('WhatsApp Business'), findsNothing);
     await pump(t);
     expect(find.text('WhatsApp Business'), findsOneWidget);
+    await open(t, 'whatsapp');
     expect(find.text('Connect your WhatsApp Business number'), findsOneWidget);
   });
 
   testWidgets('a server error is shown and nothing is lost', (t) async {
     final (_, out) = await pump(t, extra: {'PUT /api/settings': (o) => const FakeReply(400, {'error': 'Bill prefix must be 1 to 6 capital letters or digits'})});
+    await open(t, 'region');
     await t.enterText(find.byKey(const ValueKey('set-bill_prefix')), 'b-1');
     await t.tap(find.text('Save settings'));
     await t.pumpAndSettle();
