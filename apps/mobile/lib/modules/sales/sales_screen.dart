@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/filter_chip_menu.dart';
@@ -99,7 +100,7 @@ class _SalesScreenState extends State<SalesScreen> {
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
         Row(children: [
-          Expanded(child: Text('Sales', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600))),
+          Expanded(child: SkHeading('Sales')),
           if (!widget.me.readOnly)
             FilledButton.icon(onPressed: () => widget.onNewSale().then((_) => _load()), icon: const Icon(Icons.add_rounded), label: const Text('New sale')),
         ]),

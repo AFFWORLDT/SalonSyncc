@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/scale.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/motion.dart';
@@ -22,7 +23,7 @@ class SaleDone extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    const success = Color(0xFF22A06B);
+    final success = skPalette(context).success;
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -36,7 +37,7 @@ class SaleDone extends StatelessWidget {
                 duration: skDuration(context, 420),
                 curve: Curves.elasticOut,
                 builder: (_, v, child) => Transform.scale(scale: v, child: child),
-                child: const CircleAvatar(radius: 22, backgroundColor: success, foregroundColor: Colors.white, child: Icon(Icons.check_rounded, size: 26)),
+                child: CircleAvatar(radius: 22, backgroundColor: success, foregroundColor: Colors.white, child: Icon(Icons.check_rounded, size: 26)),
               ),
               const SizedBox(width: 12),
               Expanded(

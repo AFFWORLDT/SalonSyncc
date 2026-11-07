@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/toast.dart';
+import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/filter_chip_menu.dart';
@@ -67,7 +69,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     _load();
   }
 
-  void _toast(String s) => ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(s)));
+  void _toast(String s) => showSkToast(context, s);
 
   Future<void> _editBarber(Expense? e, {required int barberId, required String barberName, required String day}) async {
     final r = await showModalBottomSheet<String>(
@@ -114,7 +116,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
         Row(children: [
-          Expanded(child: Text('Expenses', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600))),
+          Expanded(child: SkHeading('Expenses')),
           if (!ro)
             FilledButton.icon(
               onPressed: _company ? () => _editCompany(null) : _addBarber,

@@ -1,4 +1,5 @@
 import 'package:animations/animations.dart';
+import '../core/ui/toast.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -84,7 +85,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     if (!widget.registry.isVisible(_tab, me)) {
       setState(() => _tab = '');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text(kSwitchedOff)));
+      showSkToast(context, kSwitchedOff);
     }
   }
 

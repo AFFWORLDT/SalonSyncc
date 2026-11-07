@@ -1,11 +1,11 @@
 import 'package:animations/animations.dart';
+import '../../core/ui/avatar.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_error.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/haptics.dart';
-import '../../core/ui/salon_logo.dart';
 import '../../core/ui/states.dart';
 import '../../core/ui/motion.dart';
 import '../../data/sales_api.dart';
@@ -726,7 +726,7 @@ class _BarberTile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(2.5),
                 decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: on ? cs.primary : Colors.transparent, width: 2)),
-                child: ClipOval(child: SalonLogo(slug: slug, name: staff.name, logoUrl: staff.avatarUrl, size: 56)),
+                child: SkAvatar(slug: slug, name: staff.name, url: staff.avatarUrl, size: 56),
               ),
               const SizedBox(height: 8),
               Text(

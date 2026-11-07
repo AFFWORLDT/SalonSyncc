@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../core/ui/heading.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/format/fmt.dart';
@@ -94,7 +95,7 @@ class _BillsScreenState extends State<BillsScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
-        Text(widget.admin ? 'Bills' : 'My bills', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+        SkHeading(widget.admin ? 'Bills' : 'My bills'),
         if (widget.admin) Text('Every sale makes a bill. Open one to see or print it.', style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 12),
         TextField(

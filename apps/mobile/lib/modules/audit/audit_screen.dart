@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../core/ui/heading.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/format/fmt.dart';
@@ -155,8 +156,8 @@ class _AuditScreenState extends State<AuditScreen> {
   }
 
   String _when(int ms) {
-    final d = DateTime.fromMillisecondsSinceEpoch(ms);
-    return '${widget.me.fmt.dayLabel(ymd(d))} ${widget.me.fmt.time(ms)}';
+    final fmt = widget.me.fmt;
+    return '${fmt.dayLabel(fmt.ymdOf(ms))} ${fmt.time(ms)}';
   }
 
   void _detail(AuditEntry e) {
@@ -202,7 +203,7 @@ class _AuditScreenState extends State<AuditScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-        Text('Audit log', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+        SkHeading('Audit log'),
         Text('Every bill, expense and setting change: who did it, when, and what changed. Nothing here can be edited.', style: t.bodySmall),
         const SizedBox(height: 12),
         TextField(

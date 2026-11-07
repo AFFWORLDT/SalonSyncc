@@ -1,5 +1,9 @@
 import 'dart:typed_data';
 
+import '../../core/ui/form_sheet.dart';
+import '../../core/ui/toast.dart';
+import '../../core/ui/avatar.dart';
+import '../../core/ui/heading.dart';
 import '../../core/ui/toggle.dart';
 import 'package:flutter/material.dart';
 
@@ -7,7 +11,6 @@ import '../../core/format/fmt.dart';
 import '../../core/ui/glass.dart';
 import '../../core/ui/haptics.dart';
 import '../../core/ui/photo_pick.dart';
-import '../../core/ui/salon_logo.dart';
 import '../../core/ui/states.dart';
 import '../../data/staff_api.dart';
 import '../../models/me.dart';
@@ -44,7 +47,7 @@ class _StaffScreenState extends State<StaffScreen> {
     }
   }
 
-  void _toast(String s) => ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(s)));
+  void _toast(String s) => showSkToast(context, s);
   String _limitText() => 'Your plan allows ${widget.me.maxStaff} active staff. Upgrade your plan to add more.';
 
   Future<void> _form([Staff? s]) async {
@@ -111,7 +114,7 @@ class _StaffScreenState extends State<StaffScreen> {
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
         Row(children: [
-          Expanded(child: Text('Staff', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600))),
+          Expanded(child: SkHeading('Staff')),
           FilledButton.icon(onPressed: full || me.readOnly || all == null ? null : () => _form(), icon: const Icon(Icons.person_add_alt_rounded), label: const Text('Add staff')),
         ]),
         Text('Shop default commission: ${pctLabel(me.salon.defaultCommissionPct)} (change in Settings)', style: t.bodySmall),
@@ -150,7 +153,7 @@ class _StaffScreenState extends State<StaffScreen> {
           blur: false,
           padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
           child: Row(children: [
-            SalonLogo(slug: me.org.slug, name: s.name, logoUrl: s.avatarUrl, size: 40),
+            SkAvatar(slug: me.org.slug, name: s.name, url: s.avatarUrl, size: 44),
             const SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -296,14 +299,14 @@ class _StaffFormState extends State<_StaffForm> {
     const size = 72.0;
     final name = _name.text.trim().isEmpty ? (s?.name ?? '') : _name.text.trim();
     final Widget face = _photo != null
-        ? ClipRRect(borderRadius: BorderRadius.circular(size * 0.28), child: Image.memory(Uint8List.fromList(_photo!.$1), width: size, height: size, fit: BoxFit.cover))
-        : SalonLogo(slug: widget.me.org.slug, name: name, logoUrl: _removePhoto ? null : s?.avatarUrl, size: size);
+        ? ClipOval(child: Image.memory(Uint8List.fromList(_photo!.$1), width: size, height: size, fit: BoxFit.cover))
+        : SkAvatar(slug: widget.me.org.slug, name: name, url: _removePhoto ? null : s?.avatarUrl, size: size);
     final has = _photo != null || (!_removePhoto && s?.avatarUrl != null);
     return Row(children: [
       InkWell(
         key: const ValueKey('st-photo'),
         onTap: _busy ? null : _pickPhoto,
-        borderRadius: BorderRadius.circular(size * 0.28),
+        customBorder: const CircleBorder(),
         child: Stack(clipBehavior: Clip.none, children: [
           face,
           Positioned(
@@ -334,15 +337,12 @@ class _StaffFormState extends State<_StaffForm> {
   @override
   Widget build(BuildContext context) {
     final owner = s?.isOwner ?? false;
-    final t = Theme.of(context).textTheme;
     InputDecoration dec(String label, [String? hint]) => InputDecoration(labelText: label, helperText: hint, helperMaxLines: 2);
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.viewInsetsOf(context).bottom),
-      child: SingleChildScrollView(
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(s == null ? 'Add barber' : 'Edit ${s!.name}', style: t.titleLarge),
-          Text(s == null ? 'They sign in with this username and password.' : 'Password is changed with “Reset password”.', style: t.bodySmall),
-          const SizedBox(height: 16),
+    return FormSheet(
+      title: s == null ? 'Add staff' : 'Edit ${s!.name}',
+      subtitle: s == null ? 'They sign in with this username and password.' : 'Password is changed with “Reset password”.',
+      error: _error,
+      fields: [
           if (_canPhoto) ...[_photoRow(context), const SizedBox(height: 16)],
           TextField(key: const ValueKey('st-name'), controller: _name, textCapitalization: TextCapitalization.words, decoration: dec('Name')),
           const SizedBox(height: 10),
@@ -370,11 +370,11 @@ class _StaffFormState extends State<_StaffForm> {
             TextField(
               controller: _pct,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: dec('Commission %', 'Empty = default ${pctLabel(widget.me.salon.defaultCommissionPct)}'),
+              decoration: dec('Commission %', 'Leave empty to use the shop default (${pctLabel(widget.me.salon.defaultCommissionPct)})'),
             ),
           ],
           const SizedBox(height: 10),
-          TextField(controller: _order, keyboardType: TextInputType.number, decoration: dec('Column order', s == null ? 'Position in the sheet (empty = last)' : 'Position in the sheet')),
+          TextField(controller: _order, keyboardType: TextInputType.number, decoration: dec('Order on the daily sheet', s == null ? 'Their column number; leave empty to add them last' : 'Their column number, from the left')),
           const SizedBox(height: 10),
           TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: dec('Mobile (optional)')),
           if (_role == 'barber')
@@ -385,11 +385,8 @@ class _StaffFormState extends State<_StaffForm> {
               value: _canExpense,
               onChanged: (v) => setState(() => _canExpense = v),
             ),
-          if (_error != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))),
-          const SizedBox(height: 14),
-          FilledButton(onPressed: _busy ? null : _save, child: const Text('Save')),
-        ]),
-      ),
+      ],
+      actions: [FilledButton(key: const ValueKey('st-save'), onPressed: _busy ? null : _save, child: Text(_busy ? 'Saving…' : 'Save'))],
     );
   }
 }

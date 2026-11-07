@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/ui/toast.dart';
 import 'package:get/get.dart';
 
 import '../../core/auth/auth_controller.dart';
@@ -40,7 +41,7 @@ final dashboardModule = FeatureModule(
       onDailySheet: () => openModule('sheet'),
       onAddCompanyExpense: () async {
         final r = await showCompanyExpenseSheet(context, api: ExpensesApi(auth.api), me: me);
-        if (r != null && context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r)));
+        if (r != null && context.mounted) showSkToast(context, r);
       },
       onNewSale: () => openSaleSheet(context, me: me, sales: sales, staff: StaffApi(auth.api), doneActions: shareActionsFor),
     );

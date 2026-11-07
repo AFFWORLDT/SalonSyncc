@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import '../../core/ui/toast.dart';
+import '../../core/ui/heading.dart';
 import '../../core/ui/toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
@@ -102,7 +104,7 @@ class _SheetScreenState extends State<SheetScreen> {
       final fmt = widget.me.fmt;
       await widget.shareFile(buildDailyXlsx(d, salonName: widget.me.salonName, fmt: fmt), workbookName(widget.me.salonName, fmt.monthLabel(d.month)));
     } catch (e) {
-      if (mounted) ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(messageOf(e))));
+      if (mounted) showSkToast(context, messageOf(e), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -127,7 +129,7 @@ class _SheetScreenState extends State<SheetScreen> {
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
         Row(children: [
-          Expanded(child: Text('Daily sheet', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600))),
+          Expanded(child: SkHeading('Daily sheet')),
           if (me.features.contains('excel_export'))
             OutlinedButton.icon(
               onPressed: d == null || _exporting ? null : _excel,

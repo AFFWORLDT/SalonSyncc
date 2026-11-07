@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/toast.dart';
 import '../../core/ui/states.dart';
 import '../../data/account_api.dart';
 
@@ -7,7 +8,7 @@ import '../../data/account_api.dart';
 Future<void> showChangePassword(BuildContext context, AccountApi api) async {
   final ok = await showModalBottomSheet<bool>(context: context, isScrollControlled: true, showDragHandle: true, builder: (_) => _Sheet(api: api));
   if (ok == true && context.mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password changed')));
+    showSkToast(context, 'Password changed', kind: ToastKind.success);
   }
 }
 

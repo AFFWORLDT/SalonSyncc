@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../core/ui/toast.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
@@ -76,7 +77,7 @@ class _ShareButtonsState extends State<ShareButtons> {
         } catch (_) {}
       });
     } catch (e) {
-      if (mounted) ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(messageOf(e))));
+      if (mounted) showSkToast(context, messageOf(e), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _sending = false);
     }

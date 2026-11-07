@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/ui/avatar.dart';
 import 'package:flutter/material.dart';
 
 import '../core/format/fmt.dart';
@@ -27,7 +28,7 @@ class SkTopBar extends StatelessWidget {
           },
           icon: Icon(i, size: 26),
         );
-    final avatar = ClipOval(child: SalonLogo(slug: me.org.slug, name: me.user.name, logoUrl: me.user.avatarUrl, size: 36));
+    final avatar = SkAvatar(slug: me.org.slug, name: me.user.name, url: me.user.avatarUrl, size: 36);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
       child: Row(children: [

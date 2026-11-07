@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import '../core/ui/toast.dart';
+import '../core/ui/avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -9,7 +11,6 @@ import '../core/theme/theme_controller.dart';
 import '../core/ui/haptics.dart';
 import '../core/ui/photo_pick.dart';
 import '../core/ui/route.dart';
-import '../core/ui/salon_logo.dart';
 import '../core/ui/states.dart';
 import '../data/account_api.dart';
 import '../models/me.dart';
@@ -53,7 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       Haptic.success();
     } catch (e) {
       Haptic.error();
-      if (mounted) ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(messageOf(e))));
+      if (mounted) showSkToast(context, messageOf(e), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _photoBusy = false);
     }
@@ -115,7 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 key: const ValueKey('profile-photo'),
                 onTap: () => _photo(me),
                 child: Stack(clipBehavior: Clip.none, children: [
-                  ClipOval(child: SalonLogo(slug: me.org.slug, name: me.user.name, logoUrl: me.user.avatarUrl, size: 92)),
+                  SkAvatar(slug: me.org.slug, name: me.user.name, url: me.user.avatarUrl, size: 92),
                   if (_photoBusy) const Positioned.fill(child: Center(child: CircularProgressIndicator())),
                   Positioned(
                     right: 0,

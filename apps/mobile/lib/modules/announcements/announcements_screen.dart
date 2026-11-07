@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/ui/glass.dart';
 import '../../core/ui/states.dart';
@@ -46,9 +47,8 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   }
 
   String _when(int ms) {
-    final d = DateTime.fromMillisecondsSinceEpoch(ms);
-    final ymd = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
     final fmt = widget.me.fmt;
+    final ymd = fmt.ymdOf(ms);
     return ymd == widget.me.today ? fmt.time(ms) : '${fmt.dayLabel(ymd)} · ${fmt.time(ms)}';
   }
 
@@ -59,6 +59,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
+        const SkHeading('Announcements'),
         if (_error != null && f == null)
           ErrorState(error: _error!, onRetry: _load)
         else if (f == null)

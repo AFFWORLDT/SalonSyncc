@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/count_up.dart';
@@ -107,7 +108,7 @@ class TodayScreenState extends State<TodayScreen> {
     return RefreshIndicator(
       onRefresh: _pull,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
-        Text('Hi ${me.user.name} 👋', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+        SkHeading('Hi ${me.user.name} 👋'),
         const SizedBox(height: 2),
         Text(fmt.dateLabel(me.today), style: SkText.mono.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
         const SizedBox(height: 16),

@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import '../../core/ui/toast.dart';
+import '../../core/ui/heading.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -86,7 +88,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
     _load();
   }
 
-  void _toast(String s) => ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(s)));
+  void _toast(String s) => showSkToast(context, s);
 
   Future<void> _sheet(WidgetBuilder b) async {
     final r = await showFormSheet(context, b);
@@ -150,7 +152,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-        Text('Ledger', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+        SkHeading('Ledger'),
         Text('Every money movement, in order. Nothing here is ever rewritten.', style: t.bodySmall),
         const SizedBox(height: 12),
         SegmentedButton<bool>(

@@ -93,6 +93,12 @@ class Fmt {
   /// "14:05" in the salon's time zone.
   String time(int ms) => DateFormat('HH:mm', 'en_US').format(_at(ms));
 
+  /// The salon-zone day (YYYY-MM-DD) of an instant.
+  String ymdOf(int ms) {
+    final d = _at(ms);
+    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  }
+
   /// "7 Nov 2026, 22:03" in the salon's time zone (web: dateTimeLabel).
   String dateTime(int ms) => DateFormat('d MMM y, HH:mm', 'en_US').format(_at(ms));
 

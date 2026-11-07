@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/count_up.dart';
@@ -83,7 +84,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
-        Text('My history', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+        SkHeading('My history'),
         const SizedBox(height: 8),
         Row(children: [
           IconButton(key: const ValueKey('prev-month'), tooltip: 'Previous month', onPressed: () => _go(prevMonth(_month)), icon: const Icon(Icons.chevron_left_rounded)),

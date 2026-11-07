@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/ui/filter_chip_menu.dart';
 import '../../core/ui/glass.dart';
@@ -77,7 +78,7 @@ class _RatingsScreenState extends State<RatingsScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-        Text('Ratings', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+        SkHeading('Ratings'),
         const SizedBox(height: 8),
         Align(
           alignment: Alignment.centerLeft,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/bar_chart.dart';
@@ -138,9 +139,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
-        Text('Dashboard', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
-        Text(subtitle, style: SkText.mono.copyWith(color: cs.onSurfaceVariant, fontSize: 13)),
-        const SizedBox(height: 12),
+        SkHeading('Dashboard', subtitle: subtitle, mono: true),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(children: [

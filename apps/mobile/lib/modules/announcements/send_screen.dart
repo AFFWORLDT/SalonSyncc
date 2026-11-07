@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/toast.dart';
+import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/ui/glass.dart';
 import '../../core/ui/states.dart';
@@ -67,9 +69,9 @@ class _SendAnnouncementScreenState extends State<SendAnnouncementScreen> {
       _title.clear();
       _body.clear();
       setState(() => _sent = [a, ...?_sent]);
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text('Sent to ${a.audience == 'all' ? 'everyone' : a.targetName ?? 'the barber'} · ${_people(a.recipients)}')));
+      showSkToast(context, 'Sent to ${a.audience == 'all' ? 'everyone' : a.targetName ?? 'the barber'} · ${_people(a.recipients)}');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(messageOf(e))));
+      if (mounted) showSkToast(context, messageOf(e), kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -79,14 +81,12 @@ class _SendAnnouncementScreenState extends State<SendAnnouncementScreen> {
   Widget build(BuildContext context) {
     final fmt = widget.me.fmt, t = Theme.of(context).textTheme, cs = Theme.of(context).colorScheme;
     final sent = _sent;
-    String when(int ms) {
-      final d = DateTime.fromMillisecondsSinceEpoch(ms);
-      return '${fmt.dateLabel('${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}')} ${fmt.time(ms)}';
-    }
+    String when(int ms) => '${fmt.dateLabel(fmt.ymdOf(ms))} ${fmt.time(ms)}';
 
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
+        const SkHeading('Announcements', subtitle: 'Send a message to your team'),
         SkGlass(
           blur: false,
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

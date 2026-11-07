@@ -51,7 +51,7 @@ void main() {
     final a = await pump(t, extra: {'POST /api/users': (o) => const FakeReply(409, {'error': 'Staff limit reached for your plan', 'code': 'staff_limit'})});
     await t.tap(find.text('Add staff'));
     await t.pumpAndSettle();
-    expect(find.text('Add barber'), findsOneWidget);
+    expect(find.text('They sign in with this username and password.'), findsOneWidget);
     await t.enterText(find.byKey(const ValueKey('st-name')), 'Omar Khan');
     expect(find.widgetWithText(TextField, 'omarkhan'), findsOneWidget);
     await t.enterText(find.byKey(const ValueKey('st-password')), 'abc');

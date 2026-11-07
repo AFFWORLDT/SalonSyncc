@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import '../../core/ui/toast.dart';
+import '../../core/ui/heading.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -81,7 +83,7 @@ class _MonthlyScreenState extends State<MonthlyScreen> {
     try {
       await widget.shareFile(buildMonthlyXlsx(r, fmt: widget.me.fmt), workbookName(widget.me.salonName, '${r.year} summary'));
     } catch (_) {
-      if (mounted) ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(content: Text("Couldn't create the Excel file")));
+      if (mounted) showSkToast(context, "Couldn't create the Excel file", kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -105,7 +107,7 @@ class _MonthlyScreenState extends State<MonthlyScreen> {
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
         Row(children: [
-          Expanded(child: Text('Monthly', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600))),
+          Expanded(child: SkHeading('Monthly')),
           if (me.features.contains('excel_export'))
             OutlinedButton.icon(onPressed: r == null || _exporting ? null : _excel, icon: const Icon(Icons.table_view_outlined), label: Text(_exporting ? 'Preparing…' : 'Excel')),
         ]),

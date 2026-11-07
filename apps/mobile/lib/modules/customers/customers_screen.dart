@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import '../../core/ui/toast.dart';
+import '../../core/ui/heading.dart';
 import '../../core/ui/toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,10 +17,7 @@ import '../../models/paged.dart';
 import '../../models/sale.dart';
 import '../today/sale_row.dart';
 
-String _dateTime(Fmt fmt, int ms) {
-  final d = DateTime.fromMillisecondsSinceEpoch(ms);
-  return '${fmt.dateLabel('${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}')} ${fmt.time(ms)}';
-}
+String _dateTime(Fmt fmt, int ms) => '${fmt.dateLabel(fmt.ymdOf(ms))} ${fmt.time(ms)}';
 
 String _waDigits(String phone, String country) => phone.startsWith('+') ? phone.substring(1) : '$country${phone.replaceFirst(RegExp(r'^0'), '')}';
 
@@ -77,7 +76,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-        Text('Customers', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+        SkHeading('Customers'),
         Text('Saved automatically when a barber enters a mobile number. Tap one for their visit history.', style: t.bodySmall),
         const SizedBox(height: 12),
         TextField(
@@ -184,10 +183,10 @@ class _CustomerProfileState extends State<CustomerProfile> {
     try {
       await widget.api.setOptOut(widget.id, off);
       if (!mounted) return;
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(off ? 'No more WhatsApp reminders or announcements' : 'WhatsApp messages on')));
+      showSkToast(context, off ? 'No more WhatsApp reminders or announcements' : 'WhatsApp messages on');
       _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(messageOf(e))));
+      if (mounted) showSkToast(context, messageOf(e), kind: ToastKind.error);
     }
   }
 
@@ -219,7 +218,7 @@ class _CustomerProfileState extends State<CustomerProfile> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-                    Text(c.name ?? 'No name', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+                    SkHeading(c.name ?? 'No name'),
                     Text('${c.phone == null ? 'No mobile' : fmt.phone(c.phone!)}${c.firstVisitAt == null ? '' : ' · customer since ${_dateTime(fmt, c.firstVisitAt!).split(' ').take(3).join(' ')}'}', style: t.bodySmall),
                     if (c.phone != null)
                       Padding(

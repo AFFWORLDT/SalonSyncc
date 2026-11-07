@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/ui/toast.dart';
+import '../../core/ui/heading.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/format/fmt.dart';
@@ -72,7 +74,7 @@ class _PlanScreenState extends State<PlanScreen> {
     }
   }
 
-  void _toast(String s) => ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(s)));
+  void _toast(String s) => showSkToast(context, s);
 
   Future<void> _go(String id, Future<String> Function() call) async {
     setState(() => _opening = id);
@@ -124,7 +126,7 @@ class _PlanScreenState extends State<PlanScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-        Text('Plan', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+        SkHeading('Plan'),
         Text("You're on ${_planNames[current] ?? current}${banner == null ? '' : ' · $banner'}"),
         const SizedBox(height: 12),
         if (_error != null && b == null)
@@ -138,7 +140,7 @@ class _PlanScreenState extends State<PlanScreen> {
               child: Row(children: [
                 Expanded(
                   child: Text(b.paysByCard
-                      ? 'Paid by card${b.periodEnd == null ? '' : ' · ${b.cancelAt != null ? 'ends' : 'renews'} ${me.fmt.dateLabel(DateTime.fromMillisecondsSinceEpoch(b.cancelAt ?? b.periodEnd!).toIso8601String().substring(0, 10))}'}${b.stripeStatus == 'past_due' ? ' · the last payment failed, please update your card' : ''}'
+                      ? 'Paid by card${b.periodEnd == null ? '' : ' · ${b.cancelAt != null ? 'ends' : 'renews'} ${me.fmt.dateLabel(me.fmt.ymdOf(b.cancelAt ?? b.periodEnd!))}'}${b.stripeStatus == 'past_due' ? ' · the last payment failed, please update your card' : ''}'
                       : 'Card details and invoices'),
                 ),
                 OutlinedButton(onPressed: _opening != null ? null : () => _go('portal', widget.api.portal), child: const Text('Manage billing')),

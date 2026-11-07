@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/ui/avatar.dart';
+import '../../core/ui/heading.dart';
 import '../../core/ui/toggle.dart';
 import 'package:get/get.dart';
 
@@ -6,7 +8,6 @@ import '../../core/auth/auth_controller.dart';
 import '../../core/auth/lock_controller.dart';
 import '../../core/features/feature_module.dart';
 import '../../core/theme/theme_controller.dart';
-import '../../core/ui/salon_logo.dart';
 import '../../data/account_api.dart';
 import 'change_password.dart';
 import '../../models/role.dart';
@@ -51,10 +52,11 @@ class AccountScreen extends StatelessWidget {
     final theme = Get.find<ThemeController>();
     final me = auth.me.value!;
     return ListView(padding: const EdgeInsets.symmetric(vertical: 12), children: [
+        const Padding(padding: EdgeInsets.symmetric(horizontal: 20), child: SkHeading('My account')),
       Padding(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
         child: Row(children: [
-          SalonLogo(slug: me.org.slug, name: me.user.name, logoUrl: me.user.avatarUrl, size: 56),
+          SkAvatar(slug: me.org.slug, name: me.user.name, url: me.user.avatarUrl, size: 56),
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

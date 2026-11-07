@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/ui/toast.dart';
+import '../../core/ui/heading.dart';
 import '../../core/ui/toggle.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -122,7 +124,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _s = {..._s!, ...saved};
         _saving = false;
       });
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(const SnackBar(content: Text('Settings saved')));
+      showSkToast(context, 'Settings saved', kind: ToastKind.success);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -133,7 +135,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _toast(String s) => ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(s)));
+  void _toast(String s) => showSkToast(context, s);
 
   Future<void> _logo() async {
     final picked = await widget.pickLogo();
@@ -226,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final money = TextInputType.numberWithOptions(decimal: true);
     const number = TextInputType.number;
     return ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-      Text('Settings', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+      SkHeading('Settings'),
       const SizedBox(height: 12),
       _section('Billing', sub: 'Applies to new sales. Old sales keep the commission and VAT they were made with.', [
         _field('default_commission_pct', 'Default commission %', keyboard: money, hint: 'Used for barbers without their own % (set per barber on the Barbers page).'),
@@ -343,7 +345,7 @@ class _WhatsAppSectionState extends State<_WhatsAppSection> {
     super.dispose();
   }
 
-  void _toast(String s) => ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(s)));
+  void _toast(String s) => showSkToast(context, s);
 
   Future<void> _connect() async {
     setState(() {

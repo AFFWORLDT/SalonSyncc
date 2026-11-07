@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/toast.dart';
+import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/ui/form_sheet.dart';
@@ -44,7 +46,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
     }
   }
 
-  void _toast(String s) => ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(s)));
+  void _toast(String s) => showSkToast(context, s);
 
   ServiceForm _formOf(Service s, {bool? active}) =>
       ServiceForm(category: s.category, name: s.name, description: s.description, price: widget.me.fmt.toInput(s.price), sortOrder: s.sortOrder, active: active ?? s.active);
@@ -116,7 +118,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
         Row(children: [
-          Expanded(child: Text('Services', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600))),
+          Expanded(child: SkHeading('Services')),
           if (!ro && all != null && all.isNotEmpty) FilledButton.icon(onPressed: () => _edit(), icon: const Icon(Icons.add_rounded), label: const Text('Add service')),
         ]),
         Text('What barbers pick on a new sale, and what prints on the bill.', style: t.bodySmall),
