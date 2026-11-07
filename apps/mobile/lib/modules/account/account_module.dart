@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/ui/confirm_sign_out.dart';
 import '../../core/ui/avatar.dart';
 import '../../core/ui/heading.dart';
 import '../../core/ui/toggle.dart';
@@ -89,7 +90,9 @@ class AccountScreen extends StatelessWidget {
           )),
       for (final b in accountExtras) b(context),
       const Divider(),
-      ListTile(leading: const Icon(Icons.logout), title: const Text('Sign out'), onTap: () => auth.signOut()),
+      ListTile(leading: const Icon(Icons.logout), title: const Text('Sign out'), onTap: () async {
+        if (await confirmSignOut(context)) await auth.signOut();
+      }),
       ListTile(leading: const Icon(Icons.swap_horiz), title: const Text('Switch salon'), onTap: () => auth.switchSalon()),
     ]);
   }

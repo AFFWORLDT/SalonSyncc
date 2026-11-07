@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../core/ui/confirm_sign_out.dart';
 import '../core/ui/tour.dart';
 import '../core/ui/toast.dart';
 import '../core/ui/avatar.dart';
@@ -226,7 +227,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             },
           ),
           _Row(icon: Icons.swap_horiz_rounded, title: 'Switch salon', onTap: () => auth.switchSalon()),
-          _Row(icon: Icons.logout_rounded, title: 'Sign out', danger: true, last: true, onTap: () => auth.signOut()),
+          _Row(icon: Icons.logout_rounded, title: 'Sign out', danger: true, last: true, onTap: () async {
+            if (await confirmSignOut(context)) await auth.signOut();
+          }),
           const SizedBox(height: 24),
           Center(child: Text('SalonKit', style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant.withValues(alpha: 0.7)))),
         ]),

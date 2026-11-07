@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/ui/confirm_sign_out.dart';
 import 'package:get/get.dart';
 
 import '../core/auth/auth_controller.dart';
@@ -41,6 +42,7 @@ class _LockScreenState extends State<LockScreen> {
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () async {
+                    if (!await confirmSignOut(context)) return;
                     lock.clear();
                     await auth.signOut();
                   },
