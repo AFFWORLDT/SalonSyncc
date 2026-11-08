@@ -16,7 +16,8 @@ import { normalizeSlug, slugFromHost } from "../core/tenant";
 import { services } from "../core/services";
 import { orgAppUrl } from "../core/links";
 import { platformRepo, type Org } from "../data/platform";
-import { tenantRepo, type UserRow } from "../data/tenant";
+import { tenantRepo, usersRepo, type UserRow } from "../data/tenant";
+import { hashPassword } from "../core/crypto";
 import { rateCount, rateHit } from "../data/infra";
 import { sha256 } from "../lib/hash";
 import { LOGIN_WINDOW_MS, hourWindow, isLocked, loginLimits, loginWindow } from "../lib/limits";
@@ -36,6 +37,7 @@ const LOCKED = "Too many attempts. Try again in a few minutes.";
 
 auth.use("/code", originGuard);
 auth.use("/code/verify", originGuard);
+auth.use("/password/reset", originGuard);
 
 async function body(c: Context<AppEnv>): Promise<Record<string, unknown>> {
   const b = await c.req.json().catch(() => null);
@@ -148,4 +150,23 @@ auth.post("/code/verify", async (c) => {
   const { org, user } = await verifyCode(c, await body(c));
   await issueSession(c, { uid: user.id, orgId: org.id, v: user.session_version });
   return c.json({ ok: true, slug: org.slug });
+});
+
+/** At least this long, for a password chosen with "Forgot password?". */
+export const RESET_MIN_LENGTH = 6;
+
+/**
+ * "Forgot password?": the emailed code (POST /api/auth/code first) plus a new password. Signs out every other
+ * session (session_version), then the app signs in with the new password. {org?, email, code, password}.
+ */
+auth.post("/password/reset", async (c) => {
+  const b = await body(c);
+  const password = typeof b.password === "string" ? b.password : "";
+  if (password.length < RESET_MIN_LENGTH || password.length > 200) throw new HttpError(400, `Password must be at least ${RESET_MIN_LENGTH} characters`);
+  const { org, user } = await verifyCode(c, b);
+  const staff = usersRepo(c.env.DB, org.id);
+  const row = await staff.byId(user.id);
+  if (!row) throw new HttpError(401, BAD_CODE);
+  await staff.resetPassword(row, await hashPassword(password), { id: user.id, name: user.name });
+  return c.json({ ok: true, slug: org.slug, username: user.username });
 });

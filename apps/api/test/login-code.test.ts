@@ -206,3 +206,26 @@ async function loginAsOwner(slug: string): Promise<string> {
   expect(r.status).toBe(200);
   return r.headers.get("set-cookie")!.split(";")[0]!;
 }
+
+describe("forgot password: emailed code + a new password", () => {
+  it("sets the new password, signs out other sessions, and the code works once", async () => {
+    await setup("lc-reset");
+    const code = await askCode("lc-reset", "sam@mail.com", "10.6.0.1");
+    const short = await post("lc-reset", "/auth/password/reset", { email: "sam@mail.com", code, password: "12345" }, "10.6.0.2");
+    expect(short.status).toBe(400);
+    const r = await post("lc-reset", "/auth/password/reset", { email: "sam@mail.com", code, password: "newpass99" }, "10.6.0.3");
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ ok: true, slug: "lc-reset", username: "sam" });
+    expect((await post("lc-reset", "/auth/login", { username: "sam", password: "newpass99" }, "10.6.0.4")).status).toBe(200);
+    expect((await post("lc-reset", "/auth/login", { username: "sam", password: "pass1234" }, "10.6.0.5")).status).toBe(401);
+    expect((await post("lc-reset", "/auth/password/reset", { email: "sam@mail.com", code, password: "another99" }, "10.6.0.6")).status).toBe(401);
+  });
+
+  it("a wrong code changes nothing", async () => {
+    await setup("lc-reset2");
+    const code = await askCode("lc-reset2", "sam@mail.com", "10.6.1.1");
+    const wrong = code === "000000" ? "111111" : "000000";
+    expect((await post("lc-reset2", "/auth/password/reset", { email: "sam@mail.com", code: wrong, password: "newpass99" }, "10.6.1.2")).status).toBe(401);
+    expect((await post("lc-reset2", "/auth/login", { username: "sam", password: "pass1234" }, "10.6.1.3")).status).toBe(200);
+  });
+});
