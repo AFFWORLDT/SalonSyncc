@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/range_sheet.dart';
+
 import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/ui/filter_chip_menu.dart';
@@ -53,12 +55,7 @@ class _RatingsScreenState extends State<RatingsScreen> {
   }
 
   Future<void> _range() async {
-    final r = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.parse(widget.me.today),
-      initialDateRange: DateTimeRange(start: DateTime.parse(_from), end: DateTime.parse(_to)),
-    );
+    final r = await showSkRangeSheet(context, today: DateTime.parse(widget.me.today), initial: DateTimeRange(start: DateTime.parse(_from), end: DateTime.parse(_to)));
     if (r == null) return;
     setState(() {
       _from = ymd(r.start);

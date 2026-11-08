@@ -6,6 +6,8 @@ import '../../core/ui/stats.dart';
 import '../../core/ui/toast.dart';
 import '../../core/ui/heading.dart';
 import 'package:flutter/material.dart';
+
+import '../../core/ui/range_sheet.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/export/daily_xlsx.dart' show workbookName;
@@ -100,12 +102,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
   }
 
   Future<void> _range() async {
-    final r = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.parse(widget.me.today),
-      initialDateRange: DateTimeRange(start: DateTime.parse(_from), end: DateTime.parse(_to)),
-    );
+    final r = await showSkRangeSheet(context, today: DateTime.parse(widget.me.today), initial: DateTimeRange(start: DateTime.parse(_from), end: DateTime.parse(_to)));
     if (r != null) {
       _set(() {
         _from = ymd(r.start);

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ui/range_sheet.dart';
+
 import '../../core/ui/filter_chip_menu.dart';
 import '../../core/screen_cache.dart';
 import '../../core/theme/scale.dart';
@@ -118,12 +120,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _custom() async {
     final today = DateTime.parse(widget.me.today);
-    final r = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: today,
-      initialDateRange: DateTimeRange(start: DateTime.parse(_from), end: DateTime.parse(_to)),
-    );
+    final r = await showSkRangeSheet(context, today: today, initial: _preset == 'Custom' ? DateTimeRange(start: DateTime.parse(_from), end: DateTime.parse(_to)) : null);
     if (r != null) _range('Custom', ymd(r.start), ymd(r.end));
   }
 

@@ -3,6 +3,8 @@ import 'dart:async';
 import '../../core/ui/heading.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/ui/range_sheet.dart';
+
 import '../../core/format/fmt.dart';
 import '../../core/ui/filter_chip_menu.dart';
 import '../../core/ui/glass.dart';
@@ -141,12 +143,7 @@ class _AuditScreenState extends State<AuditScreen> {
   }
 
   Future<void> _range() async {
-    final r = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.parse(widget.me.today),
-      initialDateRange: DateTimeRange(start: DateTime.parse(_from), end: DateTime.parse(_to)),
-    );
+    final r = await showSkRangeSheet(context, today: DateTime.parse(widget.me.today), initial: DateTimeRange(start: DateTime.parse(_from), end: DateTime.parse(_to)));
     if (r != null) {
       _set(() {
         _from = ymd(r.start);
