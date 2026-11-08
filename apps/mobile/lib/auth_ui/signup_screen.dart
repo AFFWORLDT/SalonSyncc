@@ -34,7 +34,10 @@ String slugFromName(String name) {
 
 /// A new salon from the phone: 7 days free, signed in as its owner straight away (the web's sign-up, same server).
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  const SignupScreen({super.key, this.social});
+
+  /// From "Continue with Google / Apple": the email is theirs already (no email or password to type).
+  final SocialNew? social;
   @override
   State<SignupScreen> createState() => _SignupScreenState();
 }
@@ -42,7 +45,7 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final auth = Get.find<AuthController>();
   final _salon = TextEditingController();
-  final _name = TextEditingController();
+  late final _name = TextEditingController(text: widget.social?.name ?? '');
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _slug = TextEditingController();
@@ -100,17 +103,19 @@ class _SignupScreenState extends State<SignupScreen> {
     });
   }
 
+  SocialNew? get social => widget.social;
+
   Future<void> _submit() async {
     if (_busy) return;
     final problem = _salon.text.trim().length < 2
         ? "Enter your salon's name"
         : _name.text.trim().length < 2
             ? 'Enter your name'
-            : !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(_email.text.trim())
+            : social == null && !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$').hasMatch(_email.text.trim())
                 ? 'Enter a valid email'
                 : !isValidSlug(normalizeSlug(_slug.text))
                     ? 'Choose a salon ID (3–30 letters, numbers or dashes)'
-                    : _pass.text.length < 8
+                    : social == null && _pass.text.length < 8
                         ? 'Password must be at least 8 characters'
                         : null;
     if (problem != null) {
@@ -130,6 +135,7 @@ class _SignupScreenState extends State<SignupScreen> {
         password: _pass.text,
         phone: _phone.text,
         country: _country,
+        idToken: social?.idToken,
       );
     } on Offline {
       if (mounted) setState(() => _error = "You're offline");
@@ -158,7 +164,10 @@ class _SignupScreenState extends State<SignupScreen> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Text('Start your free trial', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
-                  Text('7 days free, every feature. No card needed.', style: t.bodyMedium?.copyWith(color: c.onSurfaceVariant)),
+                  Text(
+                    social == null ? '7 days free, every feature. No card needed.' : 'Signed in as ${social!.email}. Now tell us about your salon: 7 days free, no card needed.',
+                    style: t.bodyMedium?.copyWith(color: c.onSurfaceVariant),
+                  ),
                   const SizedBox(height: 20),
                   TextField(
                     key: const ValueKey('su-salon'),
@@ -178,7 +187,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     decoration: const InputDecoration(labelText: 'Your name'),
                   ),
                   gap,
-                  TextField(
+                  if (social == null) TextField(
                     key: const ValueKey('su-email'),
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
@@ -223,7 +232,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ),
                   gap,
-                  TextField(
+                  if (social == null) TextField(
                     key: const ValueKey('su-pass'),
                     controller: _pass,
                     obscureText: !_show,

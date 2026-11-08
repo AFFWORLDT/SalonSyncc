@@ -13,6 +13,13 @@ export 'session_store.dart' show SavedSalon;
 
 enum AuthState { unknown, needSalon, needLogin, signedIn }
 
+/// Google / Apple said who this is, and no salon has that email yet: offer a new salon.
+class SocialNew {
+  const SocialNew({required this.idToken, required this.email, this.name});
+  final String idToken, email;
+  final String? name;
+}
+
 typedef ClientFactory = ApiClient Function(Uri base, {String? Function()? token, void Function()? onUnauthorized, void Function()? onFeatureDisabled});
 
 /// Who is signed in, to which salon. Remembers both; a 401 anywhere returns to sign-in with the salon kept.
@@ -26,6 +33,9 @@ class AuthController extends GetxController {
   final state = AuthState.unknown.obs;
   final me = Rxn<Me>();
   final salon = Rxn<SavedSalon>();
+
+  /// A salon was just created on this phone: the first-run setup (logo, invite the team) opens once.
+  bool justSignedUp = false;
 
   /// Why a tapped sign-in link didn't work (expired, used), shown on the first screen.
   final linkMessage = RxnString();
@@ -126,18 +136,28 @@ class AuthController extends GetxController {
     await _adopt(r);
   }
 
-  /// A new salon on the 7-day free trial, signed in straight away as its owner.
-  Future<void> signUp({required String salonName, required String ownerName, required String email, required String slug, required String password, String? phone, required String country}) async {
+  /// "Continue with Google / Apple" with the provider's [idToken]: signed in when the email is on a team; otherwise
+  /// the email (and name) to start a new salon with ([signUp] with the same token).
+  Future<SocialNew?> socialSignIn(String idToken) async {
+    final r = await clientFor(rootBase()).post('/api/auth/social', {'id_token': idToken, 'device': await _deviceBody()}, (j) => j as Map<String, dynamic>);
+    if (r['new'] == true) return SocialNew(idToken: idToken, email: r['email'] as String? ?? '', name: r['name'] as String?);
+    await _adopt(r);
+    return null;
+  }
+
+  /// A new salon on the 7-day free trial, signed in straight away as its owner. With [idToken] (Google / Apple) the
+  /// email and password are not sent: the verified email is the owner's, and they sign in with Google / Apple or a code.
+  Future<void> signUp({required String salonName, required String ownerName, String email = '', required String slug, String password = '', String? phone, required String country, String? idToken}) async {
     final r = await clientFor(rootBase()).post('/api/public/signup', {
       'salon_name': salonName.trim(),
       'owner_name': ownerName.trim(),
-      'email': email.trim(),
+      if (idToken != null) 'id_token': idToken else ...{'email': email.trim(), 'password': password},
       'slug': normalizeSlug(slug),
-      'password': password,
       if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
       'country': country,
       'device': await _deviceBody(),
     }, (j) => j as Map<String, dynamic>);
+    justSignedUp = true;
     await _adopt(r);
   }
 

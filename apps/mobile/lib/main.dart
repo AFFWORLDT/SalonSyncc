@@ -19,6 +19,11 @@ import 'shell/shell.dart';
 import 'core/api/api_client.dart';
 import 'core/auth/auth_controller.dart';
 import 'core/auth/link_handler.dart';
+import 'core/auth/social_auth.dart';
+import 'auth_ui/first_run_screen.dart';
+import 'core/ui/route.dart';
+import 'data/settings_api.dart';
+import 'data/staff_api.dart';
 import 'core/auth/device_info.dart';
 import 'core/auth/secure_store.dart';
 import 'core/auth/session_store.dart';
@@ -52,6 +57,8 @@ Future<void> run({bool crashReports = true}) async {
   } catch (e) {
     debugPrint('Firebase off: $e');
   }
+  // Continue with Google / Apple needs Firebase; without it the first screen shows only the email way.
+  if (firebase) Get.put<SocialAuth>(const FirebaseSocialAuth());
   final theme = Get.put(ThemeController());
   final device = await DeviceInfo.current();
   final ua = 'SalonKit/${device.appVersion} (${device.platform})';
@@ -76,6 +83,13 @@ Future<void> run({bool crashReports = true}) async {
   final update = Get.put(UpdateController(api: ApiClient(configBase(), userAgent: ua), platform: device.platform, currentVersion: device.appVersion));
   appWrappers.add((context, child) => UpdateGate(child: child));
   registerLockToggle();
+  // A salon just created on this phone: logo, invite the team (once, before anything else asks for attention).
+  postSignInSteps.add((context) async {
+    final me = auth.me.value;
+    if (!auth.justSignedUp || me == null || !context.mounted) return;
+    auth.justSignedUp = false;
+    await Navigator.of(context).push(SkRoute<void>(builder: (_) => FirstRunScreen(me: me, settings: SettingsApi(auth.api), staff: StaffApi(auth.api))));
+  });
   postSignInSteps.add(offerBiometricLock);
   final registry = FeatureRegistry(appModules);
   if (firebase) {

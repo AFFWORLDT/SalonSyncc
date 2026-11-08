@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:salonkit/app.dart';
 import 'package:salonkit/core/auth/auth_controller.dart';
 import 'package:salonkit/core/auth/link_handler.dart';
+import 'package:salonkit/core/auth/social_auth.dart';
 
 import 'support/fake_adapter.dart';
 import 'support/harness.dart';
@@ -12,6 +13,9 @@ import 'support/me_fixture.dart';
 /// Root host (salonkit.online) answers the email-only calls; the salon's host answers brand and me.
 FakeAdapter api({bool goodCode = true}) => FakeAdapter({
       'POST /api/auth/code': (o) => {'ok': true},
+      'POST /api/auth/social': (o) => (o.data as Map)['id_token'] == 'tok-known'
+          ? {'token': 'skm_s', 'expires_at': 1, 'slug': 'supersalon'}
+          : {'new': true, 'email': 'nina@gmail.com', 'name': 'Nina New'},
       'POST /api/mobile/session': (o) => goodCode && (o.data as Map)['code'] == '123456'
           ? {'token': 'skm_t', 'expires_at': 1, 'slug': 'supersalon'}
           : const FakeReply(401, {'error': 'That code is wrong or has expired'}),
@@ -21,8 +25,29 @@ FakeAdapter api({bool goodCode = true}) => FakeAdapter({
       'GET /api/me': (o) => fx('me_barber.json'),
     });
 
-Future<FakeAdapter> open(WidgetTester t, {bool goodCode = true}) async {
+class FakeSocial implements SocialAuth {
+  FakeSocial({this.token, this.error, this.hasApple = false});
+  final String? token;
+  final String? error;
+  final bool hasApple;
+  int sheets = 0;
+  Future<String?> _go() async {
+    sheets++;
+    if (error != null) throw SocialAuthError(error!);
+    return token;
+  }
+
+  @override
+  Future<String?> google() => _go();
+  @override
+  Future<String?> apple() => _go();
+  @override
+  bool get appleAvailable => hasApple;
+}
+
+Future<FakeAdapter> open(WidgetTester t, {bool goodCode = true, SocialAuth? social}) async {
   final a = api(goodCode: goodCode);
+  if (social != null) Get.put<SocialAuth>(social);
   await putAuth(a).boot();
   await t.pumpWidget(const SalonKitApp());
   await t.pumpAndSettle();
@@ -104,5 +129,64 @@ void main() {
     await t.pump(const Duration(milliseconds: 500));
     await t.pumpAndSettle();
     expect(find.text('That salon ID is taken'), findsOneWidget);
+  });
+
+  testWidgets('no Firebase: only the email way', (t) async {
+    await open(t);
+    expect(find.byKey(const ValueKey('start-google')), findsNothing);
+  });
+
+  testWidgets('Android: Google, no Apple', (t) async {
+    await open(t, social: FakeSocial(hasApple: false));
+    expect(find.byKey(const ValueKey('start-google')), findsOneWidget);
+    expect(find.byKey(const ValueKey('start-apple')), findsNothing);
+  });
+
+  testWidgets('iPhone: Google and Apple', (t) async {
+    await open(t, social: FakeSocial(hasApple: true));
+    expect(find.byKey(const ValueKey('start-apple')), findsOneWidget);
+  });
+
+  testWidgets('Google, email on a team: signed in to that salon', (t) async {
+    final a = await open(t, social: FakeSocial(token: 'tok-known'));
+    await t.tap(find.byKey(const ValueKey('start-google')));
+    await t.pumpAndSettle();
+    final call = a.calls.singleWhere((c) => c.path == '/api/auth/social');
+    expect([call.uri.host, (call.data as Map)['id_token']], ['salonkit.online', 'tok-known']);
+    expect(find.text('Hi ali 👋'), findsOneWidget);
+  });
+
+  testWidgets('Google, new email: sign-up without email or password, then setup opens', (t) async {
+    final a = await open(t, social: FakeSocial(token: 'tok-new'));
+    await t.tap(find.byKey(const ValueKey('start-google')));
+    await t.pumpAndSettle();
+    expect(find.textContaining('Signed in as nina@gmail.com'), findsOneWidget);
+    expect(find.byKey(const ValueKey('su-email')), findsNothing);
+    expect(find.byKey(const ValueKey('su-pass')), findsNothing);
+    expect(find.widgetWithText(TextField, 'Nina New'), findsOneWidget);
+    await t.enterText(find.byKey(const ValueKey('su-salon')), 'New Cuts');
+    await t.pump(const Duration(milliseconds: 500));
+    await t.pumpAndSettle();
+    await t.ensureVisible(find.widgetWithText(FilledButton, 'Start free trial'));
+    await t.tap(find.widgetWithText(FilledButton, 'Start free trial'));
+    await t.pumpAndSettle();
+    final body = a.calls.singleWhere((c) => c.path == '/api/public/signup').data as Map;
+    expect([body['id_token'], body.containsKey('email'), body.containsKey('password'), body['owner_name']], ['tok-new', false, false, 'Nina New']);
+    expect(Get.find<AuthController>().justSignedUp, isTrue);
+  });
+
+  testWidgets('closing the Google sheet does nothing', (t) async {
+    final a = await open(t, social: FakeSocial(token: null));
+    await t.tap(find.byKey(const ValueKey('start-google')));
+    await t.pumpAndSettle();
+    expect(a.calls.where((c) => c.path == '/api/auth/social'), isEmpty);
+    expect(find.text('Sign in to your salon'), findsOneWidget);
+  });
+
+  testWidgets('a Google sheet error is shown', (t) async {
+    await open(t, social: FakeSocial(error: "You're offline"));
+    await t.tap(find.byKey(const ValueKey('start-google')));
+    await t.pumpAndSettle();
+    expect(find.text("You're offline"), findsOneWidget);
   });
 }

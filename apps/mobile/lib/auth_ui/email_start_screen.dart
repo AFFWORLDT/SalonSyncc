@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../core/api/api_error.dart';
 import '../core/auth/auth_controller.dart';
+import '../core/auth/social_auth.dart';
 import '../core/ui/background.dart';
 import '../core/ui/glass.dart';
 import '../core/ui/route.dart';
@@ -48,6 +49,28 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  SocialAuth? get _social => Get.isRegistered<SocialAuth>() ? Get.find<SocialAuth>() : null;
+
+  /// Google / Apple: signed in when the email is on a team; a new email goes on to start a salon.
+  Future<void> _socially(Future<String?> Function(SocialAuth s) sheet) async {
+    final s = _social;
+    if (s == null) return;
+    await _run(() async {
+      final String? token;
+      try {
+        token = await sheet(s);
+      } on SocialAuthError catch (e) {
+        if (mounted) setState(() => _error = e.message);
+        return;
+      }
+      if (token == null) return; // closed the sheet
+      final fresh = await auth.socialSignIn(token);
+      if (fresh != null && mounted) {
+        await Navigator.of(context).push(SkRoute<void>(builder: (_) => SignupScreen(social: fresh)));
+      }
+    });
   }
 
   Future<void> _send() async {
@@ -103,6 +126,31 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
                         style: t.bodyMedium?.copyWith(color: c.onSurfaceVariant),
                       ),
                       const SizedBox(height: 20),
+                      if (!_sent && _social != null) ...[
+                        _SocialButton(
+                          key: const ValueKey('start-google'),
+                          label: 'Continue with Google',
+                          icon: const Text('G', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF4285F4))),
+                          onPressed: _busy ? null : () => _socially((s) => s.google()),
+                        ),
+                        if (_social!.appleAvailable) ...[
+                          const SizedBox(height: 10),
+                          _SocialButton(
+                            key: const ValueKey('start-apple'),
+                            label: 'Continue with Apple',
+                            icon: const Icon(Icons.apple, size: 22),
+                            onPressed: _busy ? null : () => _socially((s) => s.apple()),
+                          ),
+                        ],
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          child: Row(children: [
+                            const Expanded(child: Divider()),
+                            Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('or', style: t.bodySmall?.copyWith(color: c.onSurfaceVariant))),
+                            const Expanded(child: Divider()),
+                          ]),
+                        ),
+                      ],
                       if (!_sent)
                         TextField(
                           key: const ValueKey('start-email'),
@@ -167,4 +215,23 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
       ),
     );
   }
+}
+
+/// A full-width outlined button with the provider's mark, as Google's and Apple's guidelines ask.
+class _SocialButton extends StatelessWidget {
+  const _SocialButton({super.key, required this.label, required this.icon, required this.onPressed});
+  final String label;
+  final Widget icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton(
+        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+        onPressed: onPressed,
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          SizedBox(width: 24, child: Center(child: icon)),
+          const SizedBox(width: 10),
+          Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+        ]),
+      );
 }
