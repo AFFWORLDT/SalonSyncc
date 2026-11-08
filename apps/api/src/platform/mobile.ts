@@ -12,7 +12,7 @@ export const mobile = new Hono<AppEnv>();
 const DEVICE_ID = /^[A-Za-z0-9_-]{8,100}$/;
 const BAD_DEVICE = "Update the app and try again";
 
-function deviceOf(v: unknown): { id: string; name: string; platform: "ios" | "android"; appVersion: string | null } | null {
+export function deviceOf(v: unknown): { id: string; name: string; platform: "ios" | "android"; appVersion: string | null } | null {
   if (!v || typeof v !== "object") return null;
   const d = v as Record<string, unknown>;
   const name = typeof d.name === "string" ? d.name.trim() : "";
@@ -38,7 +38,8 @@ mobile.post("/session", async (c) => {
     platform: device.platform,
     appVersion: device.appVersion,
   });
-  return c.json({ token, expires_at: expiresAt });
+  // slug: which salon this was (the app signs in by email alone and learns the salon here).
+  return c.json({ token, expires_at: expiresAt, slug: org.slug });
 });
 
 /** On the tenant router (needs a signed-in user): this phone signs out; admins see and end their staff's phone sessions. */

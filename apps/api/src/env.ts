@@ -12,6 +12,8 @@ export interface Env {
   ADMIN_HOST: string;
   MAIL_FROM: string;
   SUPPORT_EMAIL: string;
+  /** SHA-256 fingerprints of the Android app's signing certificates (comma separated), for App Links. */
+  ANDROID_CERT_SHA256?: string;
   ENVIRONMENT?: string;
   /** App origin for message links when ROOT_DOMAIN is empty (workers.dev), e.g. https://salonkit-app.affworld0.workers.dev. */
   APP_ORIGIN: string;

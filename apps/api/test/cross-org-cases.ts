@@ -40,6 +40,7 @@ CASES.push(
   staffCase("PUT", "/api/users/:id", { name: "Pwned", username: "pwned" }),
   staffCase("DELETE", "/api/users/:id"),
   staffCase("POST", "/api/users/:id/reset-password", { password: "hacked1" }),
+  staffCase("POST", "/api/users/:id/invite", {}),
   staffCase("PUT", "/api/users/:id/avatar", undefined),
   staffCase("DELETE", "/api/users/:id/avatar"),
   staffCase("GET", "/api/users/:id/devices"),

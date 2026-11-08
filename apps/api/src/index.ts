@@ -5,6 +5,7 @@ import { HttpError } from "./core/errors";
 import { tenantAuth, writeGuard, requireFeature, originGuard, WRITE_METHODS } from "./core/pipeline";
 import { registerMe } from "./platform/me";
 import { auth } from "./platform/auth";
+import { appLinks } from "./platform/app-links";
 import { mobile, mobileTenant } from "./platform/mobile";
 import { appConfigPublic } from "./platform/app-config";
 import { publicApi } from "./core/public";
@@ -41,6 +42,8 @@ export const app = new Hono<AppEnv>();
 
 
 app.get("/api/health", (c) => c.json({ ok: true, brand: c.env.BRAND_NAME }));
+// Sign-in/invite links open the phone app (any host, incl. the bare domain: wrangler routes salonkit.online/.well-known/*).
+app.route("/", appLinks);
 
 app.route("/api/auth", auth);
 // The phone app's sign-in (bearer tokens, no cookie). Before the tenant router.

@@ -34,7 +34,9 @@ async function setup(slug: string) {
   const org = await makeOrg({ slug });
   const owner = await makeUser(org.id, { username: "boss@mail.com", role: "owner" });
   const b1 = await makeUser(org.id, { username: "sam", role: "barber" });
-  await env.DB.prepare("UPDATE users SET email = 'Sam@Mail.com' WHERE id = ?").bind(b1.id).run();
+  // One email = one person on SalonKit: the newest test salon's barber takes it over.
+  await env.DB.prepare("UPDATE users SET email = NULL WHERE lower(email) = 'sam@mail.com'").run();
+  await env.DB.prepare("UPDATE users SET email = 'sam@mail.com' WHERE id = ?").bind(b1.id).run();
   return { org, owner, b1 };
 }
 
@@ -76,7 +78,7 @@ describe("sign in with an emailed code", () => {
     expect(((await r.json()) as { token: string }).token).toMatch(/^skm_/);
   });
 
-  it("an unknown email or another salon's email answers the same and sends nothing", async () => {
+  it("an unknown email answers the same and sends nothing", async () => {
     await setup("lc-unknown");
     await setup("lc-other");
     expect(await askCode("lc-unknown", "nobody@mail.com")).toBeNull();
@@ -123,3 +125,84 @@ describe("password sign-in with an email instead of the username", () => {
     expect(app.status).toBe(200);
   });
 });
+
+const root = (path: string, body: unknown, ip = "10.8.0.1", method = "POST") =>
+  app.fetch(
+    new Request(`https://${ROOT}/api${path}`, {
+      method,
+      headers: { "content-type": "application/json", "CF-Connecting-IP": ip },
+      body: method === "GET" ? undefined : JSON.stringify(body),
+    }),
+    e,
+    ctx,
+  );
+
+describe("one email = one salon: sign in with just the email", () => {
+  it("on the bare domain the email finds the salon; the app gets a token and the salon's ID", async () => {
+    await setup("lc-anywhere");
+    const r = await root("/auth/code", { email: "sam@mail.com" });
+    expect(r.status).toBe(200);
+    await settle();
+    const mail = f.mails.at(-1)!;
+    const code = /\b(\d{6})\b/.exec(mail.subject)![1]!;
+    expect(mail.text).toContain(`https://lc-anywhere.${ROOT}/l/?e=sam%40mail.com&c=${code}`);
+    const s = await root("/mobile/session", { email: "sam@mail.com", code, device });
+    expect(s.status).toBe(200);
+    expect(await s.json()).toMatchObject({ slug: "lc-anywhere" });
+  });
+
+  it("a staff email already used in another salon is refused", async () => {
+    const a = await setup("lc-dupe-a");
+    await setup("lc-dupe-b"); // lc-dupe-b's barber now has sam@mail.com
+    const ck = await loginAsOwner("lc-dupe-a");
+    const r = await app.fetch(
+      new Request(`https://lc-dupe-a.${ROOT}/api/users/${a.b1.id}`, { method: "PUT", headers: { cookie: ck, "content-type": "application/json" }, body: JSON.stringify({ name: "sam", username: "sam", email: "SAM@mail.com" }) }),
+      e,
+      ctx,
+    );
+    expect(r.status).toBe(409);
+    expect(((await r.json()) as { error: string }).error).toContain("already used");
+  });
+
+  it("signup refuses a staff email from another salon; from the app it returns a token straight away", async () => {
+    await setup("lc-su");
+    const base = { salon_name: "New Cuts", owner_name: "Nina Owner", password: "longpass1", country: "AE" };
+    expect((await root("/public/signup", { ...base, slug: "lc-su-new1", email: "sam@mail.com" }, "10.8.1.1")).status).toBe(409);
+    const r = await root("/public/signup", { ...base, slug: "lc-su-new2", email: "nina@cuts.com", device }, "10.8.1.2");
+    expect(r.status).toBe(201);
+    const j = (await r.json()) as { slug: string; token: string };
+    expect(j.slug).toBe("lc-su-new2");
+    expect(j.token).toMatch(/^skm_/);
+    // The owner is found by email alone afterwards.
+    await root("/auth/code", { email: "nina@cuts.com" }, "10.8.1.3");
+    await settle();
+    expect(f.mails.at(-1)!.to).toBe("nina@cuts.com");
+  });
+
+  it("an admin invites a staff member: an invite email with a one-tap link that signs them in", async () => {
+    const { b1 } = await setup("lc-invite");
+    const ck = await loginAsOwner("lc-invite");
+    const r = await app.fetch(new Request(`https://lc-invite.${ROOT}/api/users/${b1.id}/invite`, { method: "POST", headers: { cookie: ck } }), e, ctx);
+    expect(r.status).toBe(200);
+    await settle();
+    const mail = f.mails.at(-1)!;
+    expect(mail.to).toBe("sam@mail.com");
+    expect(mail.subject).toContain("added you to");
+    const code = /&c=(\d{6})/.exec(mail.text)![1]!;
+    expect((await post("lc-invite", "/mobile/session", { email: "sam@mail.com", code, device }, "10.8.2.1")).status).toBe(200);
+  });
+
+  it("serves the app-link files for Android and iOS", async () => {
+    const r = await app.fetch(new Request(`https://${ROOT}/.well-known/assetlinks.json`), { ...e, ANDROID_CERT_SHA256: "AA:BB, CC:DD" }, ctx);
+    const j = (await r.json()) as { target: { package_name: string; sha256_cert_fingerprints: string[] } }[];
+    expect(j[0]!.target).toEqual({ namespace: "android_app", package_name: "online.salonkit.app", sha256_cert_fingerprints: ["AA:BB", "CC:DD"] });
+    const ios = (await (await app.fetch(new Request(`https://x.${ROOT}/.well-known/apple-app-site-association`), e, ctx)).json()) as { applinks: { details: { appIDs: string[] }[] } };
+    expect(ios.applinks.details[0]!.appIDs).toEqual(["98843335NN.online.salonkit.app"]);
+  });
+});
+
+async function loginAsOwner(slug: string): Promise<string> {
+  const r = await post(slug, "/auth/login", { username: "boss@mail.com", password: "pass1234" }, `10.8.9.${Math.floor(Math.random() * 250)}`);
+  expect(r.status).toBe(200);
+  return r.headers.get("set-cookie")!.split(";")[0]!;
+}

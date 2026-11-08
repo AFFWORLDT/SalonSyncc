@@ -1,9 +1,11 @@
 /**
  * Sign in with an emailed code instead of a password, after the salon ID (web and phone app):
- *   POST /api/auth/code         {org?, email}        emails a 6-digit code to the staff member with that email
+ *   POST /api/auth/code         {org?, email}        emails a 6-digit code (and a one-tap link) to the person with that email
  *   POST /api/auth/code/verify  {org?, email, code}  web: a session cookie, like /login
  * The phone app sends {email, code} to POST /api/mobile/session instead of a password (see mobile.ts).
- * Asking always answers {ok:true}, so it never tells whether an email belongs to the salon.
+ * With no salon (the app's "just your email" sign-in, on the bare domain) the email finds it: one email = one salon.
+ * Asking always answers {ok:true}, so it never tells whether an email belongs to a salon.
+ * The link (https://<salon>/l/?e=&c=) opens the app on phones (App Links / Universal Links) or the web sign-in.
  */
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
@@ -22,6 +24,8 @@ import { loginCodeEmail } from "../emails/login-code";
 import { auth } from "./auth";
 
 export const CODE_TTL_MS = 10 * 60_000;
+/** A staff invite's code lasts longer: they may open it the next day. */
+export const INVITE_TTL_MS = 3 * 86_400_000;
 export const CODE_MAX_TRIES = 5;
 /** Codes asked for: per device per 15 minutes, and per email address per hour. */
 export const CODE_ASKS = { ip: 10, email: 5 } as const;
@@ -40,12 +44,46 @@ async function body(c: Context<AppEnv>): Promise<Record<string, unknown>> {
 
 const emailOf = (v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : "");
 
-/** The live salon this request is for: the host's, or body.org off a salon host (as for the password sign-in). */
-async function orgFor(c: Context<AppEnv>, org: unknown): Promise<Org | null> {
+/**
+ * The live salon this request is for: the host's, or body.org off a salon host (as for the password sign-in), or,
+ * with neither, the salon the email belongs to.
+ */
+async function orgFor(c: Context<AppEnv>, org: unknown, email: string): Promise<Org | null> {
   const host = slugFromHost(new URL(c.req.url).host, c.env.ROOT_DOMAIN, c.env.ADMIN_HOST);
+  if (host.kind === "none" && (org === undefined || org === null || org === "")) return EMAIL_RE.test(email) ? platformRepo(c.env.DB).orgOfEmail(email) : null;
   const slug = host.kind === "tenant" ? host.slug : host.kind === "none" && typeof org === "string" ? normalizeSlug(org) : "";
   const o = slug ? await platformRepo(c.env.DB).orgBySlug(slug) : null;
   return o && o.status !== "deactivated" && o.status !== "deleted" ? o : null;
+}
+
+/** The one-tap link in the email: opens the app (if installed) or the salon's web sign-in, which uses the code. */
+export const codeLink = (appUrl: string, email: string, code: string) => `${appUrl}/l/?e=${encodeURIComponent(email)}&c=${code}`;
+
+/**
+ * Makes a new code for this user (replacing any) and emails it with the one-tap link, after the response. An invite
+ * ([invitedBy]) says who added them and lasts INVITE_TTL_MS.
+ */
+export async function sendLoginCode(c: Context<AppEnv>, org: Org, user: { id: number; name: string }, email: string, invitedBy?: string): Promise<void> {
+  const repo = tenantRepo(c.env.DB, org.id);
+  const code = sixDigits();
+  const ttl = invitedBy ? INVITE_TTL_MS : CODE_TTL_MS;
+  await repo.putLoginCode(user.id, await codeHash(org.id, user.id, code), Date.now() + ttl);
+  const s = await repo.settings();
+  const appUrl = orgAppUrl(c.env, org);
+  const site = c.env.ROOT_DOMAIN ? `https://${c.env.ROOT_DOMAIN}` : appUrl;
+  const mail = loginCodeEmail({
+    brand: c.env.BRAND_NAME,
+    siteUrl: site,
+    salonName: s.displayName || org.name,
+    to: email,
+    name: user.name,
+    code,
+    link: codeLink(appUrl, email, code),
+    minutes: ttl / 60_000,
+    invitedBy,
+  });
+  // After the response, so a known and an unknown email answer equally fast.
+  c.executionCtx.waitUntil(services(c.env).mail.send(c.env, mail).then((ok) => (ok ? undefined : console.error("login code email not sent"))));
 }
 
 /** A code is hashed with its salon and user, so the same digits for someone else never match. */
@@ -62,7 +100,7 @@ auth.post("/code", async (c) => {
   if (!EMAIL_RE.test(email) || email.length > 254) throw new HttpError(400, "Enter the email address on your staff profile");
   const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
   const at = Date.now();
-  const org = await orgFor(c, b.org);
+  const org = await orgFor(c, b.org, email);
   const [byIp, byEmail] = await Promise.all([
     rateHit(c.env.DB, `code-ip:${ip}`, loginWindow(at)),
     rateHit(c.env.DB, `code-email:${org?.id ?? "-"}:${encodeURIComponent(email)}`, hourWindow(at)),
@@ -70,15 +108,7 @@ auth.post("/code", async (c) => {
   if (byIp > CODE_ASKS.ip || byEmail > CODE_ASKS.email) throw new HttpError(429, LOCKED);
   const repo = org ? tenantRepo(c.env.DB, org.id) : null;
   const user = repo ? await repo.userByEmail(email) : null;
-  if (org && repo && user) {
-    const code = sixDigits();
-    await repo.putLoginCode(user.id, await codeHash(org.id, user.id, code), at + CODE_TTL_MS);
-    const s = await repo.settings();
-    const site = c.env.ROOT_DOMAIN ? `https://${c.env.ROOT_DOMAIN}` : orgAppUrl(c.env, org);
-    const mail = loginCodeEmail({ brand: c.env.BRAND_NAME, siteUrl: site, salonName: s.displayName || org.name, to: email, name: user.name, code, minutes: CODE_TTL_MS / 60_000 });
-    // After the response, so a known and an unknown email answer equally fast.
-    c.executionCtx.waitUntil(services(c.env).mail.send(c.env, mail).then((ok) => (ok ? undefined : console.error("login code email not sent"))));
-  }
+  if (org && repo && user) await sendLoginCode(c, org, user, email);
   return c.json({ ok: true });
 });
 
@@ -86,7 +116,7 @@ auth.post("/code", async (c) => {
 export async function verifyCode(c: Context<AppEnv>, b: Record<string, unknown>): Promise<{ org: Org; user: UserRow }> {
   const email = emailOf(b.email);
   const code = typeof b.code === "string" ? b.code.replace(/\s+/g, "") : "";
-  const org = await orgFor(c, b.org);
+  const org = await orgFor(c, b.org, email);
   const repo = org ? tenantRepo(c.env.DB, org.id) : null;
   const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
   const at = Date.now();

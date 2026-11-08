@@ -9,6 +9,7 @@ import { settingsRepo, usersRepo, avatarUrl, type StaffRow, type StaffWrite } fr
 import { bannerUrl } from "../../data/tenant/users";
 import { canonicalPhone } from "../../lib/phone";
 import { resolvePublicOrg, publicRateLimit } from "../../core/public";
+import { sendLoginCode } from "../../platform/login-code";
 
 const bad = (m: string) => new HttpError(400, m);
 const notFound = () => new HttpError(404, "User not found");
@@ -120,6 +121,9 @@ staff.get("/users", gate, requireAdmin, async (c) => {
   return c.json((await repoOf(c).list()).map((r) => toUser(r, slug)));
 });
 
+/** One email = one person in one salon across SalonKit (idx_users_email): sign-in by email alone relies on it. */
+const emailTaken = () => new HttpError(409, "This email is already used by someone on SalonKit. Each person needs their own email.", "email_taken");
+
 staff.post("/users", gate, requireAdmin, async (c) => {
   const u = await readInput(c, await body(c), true);
   if (u.role === "owner") throw bad("Choose Admin or Barber");
@@ -141,6 +145,7 @@ staff.post("/users", gate, requireAdmin, async (c) => {
     if (!row) throw staffLimit();
     return c.json(toUser(row, c.var.tenant.org.slug), 201);
   } catch (e) {
+    if (String(e).includes("idx_users_email")) throw emailTaken();
     if (String(e).includes("UNIQUE")) throw new HttpError(409, "Username is taken");
     throw e;
   }
@@ -183,9 +188,20 @@ staff.put("/users/:id", gate, requireAdmin, async (c) => {
     if (!row) throw staffLimit();
     return c.json(toUser(row, c.var.tenant.org.slug));
   } catch (e) {
+    if (String(e).includes("idx_users_email")) throw emailTaken();
     if (String(e).includes("UNIQUE")) throw new HttpError(409, "Username is taken");
     throw e;
   }
+});
+
+/** Emails the staff member an invite: a one-tap link that opens the app signed in (and a code), for 3 days. */
+staff.post("/users/:id/invite", gate, requireAdmin, async (c) => {
+  const target = await repoOf(c).byId(userId(c.req.param("id")));
+  if (!target) throw notFound();
+  if (!target.active) throw bad("Turn this person back on first");
+  if (!target.email) throw bad("Add their email first");
+  await sendLoginCode(c, c.var.tenant.org, target, target.email, c.var.tenant.user.name);
+  return c.json({ ok: true, email: target.email });
 });
 
 staff.post("/users/:id/reset-password", gate, requireAdmin, async (c) => {

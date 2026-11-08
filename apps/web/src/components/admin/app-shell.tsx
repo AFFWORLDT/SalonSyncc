@@ -41,7 +41,7 @@ function readCollapsed() {
 }
 
 /** Pages that render without sign-in or the app frame. */
-const PUBLIC_PATHS = ["/login", "/platform", "/connect", ...AUTH_FREE];
+const PUBLIC_PATHS = ["/login", "/l", "/platform", "/connect", ...AUTH_FREE];
 /** Pages only the admin may open (barbers are sent home). */
 const ADMIN_PATHS = ["/ai-connect", "/services", "/sales", "/expenses", "/sheet", "/monthly", "/audit", "/ledger", "/barbers", "/customers", "/settings", "/ratings", "/plan"];
 

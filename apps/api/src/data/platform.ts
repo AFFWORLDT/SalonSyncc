@@ -107,6 +107,20 @@ export function platformRepo(db: D1Database) {
       const r = await db.prepare(`SELECT ${ORG_COLS} FROM orgs WHERE slug = ?`).bind(slug).first<OrgRow>();
       return r ? toOrg(r) : null;
     },
+    /**
+     * The salon an email belongs to (one email = one person in one salon, idx_users_email). Deliberately not org scoped:
+     * this is the lookup that finds the org for "sign in with just your email". Only active users of live salons.
+     */
+    async orgOfEmail(email: string): Promise<Org | null> {
+      const r = await db
+        .prepare(
+          `SELECT ${ORG_COLS.split(",").map((c) => `o.${c.trim()}`).join(", ")} FROM users u JOIN orgs o ON o.id = u.org_id
+           WHERE lower(u.email) = lower(?) AND u.active = 1 AND o.status NOT IN ('deactivated', 'deleted')`,
+        )
+        .bind(email)
+        .first<OrgRow>();
+      return r ? toOrg(r) : null;
+    },
     async orgById(id: string): Promise<Org | null> {
       const r = await db.prepare(`SELECT ${ORG_COLS} FROM orgs WHERE id = ?`).bind(id).first<OrgRow>();
       return r ? toOrg(r) : null;
@@ -238,7 +252,11 @@ export function signupRepo(db: D1Database) {
       return r?.reserved ? "reserved" : r?.taken ? "taken" : null;
     },
     async emailTaken(email: string): Promise<boolean> {
-      return !!(await db.prepare("SELECT 1 FROM orgs WHERE lower(owner_email) = lower(?) AND deleted_at IS NULL").bind(email).first());
+      // Also anyone's staff email: one email = one person in one salon.
+      return !!(await db
+        .prepare("SELECT 1 FROM orgs WHERE lower(owner_email) = lower(?1) AND deleted_at IS NULL UNION ALL SELECT 1 FROM users WHERE lower(email) = lower(?1)")
+        .bind(email)
+        .first());
     },
     /**
      * Creates the salon in ONE batch (all or nothing): org (trial), settings (country defaults), subscription row, owner,
@@ -259,8 +277,8 @@ export function signupRepo(db: D1Database) {
           .bind(i.orgId, i.salonName, d.currency, d.currency_minor, d.locale, d.timezone, d.phone_country, i.billPrefix),
         db.prepare("INSERT INTO subscriptions(org_id) VALUES(?)").bind(i.orgId),
         db
-          .prepare("INSERT INTO users(org_id,username,name,role,password_hash,created_at) VALUES(?,?,?,'owner',?,?)")
-          .bind(i.orgId, i.ownerUsername, i.ownerName, i.passwordHash, i.now),
+          .prepare("INSERT INTO users(org_id,username,name,role,password_hash,created_at,email) VALUES(?,?,?,'owner',?,?,?)")
+          .bind(i.orgId, i.ownerUsername, i.ownerName, i.passwordHash, i.now, i.ownerEmail.toLowerCase()),
         db
           .prepare("UPDATE orgs SET owner_user_id = (SELECT id FROM users WHERE org_id = ?1 AND username = ?2) WHERE id = ?1")
           .bind(i.orgId, i.ownerUsername),

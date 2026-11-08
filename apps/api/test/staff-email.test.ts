@@ -82,7 +82,7 @@ describe("staff email", () => {
   it("the daily email: each barber with an email, their own numbers, once a day", async () => {
     install();
     const { org, b1, b2 } = await setup("se-day");
-    await env.DB.prepare("UPDATE users SET email = 'b1@x.io' WHERE id = ?").bind(b1.id).run();
+    await env.DB.prepare("UPDATE users SET email = 'day@x.io' WHERE id = ?").bind(b1.id).run();
     await sale(org.id, b1.id, "2026-11-07", 4000, 400);
     await sale(org.id, b1.id, "2026-11-07", 2500, 250);
     await sale(org.id, b1.id, "2026-11-06", 5000, 500);
@@ -92,7 +92,7 @@ describe("staff email", () => {
     expect(await runStaffDaily(E, org as Org, s, "2026-11-07", Date.now(), budget)).toBe("sent");
     expect(budget.left).toBe(9);
     expect(f.mails).toHaveLength(1);
-    expect(f.mails[0]!.to).toBe("b1@x.io");
+    expect(f.mails[0]!.to).toBe("day@x.io");
     expect(f.mails[0]!.subject).toContain("2 customers");
     expect(f.mails[0]!.text).toContain("vs yesterday");
     expect(await runStaffDaily(E, org as Org, s, "2026-11-07", Date.now(), budget)).toBe("done");
@@ -127,7 +127,7 @@ describe("staff email", () => {
   it("an admin changing a barber's sale emails that barber when changes are announced", async () => {
     install();
     const { org, b1, ck } = await setup("se-change");
-    await env.DB.prepare("UPDATE users SET email = 'b1@x.io' WHERE id = ?").bind(b1.id).run();
+    await env.DB.prepare("UPDATE users SET email = 'change@x.io' WHERE id = ?").bind(b1.id).run();
     await env.DB.prepare("UPDATE org_settings SET notify_barber_changes = 1 WHERE org_id = ?").bind(org.id).run();
     const created: any = await (await call("POST", "/sales", ck, { amount: "40", payment_mode: "cash", barber_id: b1.id })).json();
     await settle();
@@ -135,7 +135,7 @@ describe("staff email", () => {
     const r = await call("DELETE", `/sales/${created.id}`, ck);
     expect(r.status).toBe(200);
     await settle();
-    expect(f.mails.map((m) => m.to)).toEqual(["b1@x.io"]);
+    expect(f.mails.map((m) => m.to)).toEqual(["change@x.io"]);
     expect(f.mails[0]!.subject).toContain("deleted your bill");
   });
 

@@ -16,6 +16,8 @@ import { SIGNUP_PER_HOUR, hourWindow } from "../lib/limits";
 import { auth } from "./auth";
 import { welcomeEmail } from "../emails/welcome";
 import { sha256 } from "../lib/hash";
+import { deviceOf } from "./mobile";
+import { issueMobileSession } from "../core/mobile-session";
 
 const DAY = 86_400_000;
 export const TRIAL_DAYS = 7;
@@ -141,6 +143,23 @@ publicApi.post("/signup", originGuard, async (c) => {
     await repo.markEmail(orgId, "welcome", ok ? "sent" : configured ? "failed" : "skipped", Date.now());
   };
   c.executionCtx.waitUntil(sendWelcome().catch((e) => console.error("welcome email failed", (e as Error).message)));
+  // From the phone app ({device}): signed in straight away with a phone session, no link to follow.
+  const device = b.device === undefined ? null : deviceOf(b.device);
+  if (device) {
+    const owner = await tenantRepo(c.env.DB, orgId).userByUsername(email);
+    if (owner) {
+      const s = await issueMobileSession(c.env.DB, {
+        orgId,
+        userId: owner.id,
+        sessionVersion: owner.session_version,
+        deviceId: device.id,
+        deviceName: device.name,
+        platform: device.platform,
+        appVersion: device.appVersion,
+      });
+      return c.json({ slug, token: s.token, expires_at: s.expiresAt }, 201);
+    }
+  }
   const q = `handoff=${encodeURIComponent(token)}`;
   const handoff_url = root ? `https://${slug}.${root}/login/?${q}` : `/login/?org=${encodeURIComponent(slug)}&${q}`;
   return c.json({ slug, handoff_url }, 201);
