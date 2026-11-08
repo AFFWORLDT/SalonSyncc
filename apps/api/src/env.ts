@@ -16,6 +16,10 @@ export interface Env {
   ANDROID_CERT_SHA256?: string;
   /** Firebase project whose ID tokens "Continue with Google / Apple" accepts (aud / iss). */
   FIREBASE_PROJECT_ID?: string;
+  /** Firebase web app's browser API key (website "Continue with Google"); a secret so it stays out of git. */
+  FIREBASE_WEB_API_KEY?: string;
+  /** Optional; defaults to <project>.firebaseapp.com. */
+  FIREBASE_AUTH_DOMAIN?: string;
   ENVIRONMENT?: string;
   /** App origin for message links when ROOT_DOMAIN is empty (workers.dev), e.g. https://salonkit-app.affworld0.workers.dev. */
   APP_ORIGIN: string;

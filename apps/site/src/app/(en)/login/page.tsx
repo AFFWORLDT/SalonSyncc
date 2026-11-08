@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { salonLoginUrl } from "@/lib/brand";
 import { SLUG_RE, normalizeSlug } from "@/lib/slug";
+import { GoogleButton } from "@/components/google-button";
 
-/** Sign in from the main site: ask for the salon ID, then go to the salon's own sign-in page. */
+/** Sign in from the main site: Continue with Google (straight into the salon), or the salon ID then the salon's own sign-in page. */
 export default function SiteLogin() {
   const [id, setId] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -29,6 +30,7 @@ export default function SiteLogin() {
         <h1 className="text-2xl font-semibold">Sign in to your salon</h1>
         <p className="mt-2 text-sm text-muted-foreground">Your salon ID is the first part of your salon&apos;s address.</p>
         <div className="mt-6 grid gap-2">
+          <GoogleButton divider="after" />
           <Label htmlFor="salon-id">Salon ID</Label>
           <Input id="salon-id" value={id} onChange={(e) => (setId(e.target.value), setError(null))} placeholder="superbeard" autoCapitalize="none" autoCorrect="off" spellCheck={false} className="h-11" />
           {error && (

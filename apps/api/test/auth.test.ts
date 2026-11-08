@@ -207,6 +207,8 @@ describe("auth", () => {
       "POST /api/mobile/session",
       "GET /api/public/slug",
       "POST /api/public/signup",
+      // Website "Continue with Google": the Firebase web settings (no secrets).
+      "GET /api/public/auth-config",
       "GET /api/wa/webhook",
       "POST /api/wa/webhook",
       // The super admin panel signs out without a session (it only clears its cookie); its other routes need ss_platform.

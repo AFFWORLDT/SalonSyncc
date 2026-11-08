@@ -305,6 +305,10 @@ export function signupRepo(db: D1Database) {
     async markEmail(orgId: string, kind: string, status: "sent" | "failed" | "skipped", at: number): Promise<void> {
       await db.prepare("UPDATE email_log SET status = ?3, sent_at = CASE WHEN ?3 = 'sent' THEN ?4 ELSE sent_at END WHERE org_id = ?1 AND kind = ?2").bind(orgId, kind, status, at).run();
     },
+    /** A single-use sign-in link for an existing person (website "Continue with Google"). 1 statement. */
+    async createHandoff(tokenHash: string, orgId: string, userId: number, expiresAt: number): Promise<void> {
+      await db.prepare("INSERT INTO login_handoffs(token_hash,org_id,user_id,expires_at) VALUES(?,?,?,?)").bind(tokenHash, orgId, userId, expiresAt).run();
+    },
     /** Uses a handoff token once: returns its org and user, or null if unknown, used or expired. 1 statement. */
     async consumeHandoff(tokenHash: string, now: number): Promise<{ orgId: string; userId: number } | null> {
       const r = await db

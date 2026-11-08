@@ -64,6 +64,41 @@ describe("signup form", () => {
     expect(await screen.findByRole("alert")).toHaveProperty("textContent", "That salon ID is taken");
   });
 
+  it("a Google account from Sign in: email from Google, no password, posts the token", async () => {
+    sessionStorage.setItem("sk-google-signup", JSON.stringify({ idToken: "tok-1", email: "nina@gmail.com", name: "Nina New", at: Date.now() }));
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    const calls = serve((s) => ({ slug: s, available: true }), () => new Response(JSON.stringify({ slug: "nina-cuts", handoff_url: "https://nina-cuts.salonkit.online/login/?handoff=y" }), { status: 201 }));
+    render(<SignupForm />);
+    expect((await screen.findByTestId("google-email")).textContent).toContain("nina@gmail.com");
+    expect(screen.queryByLabelText("Password")).toBeNull();
+    expect((screen.getByLabelText("Your name") as HTMLInputElement).value).toBe("Nina New");
+    fill("Salon name", "Nina Cuts");
+    await waitFor(() => expect((screen.getByText("Start my free trial").closest("button") as HTMLButtonElement).disabled).toBe(false), { timeout: 3000 });
+    fireEvent.click(screen.getByText("Start my free trial"));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://nina-cuts.salonkit.online/login/?handoff=y"));
+    expect(JSON.parse(calls.find((c) => c.url === "/api/public/signup")!.body!)).toEqual({ salon_name: "Nina Cuts", slug: "nina-cuts", owner_name: "Nina New", phone: "", country: "AE", id_token: "tok-1" });
+    expect(sessionStorage.getItem("sk-google-signup")).toBeNull();
+  });
+
+  it("Change goes back to email and password", async () => {
+    sessionStorage.setItem("sk-google-signup", JSON.stringify({ idToken: "tok-2", email: "x@gmail.com", name: null, at: Date.now() }));
+    serve((s) => ({ slug: s, available: true }), () => new Response("{}"));
+    render(<SignupForm />);
+    fireEvent.click(await screen.findByText("Change"));
+    expect(screen.getByLabelText("Password")).toBeTruthy();
+    expect((screen.getByLabelText("Email") as HTMLInputElement).value).toBe("");
+    expect(sessionStorage.getItem("sk-google-signup")).toBeNull();
+  });
+
+  it("an old Google sign-in (token expired) is dropped", () => {
+    sessionStorage.setItem("sk-google-signup", JSON.stringify({ idToken: "old", email: "old@gmail.com", name: null, at: Date.now() - 3_600_000 }));
+    serve((s) => ({ slug: s, available: true }), () => new Response("{}"));
+    render(<SignupForm />);
+    expect(screen.queryByTestId("google-email")).toBeNull();
+    expect(screen.getByLabelText("Password")).toBeTruthy();
+  });
+
   it("no Turnstile widget without a site key", () => {
     serve(() => ({ available: true }), () => new Response("{}"));
     render(<SignupForm />);

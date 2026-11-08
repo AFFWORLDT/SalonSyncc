@@ -9,6 +9,8 @@ import { ROOT_DOMAIN } from "@/lib/brand";
 import { SLUG_RE, normalizeSlug, suggestSlug } from "@/lib/slug";
 import { TURNSTILE_SITE_KEY, mountTurnstile } from "@/lib/turnstile";
 import { track } from "@/lib/track";
+import { GoogleButton, GoogleMark } from "@/components/google-button";
+import { clearPending, readPending, type PendingGoogle } from "@/lib/google";
 
 type SlugState = { state: "idle" | "checking" | "ok" | "bad"; message?: string };
 const REASON: Record<string, string> = { invalid: "3-30 letters, numbers or dashes", reserved: "That salon ID can't be used", taken: "That salon ID is taken" };
@@ -18,11 +20,13 @@ export interface SignupBody {
   salon_name: string;
   slug: string;
   owner_name: string;
-  email: string;
+  email?: string;
   phone: string;
-  password: string;
+  password?: string;
   country: string;
   turnstile?: string;
+  /** "Continue with Google": the verified email and name come from this token, no password. */
+  id_token?: string;
 }
 
 /** Same rules as the API: the email is also the owner's username (at most 60, safe characters). */
@@ -52,7 +56,28 @@ export function SignupForm() {
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // "Continue with Google": the account's email (verified by Google) replaces the email and password fields.
+  const [google, setGoogle] = useState<Omit<PendingGoogle, "at"> | null>(null);
   const widget = useRef<HTMLDivElement>(null);
+
+  const withGoogle = (g: Omit<PendingGoogle, "at">) => {
+    setGoogle(g);
+    setEmail(g.email);
+    setName((n) => n || g.name || "");
+    setError(null);
+  };
+  const dropGoogle = () => {
+    clearPending();
+    setGoogle(null);
+    setEmail("");
+  };
+
+  // A Google account that wasn't on any team, sent here from Sign in.
+  useEffect(() => {
+    const p = readPending();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (p) withGoogle(p);
+  }, []);
 
   useEffect(() => {
     if (widget.current) mountTurnstile(widget.current, setToken);
@@ -91,14 +116,16 @@ export function SignupForm() {
     setError(null);
     if (TURNSTILE_SITE_KEY && !token) return setError("Please complete the check below");
     setBusy(true);
-    const body: SignupBody = { salon_name: salon.trim(), slug: normalizeSlug(slug), owner_name: name.trim(), email: email.trim(), phone: phone.trim(), password, country };
+    const base = { salon_name: salon.trim(), slug: normalizeSlug(slug), owner_name: name.trim(), phone: phone.trim(), country };
+    const body: SignupBody = google ? { ...base, id_token: google.idToken } : { ...base, email: email.trim(), password };
     if (token) body.turnstile = token;
     try {
       const r = await fetch("/api/public/signup", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const d = (await r.json().catch(() => ({}))) as { handoff_url?: string; error?: string };
       if (!r.ok || !d.handoff_url) throw new Error(d.error ?? `Signup failed (${r.status})`);
       // GA4 key event: a salon finished signing up (sent before leaving for the salon's own address).
-      await track("sign_up", { method: "website" });
+      await track("sign_up", { method: google ? "google" : "website" });
+      clearPending();
       window.location.assign(d.handoff_url);
     } catch (err) {
       setError((err as Error).message);
@@ -109,10 +136,12 @@ export function SignupForm() {
 
   const emailBad = email.trim() !== "" && (!EMAIL_RE.test(email.trim()) || email.trim().length > 60);
   const phoneBad = !phoneOk(phone);
-  const ready = salon.trim().length >= 2 && slugState.state === "ok" && name.trim().length >= 2 && EMAIL_RE.test(email.trim()) && !emailBad && !phoneBad && password.length >= 8;
+  const ready =
+    salon.trim().length >= 2 && slugState.state === "ok" && name.trim().length >= 2 && !phoneBad && (google !== null || (EMAIL_RE.test(email.trim()) && !emailBad && password.length >= 8));
 
   return (
     <form onSubmit={submit} className="grid gap-4" data-testid="signup-form">
+      {!google && <GoogleButton label="Sign up with Google" divider="after" onNew={withGoogle} />}
       <div className="grid gap-2">
         <Label htmlFor="salon">Salon name</Label>
         <Input id="salon" required value={salon} onChange={(e) => setSalon(e.target.value)} placeholder="Super Beard Gents Salon" className="h-11" />
@@ -151,8 +180,23 @@ export function SignupForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor="email">Email</Label>
-          <Input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={emailBad} className="h-11" />
-          {emailBad && <p className="text-xs text-destructive">Enter a valid email (at most 60 characters)</p>}
+          {google ? (
+            <>
+              <div id="email" className="field-shell flex h-11 items-center gap-2 rounded-lg px-3 text-sm" data-testid="google-email">
+                <GoogleMark className="size-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{google.email}</span>
+                <button type="button" onClick={dropGoogle} className="shrink-0 text-xs text-primary underline-offset-4 hover:underline">
+                  Change
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">You&apos;ll sign in with Google.</p>
+            </>
+          ) : (
+            <>
+              <Input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={emailBad} className="h-11" />
+              {emailBad && <p className="text-xs text-destructive">Enter a valid email (at most 60 characters)</p>}
+            </>
+          )}
         </div>
         <div className="grid gap-2">
           <Label htmlFor="phone">Mobile (optional)</Label>
@@ -160,16 +204,18 @@ export function SignupForm() {
           {phoneBad && <p className="text-xs text-destructive">Enter a valid mobile number</p>}
         </div>
       </div>
-      <div className="grid gap-2">
-        <Label htmlFor="password">Password</Label>
-        <div className="relative">
-          <Input id="password" type={show ? "text" : "password"} required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className="h-11 pe-10" />
-          <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? "Hide password" : "Show password"} className="absolute inset-y-0 end-0 flex w-10 items-center justify-center text-muted-foreground">
-            {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-          </button>
+      {!google && (
+        <div className="grid gap-2">
+          <Label htmlFor="password">Password</Label>
+          <div className="relative">
+            <Input id="password" type={show ? "text" : "password"} required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className="h-11 pe-10" />
+            <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? "Hide password" : "Show password"} className="absolute inset-y-0 end-0 flex w-10 items-center justify-center text-muted-foreground">
+              {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">At least 8 characters. You sign in with your email and this password.</p>
         </div>
-        <p className="text-xs text-muted-foreground">At least 8 characters. You sign in with your email and this password.</p>
-      </div>
+      )}
       {TURNSTILE_SITE_KEY && <div ref={widget} data-testid="turnstile" />}
       {error && (
         <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">

@@ -142,3 +142,62 @@ describe("POST /api/auth/social", () => {
     expect((await post("/public/signup", { id_token: "junk", salon_name: "X Cuts", slug: "so-junk", country: "AE", device })).status).toBe(401);
   });
 });
+
+describe("website: POST /api/auth/social {web: true}", () => {
+  const handoff = (slug: string, url: string) =>
+    app.fetch(
+      new Request(`https://${slug}.${ROOT}/api/auth/handoff`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token: new URL(url).searchParams.get("handoff") }) }),
+      e,
+      ctx,
+    );
+
+  it("a known person gets a single-use sign-in link to their salon", async () => {
+    await team("so-web", "web.sam@gmail.com");
+    const r = await post("/auth/social", { id_token: await token({ email: "web.sam@gmail.com" }), web: true });
+    expect(r.status).toBe(200);
+    const j = (await r.json()) as { slug: string; handoff_url: string };
+    expect(j.slug).toBe("so-web");
+    expect(j.handoff_url).toMatch(/^https:\/\/so-web\.salonkit\.online\/login\/\?handoff=[\w-]+$/);
+    const h = await handoff("so-web", j.handoff_url);
+    expect(h.status).toBe(200);
+    expect(h.headers.get("set-cookie")).toBeTruthy();
+    expect((await handoff("so-web", j.handoff_url)).status).toBe(401);
+  });
+
+  it("the link only works on that salon's own address", async () => {
+    await team("so-web2", "web.two@gmail.com");
+    await makeOrg({ slug: "so-web-other" });
+    const j = (await (await post("/auth/social", { id_token: await token({ email: "web.two@gmail.com" }), web: true })).json()) as { handoff_url: string };
+    expect((await handoff("so-web-other", j.handoff_url)).status).toBe(401);
+  });
+
+  it("an unknown email is offered sign-up; then signup gives a link, not a phone session", async () => {
+    const t = await token({ email: "web.new@gmail.com", name: "Wen New" });
+    expect(await (await post("/auth/social", { id_token: t, web: true })).json()).toEqual({ new: true, email: "web.new@gmail.com", name: "Wen New" });
+    const su = await post("/public/signup", { id_token: t, salon_name: "Wen Cuts", slug: "so-wen", country: "AE" });
+    expect(su.status).toBe(201);
+    expect(await su.json()).toMatchObject({ slug: "so-wen", handoff_url: expect.stringContaining("so-wen.salonkit.online/login/?handoff=") });
+  });
+
+  it("refuses another site's page", async () => {
+    const r = await app.fetch(
+      new Request(`https://${ROOT}/api/auth/social`, { method: "POST", headers: { "content-type": "application/json", origin: "https://evil.example" }, body: JSON.stringify({ id_token: await token(), web: true }) }),
+      e,
+      ctx,
+    );
+    expect(r.status).toBe(403);
+  });
+});
+
+describe("GET /api/public/auth-config", () => {
+  const get = (env2: Record<string, unknown>) => app.fetch(new Request(`https://${ROOT}/api/public/auth-config`), { ...e, ...env2 }, ctx);
+  it("hides Google until the web key is set", async () => {
+    expect(await (await get({ FIREBASE_WEB_API_KEY: undefined })).json()).toEqual({ google: false });
+  });
+  it("gives the browser its Firebase settings", async () => {
+    expect(await (await get({ FIREBASE_WEB_API_KEY: "AIza-test" })).json()).toEqual({
+      google: true,
+      firebase: { apiKey: "AIza-test", projectId: "salonkit1", authDomain: "salonkit1.firebaseapp.com" },
+    });
+  });
+});
