@@ -26,6 +26,9 @@ const kSignupCountries = <(String, String)>[
   ('US', 'United States'),
 ];
 
+/// The flag emoji of a two-letter country code ("AE" -> 🇦🇪): two regional-indicator letters.
+String flagOf(String code) => String.fromCharCodes(code.toUpperCase().codeUnits.map((c) => 0x1F1E6 + c - 0x41));
+
 /// A suggested salon ID from its name: "Super Salon & Spa" -> "super-salon-spa".
 String slugFromName(String name) {
   final s = name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-+|-+$'), '');
@@ -210,7 +213,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     initialValue: _country,
                     isExpanded: true,
                     decoration: const InputDecoration(labelText: 'Country'),
-                    items: [for (final (code, name) in kSignupCountries) DropdownMenuItem(value: code, child: Text(name))],
+                    items: [for (final (code, name) in kSignupCountries) DropdownMenuItem(value: code, child: Text('${flagOf(code)}  $name'))],
                     onChanged: (v) => setState(() => _country = v ?? _country),
                   ),
                   gap,

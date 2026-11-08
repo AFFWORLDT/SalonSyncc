@@ -5,6 +5,7 @@ import 'package:salonkit/app.dart';
 import 'package:salonkit/core/auth/auth_controller.dart';
 import 'package:salonkit/core/auth/link_handler.dart';
 import 'package:salonkit/core/auth/social_auth.dart';
+import 'package:salonkit/auth_ui/signup_screen.dart' show flagOf;
 
 import 'support/fake_adapter.dart';
 import 'support/harness.dart';
@@ -188,5 +189,10 @@ void main() {
     await t.tap(find.byKey(const ValueKey('start-google')));
     await t.pumpAndSettle();
     expect(find.text("You're offline"), findsOneWidget);
+  });
+
+  test('country flags', () {
+    expect(flagOf('AE'), '🇦🇪');
+    expect(flagOf('in'), '🇮🇳');
   });
 }
