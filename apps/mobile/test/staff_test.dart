@@ -71,6 +71,27 @@ void main() {
     expect(find.text('Your plan allows 10 active staff. Upgrade your plan to add more.'), findsOneWidget);
   });
 
+  testWidgets('adding someone with an email sends them an invite link (switch on by default)', (t) async {
+    final created = Map<String, dynamic>.from((raw('users.json') as List).last as Map)..addAll({'id': 99, 'name': 'Omar Khan', 'username': 'omarkhan', 'email': 'omar@mail.com'});
+    final a = await pump(t, extra: {
+      'POST /api/users': (o) => FakeReply(201, created),
+      'POST /api/users/99/invite': (o) => {'ok': true, 'email': 'omar@mail.com'},
+    });
+    await t.tap(find.text('Add staff'));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('st-name')), 'Omar Khan');
+    await t.enterText(find.byKey(const ValueKey('st-password')), 'pass1234');
+    await t.ensureVisible(find.byKey(const ValueKey('st-email')));
+    expect(find.byKey(const ValueKey('st-invite')), findsNothing);
+    await t.enterText(find.byKey(const ValueKey('st-email')), 'omar@mail.com');
+    await t.pump();
+    expect(find.byKey(const ValueKey('st-invite')), findsOneWidget);
+    await t.tap(find.text('Save'));
+    await t.pumpAndSettle();
+    expect(a.calls.where((c) => c.path == '/api/users/99/invite'), hasLength(1));
+    expect(find.textContaining('Invite sent to omar@mail.com'), findsOneWidget);
+  });
+
   testWidgets('owner card has no inactive / delete; barber card has', (t) async {
     await pump(t);
     await t.tap(find.byTooltip('Actions for Owner'));

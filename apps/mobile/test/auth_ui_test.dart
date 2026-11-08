@@ -18,11 +18,16 @@ FakeAdapter salonApi() => FakeAdapter({
       'GET /api/me': (o) => fx('me_barber.json'),
     });
 
-Future<void> start(WidgetTester t, {bool reduceMotion = false}) async {
+/// Opens the app signed out; it starts on "just your email", and [salonId] taps through to the salon ID screen.
+Future<void> start(WidgetTester t, {bool reduceMotion = false, bool salonId = true}) async {
   final a = putAuth(salonApi());
   await a.boot();
   await t.pumpWidget(MediaQuery(data: MediaQueryData(disableAnimations: reduceMotion), child: const SalonKitApp()));
   await t.pumpAndSettle();
+  if (salonId) {
+    await t.tap(find.text('Use salon ID and password'));
+    await t.pumpAndSettle();
+  }
 }
 
 Future<void> typeSalon(WidgetTester t, String id) async {
@@ -110,6 +115,8 @@ void main() {
     await Get.find<AuthController>().boot();
     await t.pumpWidget(const SalonKitApp());
     await t.pumpAndSettle();
+    await t.tap(find.text('Use salon ID and password'));
+    await t.pumpAndSettle();
     await typeSalon(t, 'supersalon');
     await t.tap(find.text('Continue'));
     await t.pumpAndSettle();
@@ -129,14 +136,15 @@ void main() {
     expect(find.text('Hi ali 👋'), findsOneWidget);
   });
 
-  testWidgets('Not your salon? goes back to the ID screen', (t) async {
+  testWidgets('Not your salon? goes back to the first screen (just your email)', (t) async {
     await start(t);
     await typeSalon(t, 'supersalon');
     await t.tap(find.text('Continue'));
     await t.pumpAndSettle();
     await t.tap(find.text('Not your salon?'));
     await t.pumpAndSettle();
-    expect(find.text('Enter your salon ID'), findsOneWidget);
+    expect(find.text('Sign in to your salon'), findsOneWidget);
+    expect(find.text('Use salon ID and password'), findsOneWidget);
   });
 
   testWidgets('reduce motion: the salon appears without animating', (t) async {

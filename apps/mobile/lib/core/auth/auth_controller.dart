@@ -26,6 +26,9 @@ class AuthController extends GetxController {
   final state = AuthState.unknown.obs;
   final me = Rxn<Me>();
   final salon = Rxn<SavedSalon>();
+
+  /// Why a tapped sign-in link didn't work (expired, used), shown on the first screen.
+  final linkMessage = RxnString();
   String? _token;
   ApiClient? _api;
 
@@ -94,10 +97,65 @@ class AuthController extends GetxController {
     final r = await c.post('/api/mobile/session', {
       if (isDevHost) 'org': s.slug,
       ...credentials,
-      'device': {'id': await store.deviceId(), 'name': device.name, 'platform': device.platform, 'app_version': device.appVersion},
+      'device': await _deviceBody(),
     }, (j) => j as Map<String, dynamic>);
     final token = r['token'];
     if (token is! String) throw const ServerError();
+    await store.saveToken(token);
+    _token = token;
+    _api = null;
+    await refreshMe();
+    state.value = AuthState.signedIn;
+  }
+
+  Future<Map<String, Object?>> _deviceBody() async => {'id': await store.deviceId(), 'name': device.name, 'platform': device.platform, 'app_version': device.appVersion};
+
+  /// "Just your email": emails a 6-digit code and a one-tap link. The server finds the salon from the email (one email
+  /// = one salon) and answers the same whether or not it knows the email.
+  Future<void> requestEmailCode(String email) => clientFor(rootBase()).post('/api/auth/code', {'email': email.trim()}, (_) {});
+
+  /// Signs in with an emailed code, or a tapped link ([slug] from its host). The salon comes back from the server.
+  Future<void> signInWithEmailCode(String email, String code, {String? slug}) async {
+    final c = clientFor(slug == null ? rootBase() : salonBase(slug));
+    final r = await c.post('/api/mobile/session', {
+      if (isDevHost && slug != null) 'org': slug,
+      'email': email.trim(),
+      'code': code.replaceAll(RegExp(r'\s'), ''),
+      'device': await _deviceBody(),
+    }, (j) => j as Map<String, dynamic>);
+    await _adopt(r);
+  }
+
+  /// A new salon on the 7-day free trial, signed in straight away as its owner.
+  Future<void> signUp({required String salonName, required String ownerName, required String email, required String slug, required String password, String? phone, required String country}) async {
+    final r = await clientFor(rootBase()).post('/api/public/signup', {
+      'salon_name': salonName.trim(),
+      'owner_name': ownerName.trim(),
+      'email': email.trim(),
+      'slug': normalizeSlug(slug),
+      'password': password,
+      if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+      'country': country,
+      'device': await _deviceBody(),
+    }, (j) => j as Map<String, dynamic>);
+    await _adopt(r);
+  }
+
+  /// Is this salon ID free for a new salon? ('invalid' / 'taken' / 'reserved' when not.)
+  Future<String?> slugProblem(String slug) async {
+    final r = await clientFor(rootBase()).get('/api/public/slug', (j) => j as Map<String, dynamic>, query: {'s': normalizeSlug(slug)});
+    return r['available'] == true ? null : (r['reason'] as String? ?? 'taken');
+  }
+
+  /// Takes a phone session the server returned with its salon ({token, slug}): remembers the salon (with its name and
+  /// logo) and the token, then loads me.
+  Future<void> _adopt(Map<String, dynamic> r) async {
+    final token = r['token'], slug = r['slug'];
+    if (token is! String || slug is! String) throw const ServerError();
+    final b = await checkSalon(slug).catchError((Object _) => const Brand());
+    final s = SavedSalon(slug: slug, name: b.name ?? slug, logoUrl: b.logoUrl);
+    await store.saveSalon(s);
+    salon.value = s;
     await store.saveToken(token);
     _token = token;
     _api = null;

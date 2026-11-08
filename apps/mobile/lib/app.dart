@@ -2,8 +2,8 @@ import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import 'auth_ui/email_start_screen.dart';
 import 'auth_ui/login_screen.dart';
-import 'auth_ui/salon_screen.dart';
 import 'auth_ui/splash_screen.dart';
 import 'core/auth/auth_controller.dart';
 import 'core/features/registry.dart';
@@ -82,7 +82,7 @@ class _AuthGateState extends State<_AuthGate> {
       final s = auth.state.value;
       final Widget screen = switch (s) {
         AuthState.unknown => SplashScreen(salon: auth.salon.value),
-        AuthState.needSalon => const SalonScreen(),
+        AuthState.needSalon => const EmailStartScreen(),
         AuthState.needLogin => const LoginScreen(),
         AuthState.signedIn => SkBackground(child: Shell(registry: registry)),
       };

@@ -30,6 +30,7 @@ dependencies:
   timezone: ^0.10.1
   image_cropper: ^12.2.1
   flutter_image_compress: ^2.5.1
+  app_links: ^7.0.0
 
 dev_dependencies:
   flutter_test:

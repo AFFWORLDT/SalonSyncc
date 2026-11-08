@@ -18,6 +18,7 @@ import 'modules/modules.dart';
 import 'shell/shell.dart';
 import 'core/api/api_client.dart';
 import 'core/auth/auth_controller.dart';
+import 'core/auth/link_handler.dart';
 import 'core/auth/device_info.dart';
 import 'core/auth/secure_store.dart';
 import 'core/auth/session_store.dart';
@@ -99,4 +100,6 @@ Future<void> run({bool crashReports = true}) async {
   runApp(SalonKitApp(registry: registry, intro: crashReports));
   // The splash stays until the version check is back, and at least 400 ms so it never flashes.
   await auth.boot(hold: Future.wait([update.check(), Future<void>.delayed(const Duration(milliseconds: 400))]));
+  // Sign-in and invite links (and the one that opened the app), once the saved session is known.
+  LinkHandler(auth).start();
 }

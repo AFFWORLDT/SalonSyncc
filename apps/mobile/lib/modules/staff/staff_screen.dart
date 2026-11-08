@@ -79,6 +79,15 @@ class _StaffScreenState extends State<StaffScreen> {
     }
   }
 
+  Future<void> _invite(Staff s) async {
+    try {
+      final to = await widget.api.invite(s.id);
+      _toast('Invite sent to $to. They tap the link on their phone to join.');
+    } catch (e) {
+      _toast(messageOf(e));
+    }
+  }
+
   Future<void> _reset(Staff s) async {
     final ok = await showDialog<bool>(context: context, builder: (_) => _ResetDialog(api: widget.api, staff: s));
     if (ok == true) _toast('New password set for ${s.name}. They are signed out everywhere.');
@@ -186,9 +195,10 @@ class _StaffScreenState extends State<StaffScreen> {
             if (!me.readOnly)
               PopupMenuButton<String>(
                 tooltip: 'Actions for ${s.name}',
-                onSelected: (v) => switch (v) { 'edit' => _form(s), 'reset' => _reset(s), 'toggle' => _toggle(s), _ => _delete(s) },
+                onSelected: (v) => switch (v) { 'edit' => _form(s), 'invite' => _invite(s), 'reset' => _reset(s), 'toggle' => _toggle(s), _ => _delete(s) },
                 itemBuilder: (_) => [
                   const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  if (!self && s.active && (s.email ?? '').isNotEmpty) const PopupMenuItem(value: 'invite', child: Text('Send invite email')),
                   if (!s.isOwner || me.user.role == 'owner') const PopupMenuItem(value: 'reset', child: Text('Reset password')),
                   if (!self && !s.isOwner) PopupMenuItem(value: 'toggle', child: Text(s.active ? 'Make inactive' : 'Make active')),
                   if (!self && !s.isOwner) const PopupMenuItem(value: 'delete', child: Text('Delete')),
@@ -233,6 +243,7 @@ class _StaffFormState extends State<_StaffForm> {
   late final _order = TextEditingController(text: s == null ? '' : '${s!.sortOrder}');
   late final _phone = TextEditingController(text: s?.phone ?? '');
   late final _email = TextEditingController(text: s?.email ?? '');
+  bool _sendInvite = true;
   late String _role = s?.role ?? 'barber';
   late bool _canExpense = s?.canAddExpense ?? false;
   bool _userTouched = false, _busy = false;
@@ -280,13 +291,33 @@ class _StaffFormState extends State<_StaffForm> {
     try {
       final saved = s == null ? await widget.api.create(f, password: _pass.text) : await widget.api.update(s!.id, f, active: s!.active);
       final photoNote = await _savePhoto(saved.id);
+      final inviteNote = _canInvite && _sendInvite ? await _inviteNote(saved.id) : '';
       if (!mounted) return;
       Haptic.success();
-      Navigator.pop(context, s == null ? '${f.name.trim()} added. Share the username and password with them.$photoNote' : 'Saved$photoNote');
+      Navigator.pop(
+        context,
+        s == null
+            ? '${f.name.trim()} added.${inviteNote.isEmpty ? ' Share the username and password with them.' : inviteNote}$photoNote'
+            : 'Saved.$inviteNote$photoNote',
+      );
     } on StaffLimit {
       if (mounted) setState(() { _busy = false; _error = widget.limitText; });
     } catch (e) {
       if (mounted) setState(() { _busy = false; _error = messageOf(e); });
+    }
+  }
+
+  /// A new email (new staff, or an email added or changed): offer to email them an invite link.
+  bool get _canInvite {
+    final e = _email.text.trim().toLowerCase();
+    return e.contains('@') && e != (s?.email ?? '').toLowerCase();
+  }
+
+  Future<String> _inviteNote(int id) async {
+    try {
+      return ' Invite sent to ${await widget.api.invite(id)}.';
+    } catch (e) {
+      return ' (invite not sent: ${messageOf(e)})';
     }
   }
 
@@ -404,8 +435,18 @@ class _StaffFormState extends State<_StaffForm> {
             controller: _email,
             keyboardType: TextInputType.emailAddress,
             autocorrect: false,
+            onChanged: (_) => setState(() {}),
             decoration: dec('Email (optional)', 'Their daily and monthly report, announcements, and a note when you change their sale'),
           ),
+          if (_canInvite)
+            SkSwitchTile(
+              key: const ValueKey('st-invite'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Email them an invite'),
+              subtitle: const Text('A link that opens the app on their phone, already signed in. No salon ID or password to type.'),
+              value: _sendInvite,
+              onChanged: (v) => setState(() => _sendInvite = v),
+            ),
           if (_role == 'barber')
             SkSwitchTile(
               contentPadding: EdgeInsets.zero,

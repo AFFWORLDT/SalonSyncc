@@ -43,6 +43,9 @@ class StaffApi {
 
   Future<Staff> update(int id, StaffForm f, {required bool active}) => _limit(() => api.put('/api/users/$id', {...f.toJson(), 'active': active}, _one));
 
+  /// Emails them an invite: a one-tap link that opens the app signed in (3 days). The server answers with the address.
+  Future<String> invite(int id) => api.post('/api/users/$id/invite', <String, Object?>{}, (j) => (j as Map)['email'] as String);
+
   Future<void> resetPassword(int id, String password) => api.post('/api/users/$id/reset-password', {'password': password}, (_) {});
 
   /// Someone with sales or expenses is made inactive instead of deleted (old reports stay right).
