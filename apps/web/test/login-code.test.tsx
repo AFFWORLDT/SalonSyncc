@@ -30,7 +30,7 @@ describe("login: sign in with an email code", () => {
         <LoginPage />
       </AuthProvider>
     );
-    fireEvent.click(await screen.findByText("Sign in with an email code instead"));
+    fireEvent.click(await screen.findByText("Email me a sign-in code"));
     fireEvent.change(screen.getByLabelText("Salon ID"), { target: { value: "Super" } });
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "sam@mail.com" } });
     const send = screen.getByRole("button", { name: "Email me a code" }) as HTMLButtonElement;

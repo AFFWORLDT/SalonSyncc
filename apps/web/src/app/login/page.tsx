@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { lastOrg, useAuth } from "@/lib/auth-context";
 import { salonFromHost } from "@/lib/host";
-import { BRAND_NAME } from "@/lib/brand";
+import { BRAND_NAME, ROOT_DOMAIN } from "@/lib/brand";
+import { Mail } from "lucide-react";
+import { GoogleMark } from "@/components/ui/google-mark";
 import { api, clearSessionCaches, errorMessage } from "@/lib/api";
 import { BrandLogo, LogoBadge } from "@/components/logo";
 import { Button } from "@/components/ui/button";
@@ -77,6 +79,20 @@ export default function LoginPage() {
     }
   }, [refresh, router]);
   const needOrg = hostSalon === null;
+  // "Continue with Google" runs on salonkit.online (Firebase allows listed domains only, not every salon's address),
+  // then comes back here signed in. Shown once the server has Google settings.
+  const [google, setGoogle] = useState(false);
+  useEffect(() => {
+    if (!hostSalon || !ROOT_DOMAIN) return;
+    let live = true;
+    api<{ google: boolean }>("/api/public/auth-config", { redirectOn401: false })
+      .then((c) => live && setGoogle(!!c.google))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [hostSalon]);
+  const googleUrl = hostSalon && ROOT_DOMAIN ? `https://${ROOT_DOMAIN}/login/google/?org=${encodeURIComponent(hostSalon)}` : null;
   // A different salon photo (and matching moving background) on every visit; chosen after mount (static export).
   const [scene, setScene] = useState<LoginScene | null>(null);
   useEffect(() => {
@@ -145,6 +161,28 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {mode === "password" && (
+          <div className="-mb-3 grid gap-3">
+            {google && googleUrl && (
+              <a
+                href={googleUrl}
+                className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-lg border border-black/10 bg-white text-[15px] font-medium text-[#1f1f1f] shadow-sm transition duration-150 ease-out hover:bg-[#f7f7f5] active:scale-[0.98]"
+              >
+                <GoogleMark />
+                Continue with Google
+              </a>
+            )}
+            <Button type="button" variant="outline" size="lg" className="h-12 w-full gap-2.5 text-[15px]" onClick={() => switchMode("code")}>
+              <Mail className="size-5" />
+              Email me a sign-in code
+            </Button>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground" aria-hidden>
+              <span className="h-px flex-1 bg-current opacity-25" />
+              or use your password
+              <span className="h-px flex-1 bg-current opacity-25" />
+            </div>
+          </div>
+        )}
         <form onSubmit={submit} autoComplete="on" className="grid gap-4">
           {needOrg && (
             <div className="grid gap-2">
@@ -241,9 +279,11 @@ export default function LoginPage() {
               Send a new code
             </Button>
           )}
-          <Button type="button" variant="link" className="justify-self-center" onClick={() => switchMode(mode === "password" ? "code" : "password")}>
-            {mode === "password" ? "Sign in with an email code instead" : "Sign in with your password instead"}
-          </Button>
+          {mode === "code" && (
+            <Button type="button" variant="link" className="justify-self-center" onClick={() => switchMode("password")}>
+              Sign in with your password instead
+            </Button>
+          )}
         </form>
         <p className="text-center text-xs text-muted-foreground">{TAGLINE}</p>
       </div>

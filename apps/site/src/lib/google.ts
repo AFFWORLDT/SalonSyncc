@@ -33,32 +33,85 @@ export function prepareGoogle(): Promise<Ready | null> {
 
 const CLOSED = new Set(["auth/popup-closed-by-user", "auth/cancelled-popup-request", "auth/user-cancelled"]);
 
-/** Null = the person closed the popup. Throws an Error with a message worth showing. */
-export async function continueWithGoogle({ auth, mod }: Ready): Promise<GoogleResult | null> {
-  const provider = new mod.GoogleAuthProvider();
-  // A shared salon computer: always ask which account.
-  provider.setCustomParameters({ prompt: "select_account" });
-  let idToken: string;
-  try {
-    const cred = await mod.signInWithPopup(auth, provider);
-    idToken = await cred.user.getIdToken(true);
-  } catch (e) {
-    const code = (e as { code?: string }).code ?? "";
-    if (CLOSED.has(code)) return null;
-    if (code === "auth/popup-blocked") throw new Error("Your browser blocked the Google window. Allow pop-ups for this site and try again.");
-    if (code === "auth/network-request-failed") throw new Error("You're offline");
-    if (code === "auth/unauthorized-domain" || code === "auth/operation-not-allowed") throw new Error("Google sign-in isn't switched on here yet. Use your salon ID instead.");
-    throw new Error("Google sign-in didn't work. Try again or use your salon ID.");
-  } finally {
-    // SalonKit keeps its own session; Firebase was only the identity check.
-    await mod.signOut(auth).catch(() => {});
-  }
+/** Turns Firebase's error into a message worth showing; null = the person closed Google's window. */
+function googleError(e: unknown): Error | null {
+  const code = (e as { code?: string }).code ?? "";
+  if (CLOSED.has(code)) return null;
+  if (code === "auth/popup-blocked") return new Error("Your browser blocked the Google window. Allow pop-ups for this site and try again.");
+  if (code === "auth/network-request-failed") return new Error("You're offline");
+  if (code === "auth/unauthorized-domain" || code === "auth/operation-not-allowed") return new Error("Google sign-in isn't switched on here yet. Use your salon ID instead.");
+  return new Error("Google sign-in didn't work. Try again or use your salon ID.");
+}
+
+/** The server checks Google's verified email: into the salon (single-use link), or a new salon to start. */
+async function exchange(idToken: string): Promise<GoogleResult> {
   const r = await fetch("/api/auth/social", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id_token: idToken, web: true }) });
   const d = (await r.json().catch(() => ({}))) as { handoff_url?: string; new?: boolean; email?: string; name?: string | null; error?: string };
   if (!r.ok) throw new Error(d.error ?? `Sign-in failed (${r.status})`);
   if (d.handoff_url) return { kind: "signed-in", url: d.handoff_url };
   if (d.new && d.email) return { kind: "new", idToken, email: d.email, name: d.name ?? null };
   throw new Error("Sign-in failed. Try again.");
+}
+
+const provider = (mod: Ready["mod"]) => {
+  const p = new mod.GoogleAuthProvider();
+  // A shared salon computer: always ask which account.
+  p.setCustomParameters({ prompt: "select_account" });
+  return p;
+};
+
+/** Google's window as a popup (salonkit.online pages). Null = the person closed it. Throws an Error worth showing. */
+export async function continueWithGoogle({ auth, mod }: Ready): Promise<GoogleResult | null> {
+  let idToken: string;
+  try {
+    const cred = await mod.signInWithPopup(auth, provider(mod));
+    idToken = await cred.user.getIdToken(true);
+  } catch (e) {
+    const err = googleError(e);
+    if (!err) return null;
+    throw err;
+  } finally {
+    // SalonKit keeps its own session; Firebase was only the identity check.
+    await mod.signOut(auth).catch(() => {});
+  }
+  return exchange(idToken);
+}
+
+/**
+ * Google as a full-page redirect, for a salon's own sign-in page (salon.salonkit.online sends people to
+ * salonkit.online/login/google/: Firebase only allows listed domains, never *.salonkit.online). First visit leaves for
+ * Google; the return visit finishes. Null = back from Google without signing in (closed, or another account flow).
+ */
+const REDIRECT_KEY = "sk-google-redirect";
+export async function googleRedirect({ auth, mod }: Ready): Promise<GoogleResult | "leaving" | null> {
+  let started = false;
+  try {
+    started = sessionStorage.getItem(REDIRECT_KEY) !== null;
+    sessionStorage.removeItem(REDIRECT_KEY);
+  } catch {
+    /* no storage: getRedirectResult below still tells us */
+  }
+  let idToken: string | null = null;
+  try {
+    const cred = await mod.getRedirectResult(auth);
+    if (cred) idToken = await cred.user.getIdToken(true);
+  } catch (e) {
+    const err = googleError(e);
+    if (err) throw err;
+    return null;
+  } finally {
+    if (started) await mod.signOut(auth).catch(() => {});
+  }
+  if (idToken) return exchange(idToken);
+  // Back from Google with nothing: don't loop straight back there.
+  if (started) return null;
+  try {
+    sessionStorage.setItem(REDIRECT_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+  await mod.signInWithRedirect(auth, provider(mod));
+  return "leaving";
 }
 
 export function savePending(p: Omit<PendingGoogle, "at">) {
