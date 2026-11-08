@@ -6,6 +6,7 @@ import '../core/auth/auth_controller.dart';
 import '../core/auth/social_auth.dart';
 import '../core/ui/background.dart';
 import '../core/ui/glass.dart';
+import '../core/ui/google_mark.dart';
 import '../core/ui/route.dart';
 import 'salon_screen.dart';
 import 'signup_screen.dart';
@@ -130,7 +131,7 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
                         _SocialButton(
                           key: const ValueKey('start-google'),
                           label: 'Continue with Google',
-                          icon: const Text('G', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, color: Color(0xFF4285F4))),
+                          icon: const GoogleMark(size: 20),
                           onPressed: _busy ? null : () => _socially((s) => s.google()),
                         ),
                         if (_social!.appleAvailable) ...[
