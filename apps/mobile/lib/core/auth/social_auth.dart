@@ -61,8 +61,8 @@ class FirebaseSocialAuth implements SocialAuth {
       final cred = await fa.signInWithCredential(GoogleAuthProvider.credential(idToken: idToken));
       return await cred.user?.getIdToken(true);
     } on GoogleSignInException catch (e) {
-      if (e.code == GoogleSignInExceptionCode.canceled || e.code == GoogleSignInExceptionCode.interrupted) return null;
-      throw SocialAuthError(e.description ?? "Google sign-in didn't work. Use your email instead.");
+      if (googleClosedByUser(e.code, e.description)) return null;
+      throw SocialAuthError(googleErrorText(e.code, e.description));
     } on FirebaseAuthException catch (e) {
       throw SocialAuthError(e.code == 'network-request-failed' ? "You're offline" : (e.message ?? "Google sign-in didn't work. Use your email instead."));
     } finally {
@@ -79,4 +79,24 @@ class FirebaseSocialAuth implements SocialAuth {
 
   @override
   bool get appleAvailable => Platform.isIOS;
+}
+
+/// Android reports some setup problems (this app's signing key not registered with Google, "[16] Account reauth
+/// failed") as a cancel. Only a cancel the person made counts as closing the sheet; anything else is shown.
+bool googleClosedByUser(GoogleSignInExceptionCode code, String? description) {
+  if (code == GoogleSignInExceptionCode.interrupted) return true;
+  if (code != GoogleSignInExceptionCode.canceled) return false;
+  final d = (description ?? '').toLowerCase();
+  return d.isEmpty || d.contains('cancelled by the user') || d.contains('canceled by the user') || d.contains('user cancel');
+}
+
+String googleErrorText(GoogleSignInExceptionCode code, String? description) {
+  final d = description ?? '';
+  final setup = code == GoogleSignInExceptionCode.clientConfigurationError ||
+      code == GoogleSignInExceptionCode.providerConfigurationError ||
+      d.contains('[16]') ||
+      d.contains('[10]') ||
+      d.toLowerCase().contains('reauth');
+  if (setup) return 'Google sign-in isn\'t set up for this version of the app yet. Use your email instead. ($d)';
+  return d.isEmpty ? "Google sign-in didn't work. Use your email instead." : "Google sign-in didn't work: $d";
 }
