@@ -15,6 +15,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/ar/`, lastModified: now, changeFrequency: "weekly", priority: 0.9, alternates: { languages: LANGS } },
     { url: `${SITE_URL}/pricing/`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/signup/`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE_URL}/privacy/`, lastModified: now, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${SITE_URL}/terms/`, lastModified: now, changeFrequency: "yearly", priority: 0.2 },
     ...FEATURE_PAGES.map((p) => ({ url: `${SITE_URL}/${p.slug}/`, lastModified: now, changeFrequency: "monthly" as const, priority: 0.7 })),
     { url: `${SITE_URL}/blog/`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
     ...POSTS.map((p) => ({ url: `${SITE_URL}/blog/${p.slug}/`, lastModified: new Date(p.updated ?? p.date), changeFrequency: "yearly" as const, priority: 0.6 })),

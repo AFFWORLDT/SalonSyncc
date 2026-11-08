@@ -51,7 +51,11 @@ export function SiteFooter() {
         { label: "Start free trial", href: "/signup/", icon: "bolt", variant: "solid" },
       ]}
       copyright={`© ${new Date().getFullYear()} ${COMPANY}. All rights reserved.`}
-      legal={[{ label: "Pricing", href: "/pricing/" }]}
+      legal={[
+        { label: "Privacy", href: "/privacy/" },
+        { label: "Terms", href: "/terms/" },
+        { label: "Pricing", href: "/pricing/" },
+      ]}
       socials={SUPPORT_EMAIL ? [{ label: SUPPORT_EMAIL, href: `mailto:${SUPPORT_EMAIL}` }] : []}
       crew={CREW}
       doodles={["sparkle", "star", "heart", "bolt", "spiral", "plane", "sparkle", "star"]}
