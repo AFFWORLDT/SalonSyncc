@@ -195,9 +195,12 @@ describe("GET /api/public/auth-config", () => {
     expect(await (await get({ FIREBASE_WEB_API_KEY: undefined })).json()).toEqual({ google: false });
   });
   it("gives the browser its Firebase settings", async () => {
-    expect(await (await get({ FIREBASE_WEB_API_KEY: "AIza-test" })).json()).toEqual({
+    expect(await (await get({ FIREBASE_WEB_API_KEY: "AIza-test", FIREBASE_AUTH_DOMAIN: undefined })).json()).toEqual({
       google: true,
       firebase: { apiKey: "AIza-test", projectId: "salonkit1", authDomain: "salonkit1.firebaseapp.com" },
     });
+  });
+  it("uses our own domain for Google's window when set", async () => {
+    expect(((await (await get({ FIREBASE_WEB_API_KEY: "AIza-test", FIREBASE_AUTH_DOMAIN: "salonkit.online" })).json()) as { firebase: { authDomain: string } }).firebase.authDomain).toBe("salonkit.online");
   });
 });

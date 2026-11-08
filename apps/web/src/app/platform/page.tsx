@@ -4,7 +4,11 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/admin/states";
-import { pDate, relDays, signupSeries, STATUS_LABEL, statusClass, usePapi } from "@/lib/platform";
+import { PageHeader } from "@/components/admin/page-header";
+import { StatCard, deltaPercent } from "@/components/admin/stat-card";
+import { ChartCard } from "@/components/admin/chart-card";
+import { RangePicker, dayLabel, useRange } from "@/components/platform/insights-ui";
+import { relDays, STATUS_LABEL, statusClass, usePapi } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 
 interface Overview {
@@ -12,86 +16,98 @@ interface Overview {
   trialsEnding: { id: string; slug: string; name: string; at: number }[];
   inGrace: { id: string; slug: string; name: string; at: number }[];
   mrr: number;
-  signups: Record<string, number>;
-  salesLast24h: number;
-  activeStaff: number;
   currency: string;
+}
+
+type Day = { day: string; n: number };
+interface Dashboard {
+  range: number;
+  currency: string;
+  tiles: Record<string, number>;
+  series: { active: Day[]; signups: Day[]; sales: Day[]; sales_value: Day[]; ai_calls: Day[] };
 }
 
 /** Workers free plan: fine up to about this many busy salons (see the deploy notes). */
 const FREE_PLAN_SALONS = 8;
 
+const rows = (s: Day[]) => s.map((r) => ({ label: dayLabel(r.day), n: r.n }));
+const minor = (n: number) => n / 100;
+
 export default function PlatformOverview() {
-  const { data, error, reload } = usePapi<Overview>("/overview");
-  if (error && !data) return <ErrorState message={error} onRetry={reload} />;
-  if (!data)
-    return (
-      <div className="grid gap-3 sm:grid-cols-4">
-        {Array.from({ length: 8 }, (_, i) => (
-          <Skeleton key={i} className="h-24 rounded-xl" />
-        ))}
-      </div>
-    );
-  const live = ["trial", "active", "grace", "past_due"].reduce((n, s) => n + (data.byStatus[s] ?? 0), 0);
-  const series = signupSeries(data.signups);
-  const max = Math.max(1, ...series.map((s) => s.count));
-  const total30 = series.reduce((n, s) => n + s.count, 0);
+  const [range, setRange] = useRange();
+  const ov = usePapi<Overview>("/overview");
+  const db = usePapi<Dashboard>(`/insights/dashboard?range=${range}`);
+  const d = db.data?.range === range ? db.data : null;
+  const err = ov.error ?? db.error;
+  if (err && !ov.data && !db.data) return <ErrorState message={err} onRetry={() => (ov.reload(), db.reload())} />;
+
+  const live = ov.data ? ["trial", "active", "grace", "past_due"].reduce((n, s) => n + (ov.data!.byStatus[s] ?? 0), 0) : 0;
+  const t = d?.tiles ?? {};
+  const cur = d?.currency || ov.data?.currency || "";
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="text-2xl">Overview</h1>
-        <p className="text-sm text-muted-foreground">Every salon on SalonKit right now.</p>
-      </div>
+      <PageHeader title="Dashboard" description="Live snapshot across every salon on SalonKit." actions={<RangePicker value={range} onChange={setRange} />} />
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile label="Live salons" value={live} hint={`${data.byStatus.active ?? 0} paid · ${data.byStatus.trial ?? 0} on trial`} />
-        <Tile label="Monthly revenue" value={`${data.currency} ${data.mrr.toLocaleString()}`} hint="Paid salons × plan price" />
-        <Tile label="Sales, last 24 h" value={data.salesLast24h} hint={`${data.activeStaff} active staff`} />
-        <Tile label="Signups, 30 days" value={total30} hint={`${live} of ~${FREE_PLAN_SALONS} on the free Workers plan`} />
-      </div>
-
-      <Card className="gap-3 p-4">
-        <p className="text-sm font-semibold">By status</p>
-        <div className="flex flex-wrap gap-2">
-          {Object.keys(STATUS_LABEL).map((s) => (
-            <Link key={s} href={`/platform/salons/?status=${s}`} className={cn("rounded-full px-3 py-1 text-sm font-medium", statusClass(s))}>
-              {STATUS_LABEL[s]} <span className="num">{data.byStatus[s] ?? 0}</span>
-            </Link>
+      {d && ov.data ? (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard label={`Live salons (free plan ~${FREE_PLAN_SALONS})`} value={live} />
+          <StatCard label="Active today" value={t.active_today ?? 0} />
+          <StatCard label={`Active (${range} days)`} value={t.active ?? 0} delta={deltaPercent(t.active ?? 0, t.active_prev)} sparkline={d.series.active.map((r) => r.n)} />
+          <StatCard label="Signups" value={t.signups ?? 0} delta={deltaPercent(t.signups ?? 0, t.signups_prev)} sparkline={d.series.signups.map((r) => r.n)} />
+          <StatCard label="Bills" value={t.sales ?? 0} delta={deltaPercent(t.sales ?? 0, t.sales_prev)} sparkline={d.series.sales.map((r) => r.n)} />
+          <StatCard
+            label={`Billed (${cur})`}
+            value={minor(t.sales_value ?? 0)}
+            format={(n) => Math.round(n).toLocaleString()}
+            delta={deltaPercent(t.sales_value ?? 0, t.sales_value_prev)}
+            sparkline={d.series.sales_value.map((r) => r.n)}
+          />
+          <StatCard label="AI connect calls" value={t.ai_calls ?? 0} delta={deltaPercent(t.ai_calls ?? 0, t.ai_calls_prev)} sparkline={d.series.ai_calls.map((r) => r.n)} />
+          <StatCard label={`Revenue / month (${cur})`} value={ov.data.mrr} format={(n) => n.toLocaleString()} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {Array.from({ length: 8 }, (_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
           ))}
         </div>
-      </Card>
-
-      <Card className="gap-3 p-4">
-        <p className="text-sm font-semibold">Signups per day</p>
-        <div className="flex h-28 items-end gap-1" role="img" aria-label={`${total30} signups in 30 days`}>
-          {series.map((s) => (
-            <div key={s.day} className="flex flex-1 flex-col items-center justify-end" title={`${s.day}: ${s.count}`}>
-              <div className="w-full rounded-t bg-primary/70" style={{ height: `${(s.count / max) * 100}%`, minHeight: s.count ? 4 : 1 }} />
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-between text-xs text-muted-foreground">
-          <span>{pDate(Date.parse(series[0]!.day))}</span>
-          <span>Today</span>
-        </div>
-      </Card>
+      )}
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <OrgList title="Trials ending this week" items={data.trialsEnding} empty="No trials end this week." />
-        <OrgList title="In grace (payment needed)" items={data.inGrace} empty="Nobody is in grace." />
+        <ChartCard title="Active people" description="Distinct staff who used SalonKit, per day" kind="area" data={d ? rows(d.series.active) : []} config={{ n: { label: "People" } }} loading={!d} />
+        <ChartCard title="Signups" description="New salons per day" kind="bar" data={d ? rows(d.series.signups) : []} config={{ n: { label: "Salons" } }} loading={!d} />
+        <ChartCard title="Bills" description="Bills rung up across all salons, per day" kind="bar" data={d ? rows(d.series.sales) : []} config={{ n: { label: "Bills" } }} loading={!d} />
+        <ChartCard
+          title={`Billed (${cur})`}
+          description="Value of those bills, per day"
+          kind="area"
+          data={d ? d.series.sales_value.map((r) => ({ label: dayLabel(r.day), n: Math.round(minor(r.n)) })) : []}
+          config={{ n: { label: cur || "Billed" } }}
+          loading={!d}
+        />
       </div>
-    </div>
-  );
-}
 
-function Tile({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
-  return (
-    <Card className="gap-1.5 p-4">
-      <p className="font-mono text-[11px] tracking-wide text-muted-foreground uppercase">{label}</p>
-      <p className="num text-2xl leading-none font-semibold">{value}</p>
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-    </Card>
+      {ov.data && (
+        <Card className="gap-3 p-4">
+          <p className="text-sm font-semibold">Salons by status</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.keys(STATUS_LABEL).map((s) => (
+              <Link key={s} href={`/platform/salons/?status=${s}`} className={cn("rounded-full px-3 py-1 text-sm font-medium", statusClass(s))}>
+                {STATUS_LABEL[s]} <span className="num">{ov.data!.byStatus[s] ?? 0}</span>
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {ov.data && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          <OrgList title="Trials ending this week" items={ov.data.trialsEnding} empty="No trials end this week." />
+          <OrgList title="In grace (payment needed)" items={ov.data.inGrace} empty="Nobody is in grace." />
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -11,6 +11,7 @@ import { tenantRepo } from "../data/tenant";
 import type { OrgStatus } from "../data/platform";
 import { roleFeatures, type FeatureKey } from "@ss/features";
 import { isAdmin } from "./roles";
+import { activityPlatform, recordActivity } from "./activity";
 
 /**
  * Cross-site write protection. Sibling salon subdomains are same-site, so SameSite=Lax alone does not stop them.
@@ -48,7 +49,8 @@ export const originGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
 
 /**
  * D1 statements tenantAuth costs at most (unmetered, before a route runs): host org 1 + org 1 + user 1 + features 3
- * on a cold cache (plan features, plan limits, overrides) + 1 platform user check in support mode. Routes metering their own work reserve this first.
+ * on a cold cache (plan features, plan limits, overrides) + 1 platform user check in support mode, or else 1 usage
+ * write (core/activity.ts, at most every 10 minutes). Routes metering their own work reserve this first.
  */
 export const TENANT_AUTH_STMTS = 7;
 
@@ -61,12 +63,14 @@ export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   // request carrying both is not one of ours).
   const bearer = c.req.header("authorization")?.match(/^Bearer (skm_\S+)$/)?.[1];
   let mobileSessionId: string | null = null;
+  let device: { platform: string; appVersion: string | null } | null = null;
   let session: Awaited<ReturnType<typeof readSession>>;
   if (bearer) {
     if (getCookie(c, COOKIE)) throw new HttpError(401, "Please sign in", "mixed_auth");
     const m = await readMobileSession(c.env.DB, bearer);
     session = m ? { uid: m.uid, orgId: m.orgId, v: m.v, exp: Number.MAX_SAFE_INTEGER } : null;
     mobileSessionId = m?.id ?? null;
+    device = m ? { platform: m.platform, appVersion: m.appVersion } : null;
   } else session = await readSession(c);
   if (!session) throw new HttpError(401, "Please sign in");
 
@@ -99,6 +103,15 @@ export const tenantAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   const features = roleFeatures(of.features, isAdmin(user) ? "admin" : "barber", of.roleRows);
   const limits = of.limits;
   c.set("tenant", { org, user, repo, features, orgFeatures: of.features, limits, supportBy: session.sp ?? null, mobileSessionId });
+  // Usage statistics (portal): never for SalonKit staff signed in as the salon (support mode).
+  if (!session.sp) {
+    const p = recordActivity(c.env.DB, { orgId: org.id, userId: user.id, platform: activityPlatform(device?.platform), appVersion: device?.appVersion ?? null, at: Date.now() });
+    try {
+      c.executionCtx.waitUntil(p);
+    } catch {
+      await p; // no execution context (tests): finish before the route runs
+    }
+  }
   await next();
 };
 

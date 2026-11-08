@@ -49,18 +49,20 @@ export interface MobileSession {
   uid: number;
   orgId: string;
   v: number;
+  platform: string;
+  appVersion: string | null;
 }
 
 export async function readMobileSession(db: D1Database, token: string, now = Date.now()): Promise<MobileSession | null> {
   if (!token.startsWith(TOKEN_PREFIX) || token.length > 200) return null;
-  const r = await db.prepare("SELECT id, org_id, user_id, session_version, last_used_at, expires_at FROM mobile_sessions WHERE token_hash = ?")
+  const r = await db.prepare("SELECT id, org_id, user_id, session_version, last_used_at, expires_at, platform, app_version FROM mobile_sessions WHERE token_hash = ?")
     .bind(await hashToken(token))
-    .first<{ id: string; org_id: string; user_id: number; session_version: number; last_used_at: number; expires_at: number }>();
+    .first<{ id: string; org_id: string; user_id: number; session_version: number; last_used_at: number; expires_at: number; platform: string; app_version: string | null }>();
   if (!r || r.expires_at < now) return null;
   if (now - r.last_used_at >= MOBILE_TOUCH_MS) {
     await db.prepare("UPDATE mobile_sessions SET last_used_at = ?, expires_at = ? WHERE id = ?").bind(now, now + MOBILE_TTL_MS, r.id).run();
   }
-  return { id: r.id, uid: r.user_id, orgId: r.org_id, v: r.session_version };
+  return { id: r.id, uid: r.user_id, orgId: r.org_id, v: r.session_version, platform: r.platform, appVersion: r.app_version };
 }
 
 export async function revokeMobileSession(db: D1Database, id: string): Promise<void> {

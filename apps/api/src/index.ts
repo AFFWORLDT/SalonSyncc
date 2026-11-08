@@ -17,6 +17,8 @@ import "./platform/login-code";
 // Registers /api/auth/social (Continue with Google / Apple, phone app).
 import "./platform/social";
 import { platformApi } from "./platform/admin";
+// Registers the portal insights routes (App usage, People, AI, WhatsApp, Notifications, search) on platformApi.
+import "./platform/insights";
 import { settings, logoPublic, brandPublic } from "./tenant/settings/routes";
 import { staff, avatarPublic, bannerPublic } from "./tenant/staff/routes";
 import { services, servicesPublic } from "./tenant/services/routes";

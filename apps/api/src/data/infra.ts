@@ -35,7 +35,7 @@ export const GLOBAL_RETENTION_SQL = [
 ] as const;
 
 /**
- * The cron's prune (R5), 8 D1 statements in one batch: rate_hits windows that ended more than 5 minutes ago (public
+ * The cron's prune (R5), 9 D1 statements in one batch: rate_hits windows that ended more than 5 minutes ago (public
  * limiter keys count in minutes, `login-ip:` device keys in 15-minute windows, `signup:` keys in hours, so each is compared in its own unit),
  * login_failures older than 24 hours and job_runs older than 7 days.
  */
@@ -57,6 +57,8 @@ export async function pruneInfra(db: D1Database, at: number): Promise<void> {
     db.prepare(GLOBAL_RETENTION_SQL[5]).bind(at - 7 * 86_400_000),
     // OAuth app registrations unused for 90 days (a live connection refreshes, and so marks its app, at least every 30 days).
     db.prepare("DELETE FROM mcp_clients WHERE last_used_at < ?").bind(at - MCP_CLIENT_IDLE_MS),
+    // Portal usage statistics: 180 days.
+    db.prepare("DELETE FROM activity_daily WHERE day < ?").bind(new Date(at - 180 * 86_400_000).toISOString().slice(0, 10)),
   ]);
 }
 
