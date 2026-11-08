@@ -1,5 +1,5 @@
 /** Tables whose rows belong to a salon. The SQL guard test requires every statement touching these to be org_id scoped. Later plans extend this list. */
-export const TENANT_TABLES = ["users", "counters", "login_failures", "org_settings", "services", "audit_log", "customers", "sales", "sale_items", "ledger_entries", "expenses", "company_expenses", "barber_payouts", "money_transfers", "org_whatsapp", "org_assets", "push_tokens", "notifications", "announcements", "ratings", "wa_campaigns", "wa_messages", "job_runs", "mcp_auth_requests", "mcp_tokens", "mcp_calls"] as const;
+export const TENANT_TABLES = ["users", "counters", "login_failures", "org_settings", "services", "audit_log", "customers", "sales", "sale_items", "ledger_entries", "expenses", "company_expenses", "barber_payouts", "money_transfers", "org_whatsapp", "org_assets", "push_tokens", "notifications", "announcements", "ratings", "wa_campaigns", "wa_messages", "job_runs", "mcp_auth_requests", "mcp_tokens", "mcp_calls", "login_codes"] as const;
 
 export interface UserRow {
   id: number;
@@ -50,6 +50,40 @@ export function tenantRepo(db: D1Database, orgId: string) {
         .prepare(`SELECT ${USER_COLS} FROM users WHERE org_id = ? AND lower(username) = lower(?) ORDER BY id`)
         .bind(orgId, username)
         .first<UserRow>();
+    },
+    /** An active user whose staff email, or username (owners sign up with their email), is [email]; the owner first. */
+    userByEmail(email: string): Promise<(UserRow & { email: string | null }) | null> {
+      return db
+        .prepare(
+          `SELECT ${USER_COLS}, email FROM users WHERE org_id = ?1 AND active = 1 AND lower(?2) IN (lower(email), lower(username))
+           ORDER BY role = 'owner' DESC, id LIMIT 1`,
+        )
+        .bind(orgId, email)
+        .first<UserRow & { email: string | null }>();
+    },
+    /** Replaces the user's sign-in code (only its hash is kept). */
+    async putLoginCode(userId: number, codeHash: string, expiresAt: number): Promise<void> {
+      await db
+        .prepare(
+          `INSERT INTO login_codes(org_id,user_id,code_hash,expires_at,attempts) VALUES(?1,?2,?3,?4,0)
+           ON CONFLICT(org_id,user_id) DO UPDATE SET code_hash = excluded.code_hash, expires_at = excluded.expires_at, attempts = 0`,
+        )
+        .bind(orgId, userId, codeHash, expiresAt)
+        .run();
+    },
+    loginCode(userId: number): Promise<{ code_hash: string; expires_at: number; attempts: number } | null> {
+      return db
+        .prepare("SELECT code_hash, expires_at, attempts FROM login_codes WHERE org_id = ? AND user_id = ?")
+        .bind(orgId, userId)
+        .first();
+    },
+    async loginCodeMiss(userId: number): Promise<void> {
+      await db.prepare("UPDATE login_codes SET attempts = attempts + 1 WHERE org_id = ? AND user_id = ?").bind(orgId, userId).run();
+    },
+    /** Deletes the code; true only for the one call that removed it (a code signs in once). */
+    async useLoginCode(userId: number, codeHash: string): Promise<boolean> {
+      const r = await db.prepare("DELETE FROM login_codes WHERE org_id = ? AND user_id = ? AND code_hash = ?").bind(orgId, userId, codeHash).run();
+      return r.meta.changes > 0;
     },
     userById(id: number): Promise<UserRow | null> {
       return db

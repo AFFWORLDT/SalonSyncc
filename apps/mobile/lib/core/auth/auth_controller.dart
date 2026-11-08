@@ -77,13 +77,23 @@ class AuthController extends GetxController {
     state.value = AuthState.needLogin;
   }
 
-  Future<void> signIn(String username, String password) async {
+  Future<void> signIn(String username, String password) => _session({'username': username.trim(), 'password': password});
+
+  /// Emails a 6-digit sign-in code to the staff member with [email] (the server answers the same for any email).
+  Future<void> requestCode(String email) async {
+    final s = salon.value!;
+    await clientFor(salonBase(s.slug)).post('/api/auth/code', {if (isDevHost) 'org': s.slug, 'email': email.trim()}, (_) {});
+  }
+
+  /// Signs in with the code from [requestCode] instead of a password.
+  Future<void> signInWithCode(String email, String code) => _session({'email': email.trim(), 'code': code.replaceAll(RegExp(r'\s'), '')});
+
+  Future<void> _session(Map<String, Object?> credentials) async {
     final s = salon.value!;
     final c = clientFor(salonBase(s.slug));
     final r = await c.post('/api/mobile/session', {
       if (isDevHost) 'org': s.slug,
-      'username': username.trim(),
-      'password': password,
+      ...credentials,
       'device': {'id': await store.deviceId(), 'name': device.name, 'platform': device.platform, 'app_version': device.appVersion},
     }, (j) => j as Map<String, dynamic>);
     final token = r['token'];

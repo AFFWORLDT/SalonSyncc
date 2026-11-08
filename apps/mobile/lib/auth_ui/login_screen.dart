@@ -22,11 +22,68 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _show = false;
   String? _error;
 
+  // Sign in with a code emailed to the staff member instead of a password: email first, then the 6 digits.
+  bool _codeMode = false;
+  bool _codeSent = false;
+  String? _notice;
+  final _email = TextEditingController();
+  final _code = TextEditingController();
+
   @override
   void dispose() {
     _user.dispose();
     _pass.dispose();
+    _email.dispose();
+    _code.dispose();
     super.dispose();
+  }
+
+  void _switchMode() => setState(() {
+        _codeMode = !_codeMode;
+        _codeSent = false;
+        _error = null;
+        _notice = null;
+        _code.clear();
+      });
+
+  Future<void> _run(Future<void> Function() job) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await job();
+    } on ApiError catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _sendCode() async {
+    final email = _email.text.trim();
+    if (!email.contains('@')) {
+      setState(() => _error = 'Enter the email on your staff profile');
+      return;
+    }
+    await _run(() async {
+      await auth.requestCode(email);
+      if (mounted) {
+        setState(() {
+          _codeSent = true;
+          _notice = 'If $email is on your staff profile, a 6-digit code is on its way. It works for 10 minutes.';
+        });
+      }
+    });
+  }
+
+  Future<void> _submitCode() async {
+    if (_code.text.replaceAll(RegExp(r'\s'), '').length != 6) {
+      setState(() => _error = 'Enter the 6-digit code from the email');
+      return;
+    }
+    await _run(() => auth.signInWithCode(_email.text, _code.text));
   }
 
   Future<void> _submit() async {
@@ -67,6 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     Text('Sign in to ${s.name}', textAlign: TextAlign.center, style: t.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 24),
+                    if (!_codeMode) ...[
                     TextField(
                       controller: _user,
                       autocorrect: false,
@@ -97,11 +155,57 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: _busy ? null : _submit,
                       child: _busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Sign in'),
                     ),
+                    ] else ...[
+                    TextField(
+                      key: const ValueKey('login-email'),
+                      controller: _email,
+                      readOnly: _codeSent,
+                      keyboardType: TextInputType.emailAddress,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      autofillHints: const [AutofillHints.email],
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _codeSent ? null : _sendCode(),
+                      decoration: const InputDecoration(labelText: 'Email'),
+                    ),
+                    if (_codeSent) ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        key: const ValueKey('login-code'),
+                        controller: _code,
+                        autofocus: true,
+                        keyboardType: TextInputType.number,
+                        autofillHints: const [AutofillHints.oneTimeCode],
+                        maxLength: 7,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.w600),
+                        onSubmitted: (_) => _submitCode(),
+                        decoration: const InputDecoration(labelText: '6-digit code', counterText: ''),
+                      ),
+                    ],
+                    if (_notice != null && _error == null) ...[
+                      const SizedBox(height: 12),
+                      Text(_notice!, textAlign: TextAlign.center, style: t.bodyMedium?.copyWith(color: c.onSurfaceVariant)),
+                    ],
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                      onPressed: _busy ? null : (_codeSent ? _submitCode : _sendCode),
+                      child: _busy
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          : Text(_codeSent ? 'Sign in' : 'Email me a code'),
+                    ),
+                    if (_codeSent) TextButton(onPressed: _busy ? null : _sendCode, child: const Text('Send a new code')),
+                    ],
                     if (_error != null) ...[
                       const SizedBox(height: 12),
                       Text(_error!, textAlign: TextAlign.center, style: t.bodyMedium?.copyWith(color: c.error)),
                     ],
                     const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: _busy ? null : _switchMode,
+                      child: Text(_codeMode ? 'Sign in with your password instead' : 'Sign in with an email code instead'),
+                    ),
                     TextButton(onPressed: () => auth.switchSalon(), child: const Text('Not your salon?')),
                   ]),
                 ),

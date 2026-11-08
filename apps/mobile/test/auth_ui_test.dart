@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:salonkit/app.dart';
+import 'package:salonkit/core/auth/auth_controller.dart';
 import 'package:salonkit/auth_ui/salon_screen.dart';
 
 import 'support/fake_adapter.dart';
@@ -10,7 +11,8 @@ import 'support/me_fixture.dart';
 
 FakeAdapter salonApi() => FakeAdapter({
       'GET /api/public/brand': (o) => o.uri.host.startsWith('supersalon.') ? {'name': 'Super Salon', 'logo_url': null} : {'name': null, 'logo_url': null},
-      'POST /api/mobile/session': (o) => (o.data as Map)['password'] == 'pass1234'
+      'POST /api/auth/code': (o) => {'ok': true},
+      'POST /api/mobile/session': (o) => (o.data as Map)['password'] == 'pass1234' || (o.data as Map)['code'] == '123456'
           ? {'token': 'skm_t', 'expires_at': 1}
           : const FakeReply(401, {'error': 'Wrong salon ID, username or password'}),
       'GET /api/me': (o) => fx('me_barber.json'),
@@ -99,6 +101,31 @@ void main() {
     await t.enterText(find.widgetWithText(TextField, 'Password'), 'pass1234');
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await t.pumpAndSettle();
+    expect(find.text('Hi ali 👋'), findsOneWidget);
+  });
+
+  testWidgets('sign in with an email code: email, Email me a code, then the 6 digits', (t) async {
+    final a = salonApi();
+    putAuth(a);
+    await Get.find<AuthController>().boot();
+    await t.pumpWidget(const SalonKitApp());
+    await t.pumpAndSettle();
+    await typeSalon(t, 'supersalon');
+    await t.tap(find.text('Continue'));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Sign in with an email code instead'));
+    await t.pumpAndSettle();
+    expect(find.text('Password'), findsNothing);
+    await t.enterText(find.byKey(const ValueKey('login-email')), 'ali@mail.com');
+    await t.tap(find.widgetWithText(FilledButton, 'Email me a code'));
+    await t.pumpAndSettle();
+    expect(a.calls.where((c) => c.path == '/api/auth/code').single.data, {'email': 'ali@mail.com'});
+    expect(find.textContaining('a 6-digit code is on its way'), findsOneWidget);
+    await t.enterText(find.byKey(const ValueKey('login-code')), '123 456');
+    await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
+    await t.pumpAndSettle();
+    final session = a.calls.where((c) => c.path == '/api/mobile/session').single.data as Map;
+    expect([session['email'], session['code'], session.containsKey('password')], ['ali@mail.com', '123456', false]);
     expect(find.text('Hi ali 👋'), findsOneWidget);
   });
 

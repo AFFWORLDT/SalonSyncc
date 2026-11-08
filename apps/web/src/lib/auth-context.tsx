@@ -29,6 +29,8 @@ interface AuthValue {
   loading: boolean;
   /** `org` is the salon ID (slug); needed when the host isn't the salon's own subdomain. */
   login: (org: string | undefined, username: string, password: string) => Promise<void>;
+  /** Signs in with the 6-digit code emailed by POST /api/auth/code. */
+  loginWithCode: (org: string | undefined, email: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -123,6 +125,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [refresh]
   );
 
+  const loginWithCode = useCallback(
+    async (org: string | undefined, email: string, code: string) => {
+      const body: Record<string, string> = { email, code };
+      if (org) body.org = org.trim().toLowerCase();
+      await api("/api/auth/code/verify", { body, redirectOn401: false });
+      clearApiCache();
+      await refresh();
+    },
+    [refresh]
+  );
+
   const logout = useCallback(async () => {
     try {
       // This device should stop getting the signed-out user's notifications.
@@ -151,10 +164,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       readOnly: !!me && !WRITABLE.has(me.org.status),
       loading,
       login,
+      loginWithCode,
       logout,
       refresh,
     };
-  }, [me, loading, login, logout, refresh]);
+  }, [me, loading, login, loginWithCode, logout, refresh]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

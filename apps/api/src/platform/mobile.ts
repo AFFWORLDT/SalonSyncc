@@ -5,6 +5,7 @@ import { HttpError } from "../core/errors";
 import { issueMobileSession, revokeMobileSession } from "../core/mobile-session";
 import { requireAdmin } from "../core/roles";
 import { verifyLogin } from "./auth";
+import { verifyCode } from "./login-code";
 
 export const mobile = new Hono<AppEnv>();
 
@@ -26,7 +27,8 @@ mobile.post("/session", async (c) => {
   const body = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
   const device = deviceOf(body.device);
   if (!device) throw new HttpError(400, BAD_DEVICE);
-  const { org, user } = await verifyLogin(c, body);
+  // A password, or an emailed code ({email, code}: see login-code.ts).
+  const { org, user } = body.code !== undefined ? await verifyCode(c, body) : await verifyLogin(c, body);
   const { token, expiresAt } = await issueMobileSession(c.env.DB, {
     orgId: org.id,
     userId: user.id,

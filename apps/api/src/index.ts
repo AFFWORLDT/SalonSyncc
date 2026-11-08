@@ -11,6 +11,8 @@ import { publicApi } from "./core/public";
 // Registers /api/public/slug, /api/public/signup and /api/auth/handoff (before the routers are mounted below).
 import "./platform/signup";
 import "./platform/support";
+// Registers /api/auth/code and /api/auth/code/verify (sign in with an emailed code).
+import "./platform/login-code";
 import { platformApi } from "./platform/admin";
 import { settings, logoPublic, brandPublic } from "./tenant/settings/routes";
 import { staff, avatarPublic, bannerPublic } from "./tenant/staff/routes";
