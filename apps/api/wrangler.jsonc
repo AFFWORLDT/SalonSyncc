@@ -21,7 +21,7 @@
   "assets": { "directory": "../web/out", "binding": "ASSETS", "not_found_handling": "404-page", "run_worker_first": ["/*", "!/_next/*"] },
   // The cron (src/jobs/hourly.ts): every 10 minutes, each tick within the free plan's per-invocation limits.
   "triggers": { "crons": ["*/10 * * * *"] },
-  "vars": { "BRAND_NAME": "SalonKit", "ROOT_DOMAIN": "salonkit.online", "ADMIN_HOST": "admin", "MAIL_FROM": "SalonKit <hello@salonkit.online>", "SUPPORT_EMAIL": "", "APP_ORIGIN": "https://salonkit-app.affworld0.workers.dev" },
+  "vars": { "BRAND_NAME": "SalonKit", "ROOT_DOMAIN": "salonkit.online", "ADMIN_HOST": "admin", "MAIL_FROM": "SalonKit <hello@salonkit.online>", "SUPPORT_EMAIL": "support@salonkit.online", "APP_ORIGIN": "https://salonkit-app.affworld0.workers.dev" },
   // Secrets (wrangler secret put): SESSION_SECRET, SECRETS_KEY (base64 32 bytes), FCM_SERVICE_ACCOUNT, WA_APP_SECRET, WA_VERIFY_TOKEN.
   "d1_databases": [
     {
