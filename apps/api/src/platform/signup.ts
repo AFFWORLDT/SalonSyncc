@@ -18,6 +18,7 @@ import { welcomeEmail } from "../emails/welcome";
 import { sha256 } from "../lib/hash";
 import { deviceOf } from "./mobile";
 import { issueMobileSession } from "../core/mobile-session";
+import { socialIdentity } from "./social";
 
 const DAY = 86_400_000;
 export const TRIAL_DAYS = 7;
@@ -61,13 +62,15 @@ publicApi.post("/signup", originGuard, async (c) => {
   }
   const str = (k: string, max: number) => (typeof b[k] === "string" ? (b[k] as string).trim().slice(0, max + 1) : "");
   const salonName = str("salon_name", 80);
-  const ownerName = str("owner_name", 80);
-  const email = str("email", 120).toLowerCase();
+  // From "Continue with Google / Apple": the verified email (and name) come from the token, and there is no password.
+  const social = b.id_token === undefined ? null : await socialIdentity(c, b.id_token);
+  const ownerName = str("owner_name", 80) || social?.name || "";
+  const email = social ? social.email : str("email", 120).toLowerCase();
   // Phones are typed in many ways ("+971 50-123-4567", "(050) 123 4567"): keep the digits and a leading +.
   const phoneRaw = str("phone", 30);
   const phone = phoneRaw ? (phoneRaw.trim().startsWith("+") ? "+" : "") + phoneRaw.replace(/\D/g, "") : "";
   const country = str("country", 2).toUpperCase();
-  const password = typeof b.password === "string" ? b.password : "";
+  const password = social ? randomToken(24) : typeof b.password === "string" ? b.password : "";
   const slug = normalizeSlug(str("slug", 30));
   if (salonName.length < 2 || salonName.length > 80) throw bad("Enter your salon's name");
   if (ownerName.length < 2 || ownerName.length > 80) throw bad("Enter your name");

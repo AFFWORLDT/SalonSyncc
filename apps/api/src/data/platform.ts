@@ -121,6 +121,17 @@ export function platformRepo(db: D1Database) {
         .first<OrgRow>();
       return r ? toOrg(r) : null;
     },
+    /** The salon name of an inactive person with this email (live salon), for "your account is turned off". */
+    async inactiveSalonOfEmail(email: string): Promise<string | null> {
+      const r = await db
+        .prepare(
+          `SELECT o.name FROM users u JOIN orgs o ON o.id = u.org_id
+           WHERE lower(u.email) = lower(?) AND u.active = 0 AND o.status NOT IN ('deactivated', 'deleted')`,
+        )
+        .bind(email)
+        .first<{ name: string }>();
+      return r?.name ?? null;
+    },
     async orgById(id: string): Promise<Org | null> {
       const r = await db.prepare(`SELECT ${ORG_COLS} FROM orgs WHERE id = ?`).bind(id).first<OrgRow>();
       return r ? toOrg(r) : null;

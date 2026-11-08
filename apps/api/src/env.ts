@@ -14,6 +14,8 @@ export interface Env {
   SUPPORT_EMAIL: string;
   /** SHA-256 fingerprints of the Android app's signing certificates (comma separated), for App Links. */
   ANDROID_CERT_SHA256?: string;
+  /** Firebase project whose ID tokens "Continue with Google / Apple" accepts (aud / iss). */
+  FIREBASE_PROJECT_ID?: string;
   ENVIRONMENT?: string;
   /** App origin for message links when ROOT_DOMAIN is empty (workers.dev), e.g. https://salonkit-app.affworld0.workers.dev. */
   APP_ORIGIN: string;
