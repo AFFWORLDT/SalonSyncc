@@ -98,6 +98,18 @@ class AuthController extends GetxController {
     await clientFor(salonBase(s.slug)).post('/api/auth/code', {if (isDevHost) 'org': s.slug, 'email': email.trim()}, (_) {});
   }
 
+  /// "Forgot password?": the code from [requestCode] and a new password, then signed in with it (other sessions end).
+  Future<void> resetPassword(String email, String code, String password) async {
+    final s = salon.value!;
+    final r = await clientFor(salonBase(s.slug)).post('/api/auth/password/reset', {
+      if (isDevHost) 'org': s.slug,
+      'email': email.trim(),
+      'code': code.replaceAll(RegExp(r'\s'), ''),
+      'password': password,
+    }, (j) => j as Map<String, dynamic>);
+    await signIn(r['username'] as String? ?? email, password);
+  }
+
   /// Signs in with the code from [requestCode] instead of a password.
   Future<void> signInWithCode(String email, String code) => _session({'email': email.trim(), 'code': code.replaceAll(RegExp(r'\s'), '')});
 

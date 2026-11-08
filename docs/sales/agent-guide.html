@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SalonKit Sales Agent Guide</title>
+<style>
+@font-face { font-family: "GSF"; src: url("../../apps/mobile/assets/fonts/GoogleSansFlex-400.ttf"); font-weight: 400; }
+@font-face { font-family: "GSF"; src: url("../../apps/mobile/assets/fonts/GoogleSansFlex-500.ttf"); font-weight: 500; }
+@font-face { font-family: "GSF"; src: url("../../apps/mobile/assets/fonts/GoogleSansFlex-600.ttf"); font-weight: 600; }
+@font-face { font-family: "GSF"; src: url("../../apps/mobile/assets/fonts/GoogleSansFlex-700.ttf"); font-weight: 700; }
+@font-face { font-family: "GSC"; src: url("../../apps/mobile/assets/fonts/GoogleSansCode-500.ttf"); font-weight: 500; }
+@page { size: A4; margin: 18mm 17mm 20mm; @bottom-center { content: counter(page); } }
+@page :first { margin: 0; @bottom-center { content: none; } }
+:root { --green: #1f7a6a; --deep: #14544a; --cream: #f6f2e9; --card: #fffdf8; --line: #e0d9cb; --ink: #1c1b18; --muted: #67635b; --gold: #b8894b; --red: #b4432f; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: "GSF", -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); font-size: 10.6pt; line-height: 1.55; margin: 0; background: #fff; }
+h1, h2, h3 { line-height: 1.2; margin: 0 0 8pt; }
+h1 { font-size: 24pt; font-weight: 700; color: var(--deep); }
+h2 { font-size: 14.5pt; font-weight: 600; color: var(--deep); margin-top: 16pt; }
+h3 { font-size: 11.5pt; font-weight: 600; margin-top: 12pt; }
+p { margin: 0 0 8pt; }
+ul, ol { margin: 0 0 9pt; padding-left: 18pt; }
+li { margin: 0 0 3pt; }
+.page { page-break-after: always; }
+.page:last-child { page-break-after: auto; }
+.eyebrow { font-family: "GSC", monospace; font-size: 8.5pt; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); margin-bottom: 6pt; }
+.lead { font-size: 12pt; color: var(--muted); margin-bottom: 14pt; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10pt; padding: 11pt 13pt; margin: 0 0 10pt; break-inside: avoid; }
+.green { background: var(--green); color: #fff; border: 0; }
+.green h3, .green p, .green li { color: #fff; }
+.tint { background: #eef5f2; border-color: #cfe3dc; }
+.warn { background: #fbf0ec; border-color: #efcfc4; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9pt; }
+.grid2 .card, .grid3 .card { margin: 0; }
+table { width: 100%; border-collapse: collapse; margin: 4pt 0 12pt; font-size: 10pt; break-inside: avoid; }
+th, td { text-align: left; padding: 6pt 7pt; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { background: var(--cream); font-weight: 600; }
+.say { border-left: 3pt solid var(--green); background: #f3f8f6; padding: 8pt 11pt; margin: 6pt 0 10pt; border-radius: 0 8pt 8pt 0; font-style: italic; break-inside: avoid; }
+.say b { font-style: normal; color: var(--deep); }
+.num { font-family: "GSC", monospace; }
+.blank { display: inline-block; min-width: 90pt; border-bottom: 1px solid var(--muted); }
+.check li { list-style: none; position: relative; }
+.check li::before { content: "☐"; position: absolute; left: -15pt; color: var(--green); }
+.small { font-size: 9pt; color: var(--muted); }
+.big { font-size: 30pt; font-weight: 700; color: var(--green); line-height: 1; }
+/* Cover */
+.cover { height: 297mm; display: flex; flex-direction: column; justify-content: space-between; background: var(--deep); color: #fff; margin: 0; padding: 28mm 24mm; }
+.cover h1 { color: #fff; font-size: 38pt; }
+.cover .eyebrow { color: #e7c99a; }
+.cover p { color: #d9e8e3; font-size: 13pt; }
+.cover .mark { width: 64pt; height: 64pt; border-radius: 16pt; }
+.toc li { display: flex; justify-content: space-between; border-bottom: 1px dotted var(--line); padding: 4pt 0; list-style: none; }
+.toc { padding: 0; }
+</style>
+</head>
+<body>
+
+<!-- 1. Cover -->
+<section class="page">
+  <div class="cover">
+    <div>
+      <img class="mark" src="../../apps/web/public/icon-512.png" alt="">
+    </div>
+    <div>
+      <div class="eyebrow">Sales Agent Guide · SOP · Edition 1, November 2026</div>
+      <h1>Sell SalonKit.<br>Change how salons run.</h1>
+      <p>Everything you need to walk into a salon, show the owner a better way to run it, and leave with a new customer on a free trial: our vision, what we sell, who we sell to, the visit step by step, word-for-word scripts, objections and the daily routine.</p>
+    </div>
+    <div class="small" style="color:#bcd5cd">SalonKit · salonkit.online · Internal: for SalonKit sales agents only. Do not share outside the team.</div>
+  </div>
+</section>
+
+<!-- 2. Welcome -->
+<section class="page">
+  <div class="eyebrow">Welcome</div>
+  <h1>Welcome to the team</h1>
+  <p class="lead">You are the first person most salon owners will meet from SalonKit. How you walk in, how you listen and how you show the app decides whether they trust us with their business.</p>
+  <p>Salons are busy, practical places. Owners don't buy software, they buy <b>fewer arguments at closing time</b>, <b>money they can see</b> and <b>customers who come back</b>. SalonKit gives them exactly that, and it costs nothing to try for 7 days. Your job is simple to say and takes practice to do well: <b>get the owner to use SalonKit for one real day</b>. Once a salon has run a full day on SalonKit, the paper notebook rarely comes back.</p>
+  <h2>How to use this guide</h2>
+  <ul>
+    <li><b>Read it all once</b> in your first week. Every section is short.</li>
+    <li><b>Learn the scripts</b> in Chapters 9–12 until you can say them in your own words. Never read them out to an owner.</li>
+    <li><b>Keep the checklists</b> (Chapter 18) on your phone and use them before every visit.</li>
+    <li><b>Practise the 5-minute demo</b> (Chapter 11) with a colleague until you can do it without looking.</li>
+    <li><b>Ask your manager</b> about anything marked <span class="blank">&nbsp;</span>: targets and pay are set by management and written in your agreement, not in this guide.</li>
+  </ul>
+  <div class="card tint">
+    <h3>The one rule above all others</h3>
+    <p>Only promise what SalonKit does today. Every feature in this guide is real and live. If an owner asks for something that isn't here, say <i>"Let me check with the team and come back to you"</i>, write it down, and send it to us. An honest "not yet" builds more trust than a sale made on a promise we can't keep.</p>
+  </div>
+  <h2>What success looks like</h2>
+  <div class="grid3">
+    <div class="card"><div class="big">1</div><p><b>Visit</b><br>A real conversation with the owner or manager, not just leaving a flyer.</p></div>
+    <div class="card"><div class="big">2</div><p><b>Trial</b><br>The salon is created on the spot, with their own services and barbers.</p></div>
+    <div class="card"><div class="big">3</div><p><b>Paying salon</b><br>After the trial, the salon chooses Pro or Pro Max and keeps using it.</p></div>
+  </div>
+</section>
+
+<!-- 3. Contents -->
+<section class="page">
+  <div class="eyebrow">Contents</div>
+  <h1>What's inside</h1>
+  <ul class="toc">
+    <li><span>1. Our vision and mission</span><span>4</span></li>
+    <li><span>2. The problem every salon has</span><span>5</span></li>
+    <li><span>3. What SalonKit is</span><span>6</span></li>
+    <li><span>4. A tour of the product</span><span>7–9</span></li>
+    <li><span>5. Why salons choose SalonKit (USPs)</span><span>10–11</span></li>
+    <li><span>6. Plans and pricing</span><span>12</span></li>
+    <li><span>7. Who we sell to</span><span>13–14</span></li>
+    <li><span>8. Your role and objectives</span><span>15</span></li>
+    <li><span>9. The sales process, step by step</span><span>16</span></li>
+    <li><span>10. Walking in: the first 60 seconds</span><span>17</span></li>
+    <li><span>11. Discovery questions</span><span>18</span></li>
+    <li><span>12. The 5-minute demo</span><span>19</span></li>
+    <li><span>13. Starting the free trial on the spot</span><span>20</span></li>
+    <li><span>14. During the trial: follow-up plan</span><span>21</span></li>
+    <li><span>15. Handling objections</span><span>22–23</span></li>
+    <li><span>16. Closing the sale</span><span>24</span></li>
+    <li><span>17. After the sale: onboarding</span><span>25</span></li>
+    <li><span>18. Checklists</span><span>26</span></li>
+    <li><span>19. Your day and your reports</span><span>27</span></li>
+    <li><span>20. Code of conduct</span><span>28</span></li>
+    <li><span>21. Quick answers (FAQ)</span><span>29</span></li>
+    <li><span>22. Staying motivated</span><span>30</span></li>
+    <li><span>23. Glossary and contacts</span><span>31</span></li>
+  </ul>
+</section>
+
+<!-- 4. Vision -->
+<section class="page">
+  <div class="eyebrow">Chapter 1</div>
+  <h1>Our vision and mission</h1>
+  <p class="lead">Every salon, however small, should be able to run like a well-organised business: clear numbers, fair pay for the team and customers who come back.</p>
+  <div class="card green">
+    <h3>Vision</h3>
+    <p>To be the system every salon and barber shop in the region opens first thing in the morning and closes last thing at night.</p>
+  </div>
+  <div class="card">
+    <h3>Mission</h3>
+    <p>Replace the notebook, the calculator and the guesswork with one simple app that the owner, the manager and every barber can use on the phone they already have.</p>
+  </div>
+  <h2>What we believe</h2>
+  <div class="grid2">
+    <div class="card"><h3>Simple beats clever</h3><p>A barber with wet hands should be able to ring up a bill in a few taps. If a feature needs a training session, we haven't finished building it.</p></div>
+    <div class="card"><h3>Fair numbers, fewer fights</h3><p>When everyone sees the same sales and commission, the end-of-month argument about who earned what disappears.</p></div>
+    <div class="card"><h3>The salon's own brand</h3><p>Each salon gets its own web address and logo. Their customers see the salon's name on bills and messages, not ours.</p></div>
+    <div class="card"><h3>Try before you pay</h3><p>Every salon gets the full product free for 7 days, no card needed. We earn the sale by being useful, not by locking anyone in.</p></div>
+  </div>
+  <h2>Where SalonKit comes from</h2>
+  <p>SalonKit was built with a real working barber shop in Dubai, day after day at the counter. Every feature started as a real problem: a missing bill, a commission dispute, a customer who stopped coming. That is our strongest story. When you talk to an owner, you are not selling something designed in an office. You are bringing the tools another salon already uses every day.</p>
+</section>
+
+<!-- 5. Problem -->
+<section class="page">
+  <div class="eyebrow">Chapter 2</div>
+  <h1>The problem every salon has</h1>
+  <p class="lead">Before you show anything, you must understand the owner's pain. These are the problems you will hear again and again. Learn them; ask about them; let the owner tell you about them in their own words.</p>
+  <table>
+    <tr><th style="width:32%">What happens today</th><th>What it costs the owner</th></tr>
+    <tr><td><b>The notebook at the counter</b></td><td>Bills written by hand get lost, skipped or written wrong. Nobody can see today's total until someone adds it up at closing time.</td></tr>
+    <tr><td><b>Commission worked out by hand</b></td><td>Hours with a calculator at the end of the month, and arguments with barbers who remember a different number. Good barbers leave over money they think they're owed.</td></tr>
+    <tr><td><b>Cash that doesn't match</b></td><td>The drawer, the bank and the notebook never agree. The owner can't tell what is a mistake and what is missing.</td></tr>
+    <tr><td><b>The owner must be there</b></td><td>No way to see the day's sales from home or another branch. The owner can't take a day off without worrying.</td></tr>
+    <tr><td><b>Customers who don't come back</b></td><td>No list of who visited and when. Nobody reminds a regular who hasn't been in for a month. They drift to the shop next door.</td></tr>
+    <tr><td><b>Few Google reviews</b></td><td>Happy customers leave without being asked. New customers searching on Google Maps choose the salon with more stars.</td></tr>
+    <tr><td><b>VAT and paperwork</b></td><td>Bills without a TRN or VAT line, and an accountant asking for numbers nobody kept.</td></tr>
+  </table>
+  <div class="card warn">
+    <h3>Listen for these words</h3>
+    <p>"At the end of the month…", "my barber says…", "I don't know where the cash went", "I have to be here every day", "that customer stopped coming", "my accountant wants…". Each one is a door. When you hear it, ask one more question, then show the part of SalonKit that answers it.</p>
+  </div>
+</section>
+
+<!-- 6. What SalonKit is -->
+<section class="page">
+  <div class="eyebrow">Chapter 3</div>
+  <h1>What SalonKit is</h1>
+  <p class="lead">SalonKit is salon and barber shop software. The counter rings up bills, the app works out each barber's commission, keeps the daily sheet, and helps bring customers back.</p>
+  <h2>Your pitch, three lengths</h2>
+  <h3>10 seconds (in the door)</h3>
+  <div class="say">"SalonKit is an app for salons: bills, barber commission and the daily sheet, all on your phone. Every salon gets 7 days free."</div>
+  <h3>30 seconds (the owner is listening)</h3>
+  <div class="say">"Right now you probably write bills in a book and work out commission at the end of the month. With SalonKit, your barbers ring up each bill on the phone in a few taps. The app adds up the day for you, works out every barber's commission straight away, and you can see today's sales from anywhere. It was built with a barber shop in Dubai, and you can try everything free for 7 days."</div>
+  <h3>2 minutes (you have a seat)</h3>
+  <div class="say">Use the 30-second pitch, then add the one or two parts that match what the owner told you: the <b>ledger</b> if cash is the problem, <b>WhatsApp reminders</b> if customers don't come back, <b>Google reviews</b> if they want more customers, <b>VAT bills</b> if they are VAT-registered. Finish with: <b>"Shall we set it up for your salon now? It takes five minutes and it's free for 7 days."</b></div>
+  <h2>How it works, in one picture</h2>
+  <table>
+    <tr><th>Who</th><th>What they do in SalonKit</th></tr>
+    <tr><td><b>Barber</b></td><td>Signs in on their own phone, rings up their own bills, sees their own sales and commission for today.</td></tr>
+    <tr><td><b>Manager / admin</b></td><td>Sees the whole salon: every bill, every barber, expenses, the daily sheet. Fixes mistakes.</td></tr>
+    <tr><td><b>Owner</b></td><td>Everything, from anywhere: dashboard, reports, ledger, settings, staff, plan.</td></tr>
+    <tr><td><b>Customer</b></td><td>Gets a numbered bill (printed, link or WhatsApp PDF), and later a rating request and visit reminders (Pro Max).</td></tr>
+  </table>
+  <p>SalonKit works <b>in the browser</b> on any phone, tablet or computer, at the salon's own address, for example <span class="num">supersalon.salonkit.online</span>. A phone app for Android and iPhone is also being rolled out; check with your manager whether it is live in the stores before mentioning it.</p>
+</section>
+
+<!-- 7-9. Product tour -->
+<section class="page">
+  <div class="eyebrow">Chapter 4 · Product tour (1 of 3)</div>
+  <h1>A tour of the product</h1>
+  <p class="lead">Know every part well enough to show it in under a minute. Plan names in brackets show where each part is included.</p>
+  <h2>Bills (every plan, including Free)</h2>
+  <ul>
+    <li>The salon's own price list: one tap per service, plus quick amounts for anything else.</li>
+    <li>Pick the barber, cash or card, customer name and phone (or skip them).</li>
+    <li>Every bill gets its own number with the salon's prefix: no gaps, no repeats.</li>
+    <li>Print a receipt, share a link the customer opens on their phone, or send the PDF on WhatsApp (Pro Max).</li>
+    <li>Owners and managers can edit or delete a bill; on Pro Max every change is kept in the audit log with who and when.</li>
+  </ul>
+  <h2>Daily sheet (every plan)</h2>
+  <p>The notebook page, filled in automatically: one row per day, one column per barber, with the day's expenses, commission and profit. The business day ends at the hour the salon closes (4 am by default), so late-night bills count for the right day.</p>
+  <h2>Barber commission (every plan)</h2>
+  <ul>
+    <li>Each barber has their own percentage, set once.</li>
+    <li>Every bill credits that barber's share automatically and keeps the rate it was made with: changing a rate never rewrites old months.</li>
+    <li>Barbers see what they earned today on their own phone.</li>
+  </ul>
+  <h2>Dashboard</h2>
+  <p>Today, 7 days, 30 days, a year or any custom dates: sales, customers, expenses, commission and profit, with the change against the previous period and each barber's share.</p>
+</section>
+
+<section class="page">
+  <div class="eyebrow">Chapter 4 · Product tour (2 of 3)</div>
+  <h2>Monthly and yearly reports (Pro)</h2>
+  <p>Sales, expenses and profit month by month, next to the previous period, so the owner knows straight away whether this month is better than the last.</p>
+  <h2>Excel in one click (Pro)</h2>
+  <p>The daily sheet, the monthly report and the ledger download as real Excel files, ready for the accountant or Google Sheets.</p>
+  <h2>Expenses</h2>
+  <p>The salon's expenses (rent, supplies, salaries) and each barber's own expenses, recorded where they happen. Owners can let a barber add their own expenses, or keep that to themselves.</p>
+  <h2>Ledger and payouts (Pro Max)</h2>
+  <ul>
+    <li>Record what was paid to each barber, from cash or the bank.</li>
+    <li>See the shop's cash, the bank and every barber's balance in one place.</li>
+    <li>Every entry traces back to the bill, expense or payout behind it. This is how the drawer and the notebook finally agree.</li>
+  </ul>
+  <h2>Customers</h2>
+  <p>Every customer who gives a name or phone is remembered: visits, what they spent, when they last came. No more "who was that regular?"</p>
+  <h2>Staff and team</h2>
+  <ul>
+    <li>Up to 2 staff on Free, 10 on Pro, as many as needed on Pro Max.</li>
+    <li>Each person signs in with their own account. Owners can add a staff email: the person gets an invite link that opens SalonKit already signed in.</li>
+    <li>Staff with an email get their own daily and monthly report by email, team announcements, and a note if the owner changes one of their bills.</li>
+    <li>Staff can sign in with their username and password, or with a code sent to their email. On the phone app they can also continue with Google, or with Apple on iPhone.</li>
+  </ul>
+</section>
+
+<section class="page">
+  <div class="eyebrow">Chapter 4 · Product tour (3 of 3)</div>
+  <h2>WhatsApp from the salon's own number (Pro Max)</h2>
+  <ul>
+    <li>The PDF bill on WhatsApp after every visit.</li>
+    <li>Visit reminders for customers who haven't been back (15 days by default, at the hour the owner chooses).</li>
+    <li>Offers and announcements with a picture or video, to all customers at once. Anyone can reply STOP, and SalonKit respects it automatically.</li>
+    <li>Messages go out from the salon's own WhatsApp Business number, with the salon's name. WhatsApp's own message charges are billed by Meta to the salon's WhatsApp Business account.</li>
+  </ul>
+  <h2>Ratings and Google reviews (ratings on Pro; WhatsApp messages on Pro Max)</h2>
+  <ul>
+    <li>After a visit, customers are asked to rate it; the owner sees each barber's average and every comment privately.</li>
+    <li>Add the salon's Google review link in Settings and every customer is invited to review on Google with one tap.</li>
+    <li>SalonKit invites <b>every</b> customer, not only happy ones. That is what Google's review rules require. Never promise to "only send happy customers to Google".</li>
+  </ul>
+  <h2>Made for the UAE (every plan)</h2>
+  <ul>
+    <li>Amounts in AED with fils; 5% VAT and the salon's TRN on every bill when VAT is on, so bills work as UAE tax invoices.</li>
+    <li>Dubai time, +971 phone numbers however they're typed, and the salon's name in Arabic on bills.</li>
+    <li>The salon's own web address and logo on the sign-in page.</li>
+  </ul>
+  <h2>Private and safe</h2>
+  <p>Each salon has its own address and sign-ins; one salon can never see another's data. Search engines are told not to index salon apps, bills or receipts.</p>
+  <div class="card tint"><h3>Show, don't list</h3><p>Never read this tour to an owner. Pick the two or three parts that match their problems (Chapter 11) and show them live on your phone.</p></div>
+</section>
+
+<!-- 10. USPs -->
+<section class="page">
+  <div class="eyebrow">Chapter 5</div>
+  <h1>Why salons choose SalonKit</h1>
+  <p class="lead">Our unique selling points. Each one is true, easy to show, and answers a real pain.</p>
+  <div class="grid2">
+    <div class="card"><h3>1. Built with a real salon</h3><p>Designed at the counter of a working Dubai barber shop, not in an office. The flow matches how salons really work.</p></div>
+    <div class="card"><h3>2. Commission on every bill</h3><p>No more end-of-month calculator. Each barber sees what they earned today, and the owner sees everyone's.</p></div>
+    <div class="card"><h3>3. No hardware</h3><p>Runs on the phones and laptop the salon already has. Nothing to buy, nothing to install at the counter.</p></div>
+    <div class="card"><h3>4. Every barber on their own phone</h3><p>Barbers ring up their own bills; the owner sees the whole salon, from anywhere.</p></div>
+    <div class="card"><h3>5. Made for the UAE</h3><p>AED, 5% VAT and TRN on bills, Dubai time, +971 numbers, Arabic name on bills.</p></div>
+    <div class="card"><h3>6. Customers come back</h3><p>WhatsApp bills, visit reminders and offers from the salon's own number (Pro Max).</p></div>
+    <div class="card"><h3>7. More Google reviews, the right way</h3><p>Every customer invited to review, every rating seen privately per barber.</p></div>
+    <div class="card"><h3>8. The salon's own brand</h3><p>Its own web address and logo. Customers see the salon, not SalonKit.</p></div>
+    <div class="card"><h3>9. Free to start</h3><p>7 days of everything free, no card. A Free plan forever for small shops.</p></div>
+    <div class="card"><h3>10. Set up in minutes</h3><p>A new salon starts with a ready price list it can edit, so the first bill can be rung up the same day.</p></div>
+  </div>
+  <h2>Against the alternatives</h2>
+  <table>
+    <tr><th>Instead of…</th><th>SalonKit gives them…</th></tr>
+    <tr><td>Paper notebook</td><td>Bills that can't go missing, totals that add themselves up, and the day's numbers from anywhere.</td></tr>
+    <tr><td>Excel on a laptop</td><td>Every barber entering bills at once on their phone, no formulas to break; Excel export when the accountant needs it (Pro).</td></tr>
+    <tr><td>A general shop POS</td><td>Built for salons: barbers, commission, daily sheet, customer reminders. No till hardware.</td></tr>
+  </table>
+  <p class="small">Never criticise a competitor by name. Talk about what SalonKit does and let the owner compare.</p>
+</section>
+
+<!-- 11. Pricing -->
+<section class="page">
+  <div class="eyebrow">Chapter 6</div>
+  <h1>Plans and pricing</h1>
+  <p class="lead">Three plans, monthly, in AED. Every new salon starts with 7 days of Pro Max free, no card needed. After the trial the salon stays on Free or chooses Pro or Pro Max.</p>
+  <table>
+    <tr><th style="width:24%">Plan</th><th style="width:18%">Price / month</th><th style="width:16%">Staff</th><th>Best for</th></tr>
+    <tr><td><b>Free</b></td><td class="num">AED 0</td><td>Up to 2</td><td>A one- or two-chair shop that only needs bills, commission and the daily sheet.</td></tr>
+    <tr><td><b>Pro</b></td><td class="num">AED 200</td><td>Up to 10</td><td>Most salons: adds monthly and yearly reports, Excel export and ratings.</td></tr>
+    <tr><td><b>Pro Max</b></td><td class="num">AED 499</td><td>Unlimited</td><td>Busy salons that want customers back: WhatsApp bills, reminders and offers, ledger and payouts, audit log, everything.</td></tr>
+  </table>
+  <h2>Which plan to recommend</h2>
+  <div class="grid3">
+    <div class="card"><h3>Free</h3><p>1–2 barbers, owner is always at the counter, wants to stop using the notebook.</p></div>
+    <div class="card"><h3>Pro</h3><p>3–10 staff, owner wants monthly numbers and an Excel file for the accountant.</p></div>
+    <div class="card"><h3>Pro Max</h3><p>Many staff or branches, cash problems, or wants regulars to come back and more Google reviews.</p></div>
+  </div>
+  <h2>How to talk about price</h2>
+  <div class="say">"Pro is 200 dirhams a month, less than seven dirhams a day, for up to ten staff. If it stops even one commission argument or brings back two regular customers a month, it has paid for itself."</div>
+  <ul>
+    <li>Always start from the <b>free trial</b>, never from the price.</li>
+    <li>Use real numbers from the trial: "In your first week, SalonKit recorded <i>N</i> bills worth <i>AED X</i>."</li>
+    <li>Prices and plans are set by SalonKit. Do not offer discounts or special terms unless your manager has approved them in writing.</li>
+  </ul>
+  <p class="small">Prices as of November 2026. Check the pricing page at salonkit.online/pricing before every visit; it is always the source of truth.</p>
+</section>
+
+<!-- 12. ICP -->
+<section class="page">
+  <div class="eyebrow">Chapter 7</div>
+  <h1>Who we sell to</h1>
+  <p class="lead">Focus your time where SalonKit helps most. Start with the salons nearest you and build a cluster: owners talk to each other.</p>
+  <h2>Ideal customer</h2>
+  <div class="grid2">
+    <div class="card tint"><h3>Great fit</h3><ul>
+      <li>Barber shops and gents' salons with 3 or more chairs</li>
+      <li>Ladies' and unisex salons with several stylists on commission</li>
+      <li>Owners who are not always in the shop, or who own two or more branches</li>
+      <li>Salons that already use WhatsApp to talk to customers</li>
+      <li>VAT-registered salons that need proper tax invoices</li>
+    </ul></div>
+    <div class="card"><h3>Still worth a visit</h3><ul>
+      <li>One- or two-chair shops: the Free plan is a real answer</li>
+      <li>New salons about to open: start them right from day one</li>
+      <li>Salons using Excel: show what the barbers' phones add</li>
+    </ul></div>
+  </div>
+  <h2>Who decides</h2>
+  <p>The <b>owner</b> decides and pays. The <b>manager</b> or head barber often influences: win them and they will sell it to the owner for you. Barbers are users; when they like ringing up their own bills and seeing their commission, the owner hears about it.</p>
+  <h2>Best times to visit</h2>
+  <table>
+    <tr><th>Time</th><th>Why</th></tr>
+    <tr><td>Weekday mornings, just after opening</td><td>Quietest time; the owner is often there.</td></tr>
+    <tr><td>Early afternoon</td><td>Between the lunch and evening rush.</td></tr>
+    <tr><td>Avoid</td><td>Evenings, weekends and the days before Eid and holidays: the salon is full and nobody can listen.</td></tr>
+  </table>
+  <h2>Building your list</h2>
+  <ul>
+    <li>Walk your area street by street. Note every salon: name, owner's name if you learn it, chairs, phone, what they use today.</li>
+    <li>Google Maps: search "barber" and "salon" around you; salons with few reviews are a good opening ("Let me show you how to get more Google reviews").</li>
+    <li>Ask every happy customer: "Which salon owner do you know who would want this?"</li>
+  </ul>
+</section>
+
+<!-- 13. Role and objectives -->
+<section class="page">
+  <div class="eyebrow">Chapter 8</div>
+  <h1>Your role and objectives</h1>
+  <p class="lead">You are a field sales agent: you find salons, show them SalonKit, start their free trial on the spot, follow them through the trial and help them become paying customers.</p>
+  <h2>Your responsibilities</h2>
+  <ol>
+    <li>Build and keep a list of salons in your area.</li>
+    <li>Visit salons and talk to owners and managers.</li>
+    <li>Give a short, live demo on your phone.</li>
+    <li>Create the salon's account during the visit and ring up a first bill together.</li>
+    <li>Follow up during the 7-day trial (Chapter 14).</li>
+    <li>Help the owner choose a plan and keep using SalonKit.</li>
+    <li>Report your activity every day and send us every product request you hear.</li>
+  </ol>
+  <h2>Your targets</h2>
+  <p>Targets are set with your manager and written in your agreement. Fill them in here so you always know them:</p>
+  <table>
+    <tr><th>Measure</th><th>Per day</th><th>Per week</th><th>Per month</th></tr>
+    <tr><td>Salons visited (real conversation)</td><td><span class="blank">&nbsp;</span></td><td><span class="blank">&nbsp;</span></td><td><span class="blank">&nbsp;</span></td></tr>
+    <tr><td>Demos given</td><td><span class="blank">&nbsp;</span></td><td><span class="blank">&nbsp;</span></td><td><span class="blank">&nbsp;</span></td></tr>
+    <tr><td>Trials started</td><td><span class="blank">&nbsp;</span></td><td><span class="blank">&nbsp;</span></td><td><span class="blank">&nbsp;</span></td></tr>
+    <tr><td>Paying salons</td><td>—</td><td><span class="blank">&nbsp;</span></td><td><span class="blank">&nbsp;</span></td></tr>
+  </table>
+  <h2>How you are paid</h2>
+  <p>Your salary, commission and bonuses are in your agreement: <span class="blank">&nbsp;</span>. If anything is unclear, ask your manager before you start, not at the end of the month.</p>
+  <div class="card tint"><h3>The number that matters most</h3><p>The best predictor of a sale is a salon that rang up <b>real bills on its first day</b>. Count your trials by how many salons used SalonKit for a full day, not by how many accounts you created.</p></div>
+</section>
+
+<!-- 14. Process -->
+<section class="page">
+  <div class="eyebrow">Chapter 9</div>
+  <h1>The sales process, step by step</h1>
+  <p class="lead">Every sale follows the same seven steps. Know which step each salon on your list is at.</p>
+  <table>
+    <tr><th style="width:5%">#</th><th style="width:22%">Step</th><th>What you do</th><th style="width:22%">Done when</th></tr>
+    <tr><td>1</td><td><b>Prepare</b></td><td>Check your list, plan your route, charge your phone, open the demo salon.</td><td>You know which salons you'll visit and why.</td></tr>
+    <tr><td>2</td><td><b>Walk in</b></td><td>Greet, introduce yourself, ask for the owner or manager (Chapter 10).</td><td>You are talking to the decision-maker, or have their name and a time.</td></tr>
+    <tr><td>3</td><td><b>Discover</b></td><td>Ask questions, listen for their pain (Chapter 11).</td><td>You know their 1–2 biggest problems.</td></tr>
+    <tr><td>4</td><td><b>Demo</b></td><td>Show the 5-minute demo, focused on their problems (Chapter 12).</td><td>The owner has seen a bill and the daily sheet on your phone.</td></tr>
+    <tr><td>5</td><td><b>Start the trial</b></td><td>Create their salon together, add their barbers and ring up a first bill (Chapter 13).</td><td>Their salon exists and has one real bill.</td></tr>
+    <tr><td>6</td><td><b>Follow up</b></td><td>Calls and a visit during the 7 days (Chapter 14).</td><td>They have used it every day.</td></tr>
+    <tr><td>7</td><td><b>Close</b></td><td>Recommend a plan, help them choose it (Chapter 16).</td><td>They are on Pro or Pro Max, or happily on Free.</td></tr>
+  </table>
+  <h2>If the owner isn't there</h2>
+  <ul>
+    <li>Talk to the manager or head barber. Show them the demo; they are your champion.</li>
+    <li>Get the owner's name and the best time to come back. Write it down.</li>
+    <li>Leave your card and the website: <span class="num">salonkit.online</span>.</li>
+    <li>Never create a salon account without the owner's agreement.</li>
+  </ul>
+</section>
+
+<!-- 15. Walk in -->
+<section class="page">
+  <div class="eyebrow">Chapter 10</div>
+  <h1>Walking in: the first 60 seconds</h1>
+  <p class="lead">Owners decide in the first minute whether to listen. Be calm, polite and quick. Respect their customers: never interrupt a haircut.</p>
+  <h2>Before you open the door</h2>
+  <ul>
+    <li>Look in: if every chair is busy and people are waiting, come back later.</li>
+    <li>Clean, simple clothes. Phone charged, demo salon open, brightness up.</li>
+    <li>Know one thing about this salon (number of chairs, their Google rating).</li>
+  </ul>
+  <h2>The opening</h2>
+  <div class="say">"Assalamu alaikum / Good morning. I'm <b>[name]</b> from SalonKit. Is the owner here? … I'll only take five minutes. We make an app that does the bills and the barbers' commission for salons, and I'd like to show you how it works."</div>
+  <h3>If they say "I'm busy"</h3>
+  <div class="say">"No problem at all. When is a quiet time, tomorrow morning? I'll come back then." <b>Write the time down and come back exactly then.</b></div>
+  <h3>If they say "We don't need anything"</h3>
+  <div class="say">"I understand. Can I ask one question: how do you work out your barbers' commission at the end of the month?" (Let them talk. Most owners have a story.)</div>
+  <h3>If they say "Just leave a flyer"</h3>
+  <div class="say">"Of course. It's quicker to see it: can I show you one bill on my phone? Thirty seconds."</div>
+  <h2>Your body language</h2>
+  <ul>
+    <li>Stand to the side of the counter, not in front of the customers.</li>
+    <li>Show your phone so the owner can see the screen; let them hold it.</li>
+    <li>Smile, slow down, and stop talking when they start.</li>
+  </ul>
+</section>
+
+<!-- 16. Discovery -->
+<section class="page">
+  <div class="eyebrow">Chapter 11</div>
+  <h1>Discovery questions</h1>
+  <p class="lead">Ask, then listen. The owner should talk more than you. Their answers tell you which parts of SalonKit to show.</p>
+  <table>
+    <tr><th style="width:46%">Ask</th><th>If they say… show them</th></tr>
+    <tr><td>How many barbers / stylists do you have? Are they on commission?</td><td>Commission → commission on every bill, barber's own phone. Number of staff → which plan fits.</td></tr>
+    <tr><td>How do you keep your bills today?</td><td>Notebook / Excel → ringing up a bill, numbered and printable.</td></tr>
+    <tr><td>How long does the month-end commission take you?</td><td>Hours / arguments → the daily sheet with each barber's commission.</td></tr>
+    <tr><td>Does your cash always match at night?</td><td>No → the ledger: cash, bank, payouts and every barber's balance (Pro Max).</td></tr>
+    <tr><td>Can you see today's sales when you're not in the shop?</td><td>No → the dashboard on the owner's phone, from anywhere.</td></tr>
+    <tr><td>How do you bring back customers who stop coming?</td><td>We don't → WhatsApp visit reminders and offers (Pro Max).</td></tr>
+    <tr><td>How many Google reviews do you have? Do you ask customers?</td><td>Few → ratings and the one-tap Google review link.</td></tr>
+    <tr><td>Are you VAT-registered?</td><td>Yes → 5% VAT and TRN on every bill.</td></tr>
+    <tr><td>What does your accountant ask you for?</td><td>Monthly numbers → monthly report and Excel export (Pro).</td></tr>
+  </table>
+  <h2>Repeat it back</h2>
+  <div class="say">"So if I understood you: the bills are in the book, and every month you spend a whole evening on commission, and sometimes the barbers don't agree. Is that right? Let me show you how that works in SalonKit."</div>
+  <p>Repeating their problem in their words shows you listened, and makes the demo about them, not about the app.</p>
+</section>
+
+<!-- 17. Demo -->
+<section class="page">
+  <div class="eyebrow">Chapter 12</div>
+  <h1>The 5-minute demo</h1>
+  <p class="lead">Use your own demo salon on your phone. Show only what matches their problems. Let the owner tap the buttons.</p>
+  <table>
+    <tr><th style="width:12%">Time</th><th style="width:28%">Show</th><th>Say</th></tr>
+    <tr><td class="num">0:00</td><td><b>New sale</b>: tap two services, pick a barber, cash</td><td>"This is a bill. Two taps for the services, choose the barber, cash or card. Done."</td></tr>
+    <tr><td class="num">0:45</td><td><b>The bill</b>: number, total, share</td><td>"It has its own number, it can be printed or sent to the customer's phone."</td></tr>
+    <tr><td class="num">1:15</td><td><b>Today</b> / dashboard</td><td>"The day adds itself up. You can see this from home."</td></tr>
+    <tr><td class="num">2:00</td><td><b>Daily sheet</b>: barber columns, commission</td><td>"Here's your notebook page, filled in. Each barber's sales and commission, every day. No calculator at the end of the month."</td></tr>
+    <tr><td class="num">3:00</td><td><b>Their pain</b> (pick one): ledger, WhatsApp, ratings, VAT</td><td>Match what they told you in discovery.</td></tr>
+    <tr><td class="num">4:00</td><td><b>Barber's view</b></td><td>"Each barber has their own login and sees only their own bills and commission."</td></tr>
+    <tr><td class="num">4:30</td><td><b>The ask</b></td><td>"Shall we set it up for your salon right now? It's free for 7 days, you don't need a card, and it takes five minutes."</td></tr>
+  </table>
+  <h2>Demo tips</h2>
+  <ul>
+    <li>Prepare your demo salon with realistic services, three barbers and a week of bills, so the daily sheet looks alive.</li>
+    <li>Turn on Do Not Disturb. Close other apps.</li>
+    <li>If something doesn't load, stay calm: "The signal is weak here, let me show you on the next screen."</li>
+    <li>Stop when they're convinced. A long demo loses the sale.</li>
+  </ul>
+</section>
+
+<!-- 18. Trial -->
+<section class="page">
+  <div class="eyebrow">Chapter 13</div>
+  <h1>Starting the free trial on the spot</h1>
+  <p class="lead">The single most important step. A salon set up during your visit is many times more likely to become a customer than one that says "I'll sign up later".</p>
+  <h2>Step by step, with the owner</h2>
+  <ol>
+    <li>On the <b>owner's</b> phone, open <span class="num">salonkit.online</span> (or the SalonKit app) and tap <b>Start free trial</b>.</li>
+    <li>Enter the salon's name, the owner's name, the owner's email, mobile and country. On the phone app the owner can also tap <b>Continue with Google</b> (or Apple on iPhone) instead of making a password.</li>
+    <li>Choose the <b>salon ID</b> together: short, easy to type, for example <span class="num">royalcuts</span>. It becomes their address: <span class="num">royalcuts.salonkit.online</span>.</li>
+    <li>Add the salon's logo (a photo of their sign works).</li>
+    <li>Check the price list: a starter list is already there. Change prices and add their own services. Do it together, quickly; perfect it later.</li>
+    <li>Add the barbers: name and, if they have one, their email. With an email, each barber gets an invite link that opens SalonKit already signed in.</li>
+    <li>Set each barber's commission percentage.</li>
+    <li>If VAT-registered: Settings → VAT on, add the TRN.</li>
+    <li>Ring up <b>one real bill</b> together for the next customer.</li>
+    <li>Show the owner the dashboard on their own phone, then leave.</li>
+  </ol>
+  <div class="card warn"><h3>Never</h3><ul>
+    <li>Use your own email or phone for a salon's account. The account belongs to the owner.</li>
+    <li>Ask for or write down the owner's password.</li>
+    <li>Create a salon without the owner's agreement.</li>
+  </ul></div>
+  <p class="small">One email belongs to one person in one salon. If an owner says "that email is already used", they or a staff member already have a SalonKit account: help them sign in instead (email code or "Forgot password?").</p>
+</section>
+
+<!-- 19. Follow up -->
+<section class="page">
+  <div class="eyebrow">Chapter 14</div>
+  <h1>During the trial: the follow-up plan</h1>
+  <p class="lead">The trial is 7 days. Your job is to make sure the salon uses SalonKit every one of those days.</p>
+  <table>
+    <tr><th style="width:14%">When</th><th style="width:22%">How</th><th>What to do</th></tr>
+    <tr><td><b>Day 1</b> (evening)</td><td>WhatsApp message</td><td>"Thank you for your time today! How did the first day go? Any question, message me here." Ask how many bills they rang up.</td></tr>
+    <tr><td><b>Day 2</b></td><td>Call</td><td>Check every barber can sign in and is ringing up bills. Fix price-list problems.</td></tr>
+    <tr><td><b>Day 4</b></td><td>Visit (5 minutes)</td><td>Open the daily sheet together: "Look, three days, all added up for you." Show one more feature that matches their pain.</td></tr>
+    <tr><td><b>Day 6</b></td><td>Call</td><td>"Your trial ends tomorrow. Which plan suits you?" Recommend one (Chapter 6).</td></tr>
+    <tr><td><b>Day 7</b></td><td>Visit or call</td><td>Close (Chapter 16).</td></tr>
+  </table>
+  <h2>Warning signs, and what to do</h2>
+  <table>
+    <tr><th>You notice</th><th>Do this</th></tr>
+    <tr><td>No bills since day 1</td><td>Visit. Usually one barber didn't sign in, or the price list is wrong. Fix it there.</td></tr>
+    <tr><td>Only the owner uses it</td><td>Add the barbers with their emails so each gets an invite; show one barber how to ring up a bill.</td></tr>
+    <tr><td>"Too busy to use it"</td><td>Show the fastest way: New sale, two taps. Suggest using it only for one barber for a day.</td></tr>
+    <tr><td>Owner stopped answering</td><td>Message once, kindly. Then visit at a quiet time.</td></tr>
+  </table>
+</section>
+
+<!-- 20-21. Objections -->
+<section class="page">
+  <div class="eyebrow">Chapter 15 · Objections (1 of 2)</div>
+  <h1>Handling objections</h1>
+  <p class="lead">An objection is a question in disguise. Stay calm, agree with the feeling, answer with a fact, then ask a question.</p>
+  <h3>"It's too expensive."</h3>
+  <div class="say">"I understand, every dirham counts. That's why there's a Free plan, and the trial is free. Pro is 200 a month, under seven dirhams a day. How much time do you spend on commission each month? What is that evening worth to you?"</div>
+  <h3>"My notebook works fine."</h3>
+  <div class="say">"It has worked for years, I agree. Can I ask: how long does month-end take, and do the barbers ever disagree with the numbers? SalonKit is the same notebook, but it adds itself up and nobody can argue with it. Try it for 7 days, keep the notebook too if you like."</div>
+  <h3>"My barbers won't use it."</h3>
+  <div class="say">"Barbers usually like it most, because they see their own commission every day. Ringing up a bill is two taps. Let's add one barber now and try it on the next customer."</div>
+  <h3>"I'm not good with phones / technology."</h3>
+  <div class="say">"If you can send a WhatsApp, you can use SalonKit. I'll set it up with you now, and I'll come back on day four to check everything."</div>
+  <h3>"I don't have time right now."</h3>
+  <div class="say">"Of course. When is a quiet time? The setup takes five minutes; I'll come back exactly then."</div>
+  <h3>"Is my data safe? Who can see my numbers?"</h3>
+  <div class="say">"Only you and the people you add. Each salon has its own address and logins; no other salon can ever see your data, and search engines don't index it."</div>
+</section>
+
+<section class="page">
+  <div class="eyebrow">Chapter 15 · Objections (2 of 2)</div>
+  <h3>"I'll think about it."</h3>
+  <div class="say">"Of course. The trial is free and you don't need a card, so there's nothing to decide today except to try it. Shall we set it up now, and decide after seven days with real numbers?"</div>
+  <h3>"We already use another system."</h3>
+  <div class="say">"What do you like about it? … And what would you change?" Listen; then show only what is better for their problem. Never criticise the other system.</div>
+  <h3>"What if the internet goes down?"</h3>
+  <div class="say">"SalonKit works on mobile data, so if the shop Wi-Fi goes down, the phones keep working."</div>
+  <h3>"I want a feature you don't have."</h3>
+  <div class="say">"Thank you, that's useful. I'll send it to our team today." Write it down exactly, send it in your daily report. Never promise a date.</div>
+  <h3>"Can I pay yearly / get a discount?"</h3>
+  <div class="say">"Let me check with my manager and come back to you today." Only offer terms your manager has approved in writing.</div>
+  <h3>"WhatsApp messages cost money?"</h3>
+  <div class="say">"WhatsApp sending is included in Pro Max. Meta charges its own small fee per message to your WhatsApp Business account, the same for every business on WhatsApp."</div>
+  <h2>The method, every time</h2>
+  <table>
+    <tr><th>1. Listen</th><th>2. Agree with the feeling</th><th>3. Answer with a fact</th><th>4. Ask a question</th></tr>
+    <tr><td>Let them finish. Don't interrupt.</td><td>"I understand…"</td><td>One true sentence about SalonKit.</td><td>Move them forward: "Shall we try it?"</td></tr>
+  </table>
+</section>
+
+<!-- 22. Closing -->
+<section class="page">
+  <div class="eyebrow">Chapter 16</div>
+  <h1>Closing the sale</h1>
+  <p class="lead">If the trial went well, closing is a conversation, not a fight. Use their own numbers.</p>
+  <h2>Before you ask</h2>
+  <ul>
+    <li>Open their dashboard for the trial week: number of bills, total sales, each barber's commission.</li>
+    <li>Know which plan you will recommend and why (Chapter 6).</li>
+  </ul>
+  <h2>The close</h2>
+  <div class="say">"In seven days SalonKit recorded <b>[N] bills</b> and <b>AED [X]</b> for you, and your commission for the week is already worked out. You have <b>[N] staff</b>, so <b>Pro</b> fits you best. Shall we choose it now so nothing stops tomorrow?"</div>
+  <h2>Closing styles</h2>
+  <table>
+    <tr><th>Style</th><th>When</th><th>Example</th></tr>
+    <tr><td><b>Recommendation</b></td><td>Default</td><td>"For a salon your size I recommend Pro."</td></tr>
+    <tr><td><b>Choice</b></td><td>Owner is unsure</td><td>"Would Pro or Pro Max suit you better?"</td></tr>
+    <tr><td><b>Summary</b></td><td>Owner forgets the value</td><td>Repeat the three problems it solved for them this week.</td></tr>
+    <tr><td><b>Free plan</b></td><td>Small shop, money is tight</td><td>"Stay on Free; when you add a third barber, move to Pro."</td></tr>
+  </table>
+  <h2>If they say no</h2>
+  <p>Thank them, keep them on the Free plan if it fits, and ask: <i>"What would have to change for SalonKit to be worth it for you?"</i> Write the answer in your report. Many salons come back after a busy month.</p>
+  <div class="card tint"><h3>Ask for a referral, every time</h3><div class="say" style="margin:0">"Which salon owner do you know who would want this too?"</div></div>
+</section>
+
+<!-- 23. Onboarding -->
+<section class="page">
+  <div class="eyebrow">Chapter 17</div>
+  <h1>After the sale: onboarding</h1>
+  <p class="lead">A customer who uses SalonKit well stays for years and sends you others. Make the first month easy.</p>
+  <h2>First-month checklist</h2>
+  <ul class="check">
+    <li>Every barber signs in on their own phone (invites sent to their emails).</li>
+    <li>Price list complete, with real prices.</li>
+    <li>Commission percentage set for every barber.</li>
+    <li>Logo added; VAT and TRN set if they are registered.</li>
+    <li>Google review link added in Settings (from their Google Business Profile → "Ask for reviews").</li>
+    <li>Owner knows the dashboard and the daily sheet.</li>
+    <li>Pro: owner has downloaded one Excel report.</li>
+    <li>Pro Max: WhatsApp Business number connected; ledger shows cash and bank.</li>
+    <li>Staff emails added so barbers get their own daily report.</li>
+  </ul>
+  <h2>Stay in touch</h2>
+  <ul>
+    <li>Visit once in the first month, at a quiet time.</li>
+    <li>Pass support questions to <span class="num">support@salonkit.online</span> with the salon ID and a screenshot.</li>
+    <li>Tell us about happy salons: with their permission, their story helps sell to others.</li>
+  </ul>
+</section>
+
+<!-- 24. Checklists -->
+<section class="page">
+  <div class="eyebrow">Chapter 18</div>
+  <h1>Checklists</h1>
+  <div class="grid2">
+    <div class="card"><h3>Before you leave home</h3><ul class="check">
+      <li>Phone charged; power bank</li>
+      <li>Mobile data on</li>
+      <li>Demo salon ready with a week of bills</li>
+      <li>Today's route and list of salons</li>
+      <li>Business cards</li>
+      <li>Targets for today</li>
+    </ul></div>
+    <div class="card"><h3>Before every visit</h3><ul class="check">
+      <li>Salon not too busy</li>
+      <li>One fact about this salon</li>
+      <li>Do Not Disturb on</li>
+      <li>Demo open on the New sale screen</li>
+    </ul></div>
+    <div class="card"><h3>During the demo</h3><ul class="check">
+      <li>Asked discovery questions first</li>
+      <li>Repeated their problem back</li>
+      <li>Showed a bill and the daily sheet</li>
+      <li>Showed one feature for their pain</li>
+      <li>Asked to start the trial</li>
+    </ul></div>
+    <div class="card"><h3>Trial set up</h3><ul class="check">
+      <li>Account in the owner's name and email</li>
+      <li>Logo, price list, barbers, commission</li>
+      <li>First real bill rung up</li>
+      <li>Follow-up dates in your calendar</li>
+      <li>Salon ID written in your log</li>
+    </ul></div>
+  </div>
+</section>
+
+<!-- 25. Daily routine -->
+<section class="page">
+  <div class="eyebrow">Chapter 19</div>
+  <h1>Your day and your reports</h1>
+  <h2>A good day</h2>
+  <table>
+    <tr><th style="width:20%">Time</th><th>What</th></tr>
+    <tr><td>Morning</td><td>Plan the route; follow-up calls to salons on day 2 and day 6 of their trial.</td></tr>
+    <tr><td>Late morning</td><td>New visits: the quietest hours in most salons.</td></tr>
+    <tr><td>Lunch</td><td>Update your log; reply to owners' messages.</td></tr>
+    <tr><td>Afternoon</td><td>More visits; day-4 check-ins on trial salons.</td></tr>
+    <tr><td>Evening</td><td>Day-1 thank-you messages; send your daily report.</td></tr>
+  </table>
+  <h2>Your daily report</h2>
+  <p>Send it every day, even on a slow day. It takes five minutes and helps the whole team learn.</p>
+  <table>
+    <tr><th>Salon</th><th>Area</th><th>Owner / phone</th><th>Step reached</th><th>Next action and date</th><th>Notes / requests</th></tr>
+    <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>
+  </table>
+  <p><b>Step reached:</b> Visited · Demo · Trial started · Trial active · Paying · Not interested (with reason).</p>
+  <p><b>Always report:</b> every feature request, every complaint, and every reason a salon said no, in the owner's own words.</p>
+</section>
+
+<!-- 26. Code of conduct -->
+<section class="page">
+  <div class="eyebrow">Chapter 20</div>
+  <h1>Code of conduct</h1>
+  <p class="lead">You represent SalonKit in every salon you walk into. Our reputation is built one visit at a time.</p>
+  <div class="grid2">
+    <div class="card tint"><h3>Always</h3><ul>
+      <li>Be honest about what SalonKit does today.</li>
+      <li>Respect the salon's customers and time.</li>
+      <li>Keep owners' information private.</li>
+      <li>Set up accounts in the owner's name, email and phone.</li>
+      <li>Follow Google's rules: every customer is invited to review.</li>
+      <li>Report requests and problems to the team.</li>
+    </ul></div>
+    <div class="card warn"><h3>Never</h3><ul>
+      <li>Promise features, dates, discounts or terms that aren't approved.</li>
+      <li>Ask for, keep or type an owner's password.</li>
+      <li>Criticise competitors or other salons.</li>
+      <li>Write fake reviews, or ask salons to.</li>
+      <li>Send WhatsApp offers to customers without the salon's approval.</li>
+      <li>Pressure an owner who said no.</li>
+    </ul></div>
+  </div>
+  <h2>Customer data</h2>
+  <p>Salons trust us with their sales and their customers' names and numbers. Never copy, photograph or share any salon's data. If you see a problem with an account, report it to the team; don't try to fix data yourself.</p>
+</section>
+
+<!-- 27. FAQ -->
+<section class="page">
+  <div class="eyebrow">Chapter 21</div>
+  <h1>Quick answers</h1>
+  <table>
+    <tr><th style="width:38%">Question</th><th>Answer</th></tr>
+    <tr><td>Is there a free trial?</td><td>Yes: 7 days of Pro Max, no card. Then Free, Pro or Pro Max.</td></tr>
+    <tr><td>Does it need special hardware?</td><td>No. Any phone, tablet or computer; print from any printer the device can use.</td></tr>
+    <tr><td>Can barbers ring up their own bills?</td><td>Yes, each on their own phone with their own login.</td></tr>
+    <tr><td>Does the bill include VAT?</td><td>When VAT is on: 5% VAT and the TRN on every bill.</td></tr>
+    <tr><td>Can different barbers have different commission?</td><td>Yes, each has their own percentage.</td></tr>
+    <tr><td>Can I export to Excel?</td><td>Yes, on Pro and Pro Max.</td></tr>
+    <tr><td>How many staff?</td><td>Free 2, Pro 10, Pro Max unlimited.</td></tr>
+    <tr><td>Can I send bills on WhatsApp?</td><td>Yes, on Pro Max, from the salon's own WhatsApp Business number.</td></tr>
+    <tr><td>Can customers stop WhatsApp messages?</td><td>Yes, by replying STOP.</td></tr>
+    <tr><td>How do staff sign in?</td><td>Username and password, a code sent to their email, an invite link, or (phone app) Google / Apple.</td></tr>
+    <tr><td>Forgot password?</td><td>"Forgot password?" on the sign-in screen sends a code to the email on their profile.</td></tr>
+    <tr><td>Which emirates?</td><td>All of them.</td></tr>
+    <tr><td>Is the data private?</td><td>Yes: each salon has its own address and logins, and can never see another's data.</td></tr>
+    <tr><td>Who do I contact for help?</td><td><span class="num">support@salonkit.online</span></td></tr>
+  </table>
+</section>
+
+<!-- 28. Motivation -->
+<section class="page">
+  <div class="eyebrow">Chapter 22</div>
+  <h1>Staying motivated</h1>
+  <p class="lead">Field sales is a numbers game played by people. Some days every door says no. The agents who succeed are the ones who come back the next morning.</p>
+  <div class="card green"><h3>Remember why it matters</h3><p>Every salon you sign up is a small business that stops losing money it can't see, barbers who get paid fairly without arguing, and an owner who can finally take a day off. You are not selling an app. You are helping someone run their business better.</p></div>
+  <h2>Habits of top agents</h2>
+  <div class="grid2">
+    <div class="card"><h3>They plan</h3><p>A route, a list and a target every morning.</p></div>
+    <div class="card"><h3>They listen</h3><p>The owner talks 70% of the time.</p></div>
+    <div class="card"><h3>They set up on the spot</h3><p>"Let's do it now" beats "I'll send you a link".</p></div>
+    <div class="card"><h3>They follow up</h3><p>Day 1, 2, 4, 6, 7, every time.</p></div>
+    <div class="card"><h3>They learn from every no</h3><p>Write down why, and try something different next time.</p></div>
+    <div class="card"><h3>They build clusters</h3><p>One happy salon on a street makes the next one easier.</p></div>
+  </div>
+  <h2>Your growth</h2>
+  <p>Strong agents grow into team leads, trainers and area managers as SalonKit expands across the region. Talk to your manager about your path: <span class="blank">&nbsp;</span>.</p>
+  <h2>When it's hard</h2>
+  <ul>
+    <li>Count conversations, not sales. Sales follow conversations.</li>
+    <li>Call a colleague; share one story from the day.</li>
+    <li>Re-read the objections chapter: most "no"s are "not yet".</li>
+  </ul>
+</section>
+
+<!-- 29. Glossary + contacts -->
+<section class="page">
+  <div class="eyebrow">Chapter 23</div>
+  <h1>Glossary and contacts</h1>
+  <table>
+    <tr><th style="width:26%">Word</th><th>Meaning</th></tr>
+    <tr><td>Salon ID</td><td>The salon's short name and web address: <span class="num">royalcuts</span> → <span class="num">royalcuts.salonkit.online</span>.</td></tr>
+    <tr><td>Daily sheet</td><td>One row per day, one column per barber: sales, expenses, commission and profit.</td></tr>
+    <tr><td>Commission</td><td>The barber's percentage of each bill, credited automatically.</td></tr>
+    <tr><td>Ledger</td><td>The shop's cash, bank and every barber's balance, with payouts and transfers (Pro Max).</td></tr>
+    <tr><td>Business day</td><td>The salon's day, ending at closing time (4 am by default).</td></tr>
+    <tr><td>TRN</td><td>Tax Registration Number, shown on VAT bills.</td></tr>
+    <tr><td>Trial</td><td>7 days of Pro Max, free, no card.</td></tr>
+    <tr><td>Invite</td><td>An email to a staff member with a link that opens SalonKit already signed in.</td></tr>
+    <tr><td>Audit log</td><td>The record of every change to bills and settings, with who and when (Pro Max).</td></tr>
+  </table>
+  <h2>Contacts</h2>
+  <table>
+    <tr><th>For</th><th>Contact</th></tr>
+    <tr><td>Customer support (salons)</td><td><span class="num">support@salonkit.online</span></td></tr>
+    <tr><td>General enquiries</td><td><span class="num">hello@salonkit.online</span></td></tr>
+    <tr><td>Website and pricing</td><td><span class="num">salonkit.online</span> · <span class="num">salonkit.online/pricing</span></td></tr>
+    <tr><td>Your manager</td><td><span class="blank">&nbsp;</span></td></tr>
+    <tr><td>Daily report sent to</td><td><span class="blank">&nbsp;</span></td></tr>
+  </table>
+  <div class="card green" style="margin-top:18pt"><h3>Now go and visit your first salon.</h3><p>Walk in, listen, show one bill, and set them up today. Welcome to SalonKit.</p></div>
+</section>
+
+</body>
+</html>

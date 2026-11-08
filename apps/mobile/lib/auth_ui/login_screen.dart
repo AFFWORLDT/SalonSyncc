@@ -5,6 +5,8 @@ import '../core/api/api_error.dart';
 import '../core/auth/auth_controller.dart';
 import '../core/ui/background.dart';
 import '../core/ui/glass.dart';
+import '../core/ui/route.dart';
+import 'forgot_password_screen.dart';
 import '../core/ui/salon_logo.dart';
 
 /// Sign in, branded with the chosen salon so it feels like the salon's own app.
@@ -206,6 +208,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: _busy ? null : _switchMode,
                       child: Text(_codeMode ? 'Sign in with your password instead' : 'Sign in with an email code instead'),
                     ),
+                    if (!_codeMode)
+                      TextButton(
+                        key: const ValueKey('login-forgot'),
+                        onPressed: _busy ? null : () => Navigator.of(context).push(SkRoute<void>(builder: (_) => const ForgotPasswordScreen())),
+                        child: const Text('Forgot password?'),
+                      ),
                     TextButton(onPressed: () => auth.switchSalon(), child: const Text('Not your salon?')),
                   ]),
                 ),

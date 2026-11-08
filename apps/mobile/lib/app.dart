@@ -47,7 +47,7 @@ class SalonKitApp extends StatelessWidget {
 }
 
 /// Picks the screen from the sign-in state, with a shared-axis transition between them. Leaving the signed-in state
-/// (sign out, a 401, switch salon) also closes every screen opened on top, so nothing is left above sign-in.
+/// (sign out, a 401, switch salon) and entering it (from a pushed sign-up screen) close every screen opened on top.
 class _AuthGate extends StatefulWidget {
   const _AuthGate({required this.registry});
   final FeatureRegistry registry;
@@ -64,7 +64,9 @@ class _AuthGateState extends State<_AuthGate> {
   void initState() {
     super.initState();
     _leave = ever<AuthState>(auth.state, (s) {
-      if (s != AuthState.signedIn) Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
+      // Any change of sign-in state closes the screens opened on top: signing out leaves nothing above sign-in, and
+      // signing in from a screen pushed over it (sign-up, forgot password, Google sign-up) lands on the app.
+      Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
     });
   }
 

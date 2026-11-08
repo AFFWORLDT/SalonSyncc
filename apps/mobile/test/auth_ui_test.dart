@@ -12,7 +12,8 @@ import 'support/me_fixture.dart';
 FakeAdapter salonApi() => FakeAdapter({
       'GET /api/public/brand': (o) => o.uri.host.startsWith('supersalon.') ? {'name': 'Super Salon', 'logo_url': null} : {'name': null, 'logo_url': null},
       'POST /api/auth/code': (o) => {'ok': true},
-      'POST /api/mobile/session': (o) => (o.data as Map)['password'] == 'pass1234' || (o.data as Map)['code'] == '123456'
+      'POST /api/auth/password/reset': (o) => (o.data as Map)['code'] == '123456' ? {'ok': true, 'slug': 'supersalon', 'username': 'ali'} : const FakeReply(401, {'error': 'That code is wrong or has expired'}),
+      'POST /api/mobile/session': (o) => ['pass1234', 'newpass1'].contains((o.data as Map)['password']) || (o.data as Map)['code'] == '123456'
           ? {'token': 'skm_t', 'expires_at': 1}
           : const FakeReply(401, {'error': 'Wrong salon ID, username or password'}),
       'GET /api/me': (o) => fx('me_barber.json'),
@@ -133,6 +134,33 @@ void main() {
     await t.pumpAndSettle();
     final session = a.calls.where((c) => c.path == '/api/mobile/session').single.data as Map;
     expect([session['email'], session['code'], session.containsKey('password')], ['ali@mail.com', '123456', false]);
+    expect(find.text('Hi ali 👋'), findsOneWidget);
+  });
+
+  testWidgets('forgot password: code to the email, new password, signed in with it', (t) async {
+    final a = salonApi();
+    putAuth(a);
+    await Get.find<AuthController>().boot();
+    await t.pumpWidget(const SalonKitApp());
+    await t.pumpAndSettle();
+    await t.tap(find.text('Use salon ID and password'));
+    await t.pumpAndSettle();
+    await typeSalon(t, 'supersalon');
+    await t.tap(find.text('Continue'));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('login-forgot')));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('fp-email')), 'ali@mail.com');
+    await t.tap(find.widgetWithText(FilledButton, 'Email me a code'));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('fp-code')), '123456');
+    await t.enterText(find.byKey(const ValueKey('fp-pass')), 'newpass1');
+    await t.tap(find.widgetWithText(FilledButton, 'Save and sign in'));
+    await t.pumpAndSettle();
+    final reset = a.calls.singleWhere((c) => c.path == '/api/auth/password/reset').data as Map;
+    expect([reset['email'], reset['code'], reset['password']], ['ali@mail.com', '123456', 'newpass1']);
+    final login = a.calls.lastWhere((c) => c.path == '/api/mobile/session').data as Map;
+    expect([login['username'], login['password']], ['ali', 'newpass1']);
     expect(find.text('Hi ali 👋'), findsOneWidget);
   });
 
