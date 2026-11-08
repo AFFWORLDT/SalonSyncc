@@ -24,16 +24,18 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSFaceIDUsageDescription</key>
-	<string>SalonKit uses Face ID to keep your salon's data private.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>SalonKit uses your photos only when you choose the salon logo or a staff photo.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>SalonKit uses the camera only when you take a photo for the salon logo or a staff member.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>SalonKit uses Face ID to keep your salon's data private.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>SalonKit does not record audio; this is required by the photo picker it uses for photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>SalonKit uses your photos only when you choose the salon logo or a staff photo.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
