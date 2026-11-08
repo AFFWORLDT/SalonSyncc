@@ -10,8 +10,11 @@ import '../../models/notice.dart';
 
 /// Announcements and other updates for this barber, newest first. Opening the screen marks them all read.
 class AnnouncementsScreen extends StatefulWidget {
-  const AnnouncementsScreen({super.key, required this.me, required this.api, required this.unread});
+  const AnnouncementsScreen({super.key, required this.me, required this.api, required this.unread, this.title = 'Announcements'});
   final Me me;
+
+  /// 'Notifications' when opened from the bell.
+  final String title;
   final NoticesApi api;
   final ValueNotifier<int> unread;
 
@@ -59,13 +62,13 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 32), children: [
-        const SkHeading('Announcements'),
+        SkHeading(widget.title),
         if (_error != null && f == null)
           ErrorState(error: _error!, onRetry: _load)
         else if (f == null)
           for (var i = 0; i < 4; i++) const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: SkSkeleton(height: 64))
         else if (f.items.isEmpty)
-          const EmptyState(text: 'No announcements yet', icon: Icons.campaign_outlined)
+          EmptyState(text: widget.title == 'Announcements' ? 'No announcements yet' : 'No notifications yet', icon: Icons.notifications_none_rounded)
         else
           for (final Notice n in f.items)
             Padding(

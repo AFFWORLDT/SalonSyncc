@@ -11,10 +11,14 @@ import '../models/me.dart';
 /// The bar on top of every tab (Groww-style): the salon's logo and name, then Search, the AI assistant and my photo,
 /// which opens my profile (settings and everything that isn't a tab). [badge] adds up unread counts for the photo.
 class SkTopBar extends StatelessWidget {
-  const SkTopBar({super.key, required this.me, required this.onSearch, required this.onAi, required this.onProfile, this.badge = const []});
+  const SkTopBar({super.key, required this.me, required this.onSearch, required this.onAi, required this.onProfile, this.badge = const [], this.onBell, this.bell});
   final Me me;
   final VoidCallback onSearch, onAi, onProfile;
   final List<ValueListenable<int>> badge;
+
+  /// The notification bell, with [bell] as its red unread count; hidden when [onBell] is null.
+  final VoidCallback? onBell;
+  final ValueListenable<int>? bell;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +46,7 @@ class SkTopBar extends StatelessWidget {
         Expanded(child: Text(me.salonName, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.titleLarge?.copyWith(fontWeight: FontWeight.w600))),
         icon('Search', Icons.search_rounded, onSearch, const ValueKey('top-search')),
         icon('SalonKit AI', Icons.auto_awesome_outlined, onAi, const ValueKey('top-ai')),
+        if (onBell != null) _Bell(count: bell, onTap: onBell!),
         const SizedBox(width: 2),
         tourTarget('profile', InkResponse(
           key: const ValueKey('top-profile'),
@@ -65,6 +70,35 @@ class SkTopBar extends StatelessWidget {
         )),
       ]),
     );
+  }
+}
+
+/// The bell: a red count bubble (99+ at most) while there are unread notifications.
+class _Bell extends StatelessWidget {
+  const _Bell({required this.count, required this.onTap});
+  final ValueListenable<int>? count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    Widget button(int n) => IconButton(
+          key: const ValueKey('top-bell'),
+          tooltip: n > 0 ? 'Notifications, $n unread' : 'Notifications',
+          onPressed: () {
+            Haptic.tap();
+            onTap();
+          },
+          icon: Badge(
+            isLabelVisible: n > 0,
+            backgroundColor: cs.error,
+            textColor: cs.onError,
+            label: Text(n > 99 ? '99+' : '$n', style: const TextStyle(fontWeight: FontWeight.w700)),
+            child: Icon(n > 0 ? Icons.notifications_rounded : Icons.notifications_none_rounded, size: 26),
+          ),
+        );
+    final c = count;
+    return c == null ? button(0) : ValueListenableBuilder<int>(valueListenable: c, builder: (_, n, _) => button(n));
   }
 }
 

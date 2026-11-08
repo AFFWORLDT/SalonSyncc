@@ -10,10 +10,10 @@ import '../../models/role.dart';
 import 'announcements_screen.dart';
 import 'send_screen.dart';
 
-/// Unread announcements and updates, shown on the "More" tab.
+/// Unread notifications (announcements, "your sale was changed", …): the red count on the top bar's bell.
 final noticesUnread = ValueNotifier<int>(0);
 
-Future<void> _refreshUnread() async {
+Future<void> refreshNoticesUnread() async {
   final auth = Get.find<AuthController>();
   noticesUnread.value = (await NoticesApi(auth.api).list()).unread;
 }
@@ -26,8 +26,6 @@ final announcementsModule = FeatureModule(
   title: 'Announcements',
   icon: Icons.campaign_outlined,
   order: 30,
-  badge: noticesUnread,
-  onRefresh: _refreshUnread,
   builder: (_) {
     final auth = Get.find<AuthController>();
     return AnnouncementsScreen(me: auth.me.value!, api: NoticesApi(auth.api), unread: noticesUnread);

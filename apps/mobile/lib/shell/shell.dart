@@ -13,6 +13,9 @@ import '../core/features/registry.dart';
 import '../core/push/deep_link.dart';
 import '../core/ui/route.dart';
 import '../models/me.dart';
+import '../data/notices_api.dart';
+import '../modules/announcements/announcements_module.dart' show noticesUnread, refreshNoticesUnread;
+import '../modules/announcements/announcements_screen.dart';
 import 'profile_screen.dart';
 import 'search_screen.dart';
 import 'top_bar.dart';
@@ -76,6 +79,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   void _refreshBadges() {
     final me = auth.me.value;
     if (me == null) return;
+    if (me.features.contains('push')) refreshNoticesUnread().then((_) {}, onError: (_) {});
     for (final m in widget.registry.visibleFor(me)) {
       m.onRefresh?.call().then((_) {}, onError: (_) {});
     }
@@ -104,6 +108,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     }
   }
 
+  void _openNotifications(Me me) => Navigator.of(context).push(SkRoute<void>(
+        builder: (_) => ModulePage(
+          title: 'Notifications',
+          child: AnnouncementsScreen(me: me, api: NoticesApi(auth.api), unread: noticesUnread, title: 'Notifications'),
+        ),
+      ));
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -126,6 +137,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
               onSearch: () => openSearch(context, widget.registry),
               onAi: () => showAiSoon(context),
               onProfile: () => openProfile(context, widget.registry),
+              bell: noticesUnread,
+              onBell: me.features.contains('push') ? () => _openNotifications(me) : null,
             ),
             Expanded(
               child: PageTransitionSwitcher(
