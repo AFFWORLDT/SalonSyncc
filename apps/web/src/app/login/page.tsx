@@ -141,7 +141,7 @@ export default function LoginPage() {
           )}
           <h1 className="text-2xl font-bold">{brand?.name ? `Sign in to ${brand.name}` : "Sign in to your salon"}</h1>
           <p className="text-balance text-sm text-muted-foreground">
-            {mode === "code" ? "We\u2019ll email a sign-in code to the address on your staff profile." : needOrg ? "Enter your salon ID and the username your salon gave you." : "Sign in with the username your salon gave you."}
+            {mode === "code" ? "We\u2019ll email a sign-in code to the address on your staff profile." : needOrg ? "Enter your salon ID, then your email or the username your salon gave you." : "Sign in with your email or the username your salon gave you."}
           </p>
         </div>
 
@@ -166,7 +166,7 @@ export default function LoginPage() {
           {mode === "password" ? (
             <>
               <div className="grid gap-2">
-                <Label htmlFor="username">Username</Label>
+                <Label htmlFor="username">Email or username</Label>
                 <Input
                   id="username"
                   autoComplete="username"

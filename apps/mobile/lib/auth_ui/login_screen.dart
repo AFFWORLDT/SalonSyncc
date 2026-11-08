@@ -89,7 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _submit() async {
     if (_busy) return;
     if (_user.text.trim().isEmpty || _pass.text.isEmpty) {
-      setState(() => _error = 'Enter your username and password');
+      setState(() => _error = 'Enter your email or username, and your password');
       return;
     }
     setState(() {
@@ -131,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       enableSuggestions: false,
                       autofillHints: const [AutofillHints.username],
                       textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(labelText: 'Username'),
+                      decoration: const InputDecoration(labelText: 'Email or username'),
                     ),
                     const SizedBox(height: 12),
                     TextField(

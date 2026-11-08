@@ -55,7 +55,7 @@ describe("signup handoff", () => {
       </AuthProvider>
     );
     expect(await screen.findByText("This sign-in link has expired. Sign in with your password.")).toBeTruthy();
-    expect(screen.getByLabelText("Username")).toBeTruthy();
+    expect(screen.getByLabelText("Email or username")).toBeTruthy();
   });
 });
 

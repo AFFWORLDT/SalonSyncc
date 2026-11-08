@@ -29,7 +29,7 @@ auth.use("/logout", originGuard);
  */
 export async function verifyLogin(c: Context<AppEnv>, body: { org?: unknown; username?: unknown; password?: unknown }): Promise<{ org: Org; user: UserRow }> {
   let username = typeof body.username === "string" ? body.username.trim() : "";
-  if (username.length > 60) username = ""; // too long to be real: same 401 as not found, no failure row beyond the IP hit
+  if (username.length > (username.includes("@") ? 254 : 60)) username = ""; // too long to be a username (60) or an email (254): same 401 as not found, no failure row beyond the IP hit
   const password = typeof body.password === "string" ? body.password : "";
 
   const host = slugFromHost(new URL(c.req.url).host, c.env.ROOT_DOMAIN, c.env.ADMIN_HOST);
@@ -57,7 +57,8 @@ export async function verifyLogin(c: Context<AppEnv>, body: { org?: unknown; use
   ]);
   if (isLocked(ipCount, dev.max) || isLocked(deviceUser, perDevice.max) || isLocked(anyUser, anywhere.max)) throw new HttpError(429, LOCKED);
 
-  const user = repo && username ? await repo.userByUsername(username) : null;
+  // The username, or the email on a staff profile (owners: their signup email, which is also their username).
+  const user = repo && username ? ((await repo.userByUsername(username)) ?? (username.includes("@") ? await repo.userByEmail(username) : null)) : null;
 
   const ok = await checkPassword(password, user?.password_hash ?? (await dummyHash()));
   if (!live || !repo || !user || !user.active || !ok) {

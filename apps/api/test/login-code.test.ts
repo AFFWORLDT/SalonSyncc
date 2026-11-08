@@ -112,3 +112,14 @@ describe("sign in with an emailed code", () => {
     expect((await post("lc-limit", "/auth/code", { email: "sam@mail.com" }, "10.9.6.1")).status).toBe(429);
   });
 });
+
+describe("password sign-in with an email instead of the username", () => {
+  it("the staff email works with the password; a wrong password still fails", async () => {
+    await setup("lc-pw");
+    const r = await post("lc-pw", "/auth/login", { username: "SAM@mail.com", password: "pass1234" }, "10.9.7.1");
+    expect(r.status).toBe(200);
+    expect((await post("lc-pw", "/auth/login", { username: "sam@mail.com", password: "nope" }, "10.9.7.2")).status).toBe(401);
+    const app = await post("lc-pw", "/mobile/session", { username: "sam@mail.com", password: "pass1234", device }, "10.9.7.3");
+    expect(app.status).toBe(200);
+  });
+});

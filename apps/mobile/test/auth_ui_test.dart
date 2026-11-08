@@ -84,7 +84,7 @@ void main() {
     await t.tap(find.text('Continue'));
     await t.pumpAndSettle();
     expect(find.text('Sign in to Super Salon'), findsOneWidget);
-    expect(find.text('Username'), findsOneWidget);
+    expect(find.text('Email or username'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
   });
 
@@ -93,7 +93,7 @@ void main() {
     await typeSalon(t, 'supersalon');
     await t.tap(find.text('Continue'));
     await t.pumpAndSettle();
-    await t.enterText(find.widgetWithText(TextField, 'Username'), 'ali');
+    await t.enterText(find.widgetWithText(TextField, 'Email or username'), 'ali');
     await t.enterText(find.widgetWithText(TextField, 'Password'), 'nope');
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await t.pumpAndSettle();

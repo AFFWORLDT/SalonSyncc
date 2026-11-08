@@ -40,7 +40,7 @@ void main() {
     await t.tap(find.text('Continue'));
     await waitFor(t, find.text('Sign in to E2E Salon'));
 
-    await t.enterText(find.widgetWithText(TextField, 'Username'), 'barber');
+    await t.enterText(find.widgetWithText(TextField, 'Email or username'), 'barber');
     await t.enterText(find.widgetWithText(TextField, 'Password'), 'wrong-pass');
     FocusManager.instance.primaryFocus?.unfocus(); // the keyboard can cover the button
     await settle(t, 1);

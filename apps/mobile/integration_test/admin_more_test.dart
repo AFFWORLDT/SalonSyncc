@@ -67,7 +67,7 @@ void main() {
       await t.tap(find.text('Continue'));
     }
     await waitFor(t, find.text('Sign in to E2E Salon'));
-    await t.enterText(find.widgetWithText(TextField, 'Username'), 'owner');
+    await t.enterText(find.widgetWithText(TextField, 'Email or username'), 'owner');
     await t.enterText(find.widgetWithText(TextField, 'Password'), 'pass1234');
     await hideKeyboard(t);
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
