@@ -16,7 +16,10 @@
     { "pattern": "*.salonkit.online/*", "zone_name": "salonkit.online" },
     { "pattern": "salonkit.online/api/*", "zone_name": "salonkit.online" },
     { "pattern": "salonkit.online/.well-known/*", "zone_name": "salonkit.online" },
-    { "pattern": "www.salonkit.online/api/*", "zone_name": "salonkit.online" }
+    { "pattern": "www.salonkit.online/api/*", "zone_name": "salonkit.online" },
+    // Firebase Auth's sign-in pages on our own domain (src/lib/firebase-auth-proxy.ts).
+    { "pattern": "salonkit.online/__/*", "zone_name": "salonkit.online" },
+    { "pattern": "www.salonkit.online/__/*", "zone_name": "salonkit.online" }
   ],
   // The salon dashboard (apps/web static export), same origin as the API. Build it first: npm run build -w @ss/web.
   "assets": { "directory": "../web/out", "binding": "ASSETS", "not_found_handling": "404-page", "run_worker_first": ["/*", "!/_next/*"] },

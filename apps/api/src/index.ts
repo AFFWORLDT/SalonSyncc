@@ -38,6 +38,7 @@ import { mcp } from "./tenant/mcp/routes";
 import { mcpHttp } from "./mcp/http";
 import { hourly } from "./jobs/hourly";
 import type { Env } from "./env";
+import { firebaseAuthProxyTarget, proxyFirebaseAuth } from "./lib/firebase-auth-proxy";
 
 /** The Hono app (also exported by name: tests read its route table). */
 export const app = new Hono<AppEnv>();
@@ -154,6 +155,8 @@ async function fetchWithHeaders(req: Request, env: Env, ctx: ExecutionContext): 
   const moved = MOVED_HOSTS[url.hostname];
   if (moved) return new Response(null, { status: 302, headers: { Location: moved + url.pathname + url.search, "Cache-Control": "no-store" } });
   const path = url.pathname;
+  const fbAuth = firebaseAuthProxyTarget(url, env.ROOT_DOMAIN, env.FIREBASE_PROJECT_ID);
+  if (fbAuth) return proxyFirebaseAuth(req, fbAuth);
   const workerPath = path.startsWith("/api/") || path === "/mcp" || path.startsWith("/oauth/") || path.startsWith("/.well-known/");
   // run_worker_first sends pages through the Worker (for MOVED_HOSTS); everything else is still the static site.
   if (!workerPath && env.ASSETS) return env.ASSETS.fetch(req);
