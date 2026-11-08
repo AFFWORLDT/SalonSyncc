@@ -3,6 +3,10 @@ import 'package:get/get.dart';
 
 import '../core/api/api_error.dart';
 import '../core/auth/auth_controller.dart';
+import '../core/auth/social_auth.dart';
+import '../core/ui/google_mark.dart';
+import '../core/ui/social_button.dart';
+import 'signup_screen.dart';
 import '../core/ui/background.dart';
 import '../core/ui/glass.dart';
 import '../core/ui/route.dart';
@@ -61,6 +65,28 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  SocialAuth? get _social => Get.isRegistered<SocialAuth>() ? Get.find<SocialAuth>() : null;
+
+  /// Google / Apple, same as the first screen: signed in to the salon the email is on; a new email starts a salon.
+  Future<void> _socially(Future<String?> Function(SocialAuth s) sheet) async {
+    final s = _social;
+    if (s == null) return;
+    await _run(() async {
+      final String? token;
+      try {
+        token = await sheet(s);
+      } on SocialAuthError catch (e) {
+        if (mounted) setState(() => _error = e.message);
+        return;
+      }
+      if (token == null) return; // closed the sheet
+      final fresh = await auth.socialSignIn(token);
+      if (fresh != null && mounted) {
+        await Navigator.of(context).push(SkRoute<void>(builder: (_) => SignupScreen(social: fresh)));
+      }
+    });
   }
 
   Future<void> _sendCode() async {
@@ -126,6 +152,38 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     Text('Sign in to ${s.name}', textAlign: TextAlign.center, style: t.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 24),
+                    if (!_codeMode && _social != null) ...[
+                      SkSocialButton(
+                        key: const ValueKey('login-google'),
+                        label: 'Continue with Google',
+                        icon: const GoogleMark(size: 20),
+                        onPressed: _busy ? null : () => _socially((s) => s.google()),
+                      ),
+                      if (_social!.appleAvailable) ...[
+                        const SizedBox(height: 10),
+                        SkSocialButton(
+                          key: const ValueKey('login-apple'),
+                          label: 'Continue with Apple',
+                          icon: const Icon(Icons.apple, size: 22),
+                          onPressed: _busy ? null : () => _socially((s) => s.apple()),
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      SkSocialButton(
+                        key: const ValueKey('login-code-mode'),
+                        label: 'Email me a sign-in code',
+                        icon: const Icon(Icons.mail_outline, size: 22),
+                        onPressed: _busy ? null : _switchMode,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        child: Row(children: [
+                          const Expanded(child: Divider()),
+                          Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('or use your password', style: t.bodySmall?.copyWith(color: c.onSurfaceVariant))),
+                          const Expanded(child: Divider()),
+                        ]),
+                      ),
+                    ],
                     if (!_codeMode) ...[
                     TextField(
                       controller: _user,
@@ -204,10 +262,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(_error!, textAlign: TextAlign.center, style: t.bodyMedium?.copyWith(color: c.error)),
                     ],
                     const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: _busy ? null : _switchMode,
-                      child: Text(_codeMode ? 'Sign in with your password instead' : 'Sign in with an email code instead'),
-                    ),
+                    // With Google shown, the code has its own button at the top; going back to the password stays here.
+                    if (_codeMode || _social == null)
+                      TextButton(
+                        onPressed: _busy ? null : _switchMode,
+                        child: Text(_codeMode ? 'Sign in with your password instead' : 'Sign in with an email code instead'),
+                      ),
                     if (!_codeMode)
                       TextButton(
                         key: const ValueKey('login-forgot'),

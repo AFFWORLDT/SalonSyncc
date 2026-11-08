@@ -8,6 +8,7 @@ import '../core/ui/background.dart';
 import '../core/ui/glass.dart';
 import '../core/ui/google_mark.dart';
 import '../core/ui/route.dart';
+import '../core/ui/social_button.dart';
 import 'salon_screen.dart';
 import 'signup_screen.dart';
 
@@ -128,7 +129,7 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
                       ),
                       const SizedBox(height: 20),
                       if (!_sent && _social != null) ...[
-                        _SocialButton(
+                        SkSocialButton(
                           key: const ValueKey('start-google'),
                           label: 'Continue with Google',
                           icon: const GoogleMark(size: 20),
@@ -136,7 +137,7 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
                         ),
                         if (_social!.appleAvailable) ...[
                           const SizedBox(height: 10),
-                          _SocialButton(
+                          SkSocialButton(
                             key: const ValueKey('start-apple'),
                             label: 'Continue with Apple',
                             icon: const Icon(Icons.apple, size: 22),
@@ -216,23 +217,4 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
       ),
     );
   }
-}
-
-/// A full-width outlined button with the provider's mark, as Google's and Apple's guidelines ask.
-class _SocialButton extends StatelessWidget {
-  const _SocialButton({super.key, required this.label, required this.icon, required this.onPressed});
-  final String label;
-  final Widget icon;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) => OutlinedButton(
-        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-        onPressed: onPressed,
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          SizedBox(width: 24, child: Center(child: icon)),
-          const SizedBox(width: 10),
-          Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-        ]),
-      );
 }

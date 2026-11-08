@@ -6,6 +6,7 @@ import 'package:salonkit/core/auth/auth_controller.dart';
 import 'package:salonkit/core/auth/link_handler.dart';
 import 'package:salonkit/core/auth/social_auth.dart';
 import 'package:salonkit/auth_ui/signup_screen.dart' show flagOf;
+import 'package:salonkit/auth_ui/salon_screen.dart' show kSalonDebounce;
 
 import 'support/fake_adapter.dart';
 import 'support/harness.dart';
@@ -189,6 +190,57 @@ void main() {
     await t.tap(find.byKey(const ValueKey('start-google')));
     await t.pumpAndSettle();
     expect(find.text("You're offline"), findsOneWidget);
+  });
+
+  /// From the first screen to a salon's own sign-in screen (salon ID, then Continue).
+  Future<void> toSalonLogin(WidgetTester t) async {
+    await t.tap(find.text('Use salon ID and password'));
+    await t.pumpAndSettle();
+    await t.enterText(find.byType(TextField), 'supersalon');
+    await t.pump(kSalonDebounce);
+    await t.pumpAndSettle();
+    await t.tap(find.text('Continue'));
+    await t.pumpAndSettle();
+  }
+
+  testWidgets("salon sign-in screen: Google, Apple (iPhone) and an emailed code above the password", (t) async {
+    await open(t, social: FakeSocial(token: 'tok-known', hasApple: true));
+    await toSalonLogin(t);
+    expect(find.text('Sign in to Super Salon'), findsOneWidget);
+    expect(find.byKey(const ValueKey('login-google')), findsOneWidget);
+    expect(find.byKey(const ValueKey('login-apple')), findsOneWidget);
+    expect(find.text('Sign in with an email code instead'), findsNothing);
+    await t.tap(find.byKey(const ValueKey('login-code-mode')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const ValueKey('login-email')), findsOneWidget);
+    expect(find.text('Password'), findsNothing);
+    await t.tap(find.text('Sign in with your password instead'));
+    await t.pumpAndSettle();
+    expect(find.text('Password'), findsOneWidget);
+  });
+
+  testWidgets('salon sign-in screen: Google with an email on a team signs straight in', (t) async {
+    final a = await open(t, social: FakeSocial(token: 'tok-known'));
+    await toSalonLogin(t);
+    await t.tap(find.byKey(const ValueKey('login-google')));
+    await t.pumpAndSettle();
+    expect((a.calls.singleWhere((c) => c.path == '/api/auth/social').data as Map)['id_token'], 'tok-known');
+    expect(find.text('Hi ali 👋'), findsOneWidget);
+  });
+
+  testWidgets('salon sign-in screen: Google with a new email goes to start a salon', (t) async {
+    await open(t, social: FakeSocial(token: 'tok-new'));
+    await toSalonLogin(t);
+    await t.tap(find.byKey(const ValueKey('login-google')));
+    await t.pumpAndSettle();
+    expect(find.textContaining('Signed in as nina@gmail.com'), findsOneWidget);
+  });
+
+  testWidgets('salon sign-in screen: no Firebase, the code stays a link', (t) async {
+    await open(t);
+    await toSalonLogin(t);
+    expect(find.byKey(const ValueKey('login-google')), findsNothing);
+    expect(find.text('Sign in with an email code instead'), findsOneWidget);
   });
 
   test('country flags', () {
