@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Trash2 } from "lucide-react";
+import { Crown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ interface PUser {
   id: number;
   email: string;
   role: "owner" | "support";
+  /** The first portal account: above everyone, can never be removed. */
+  super_admin?: boolean;
   created_at: number;
 }
 
@@ -53,12 +55,17 @@ export default function TeamPage() {
                   <p className="truncate text-sm font-medium">
                     {u.email}
                     {u.id === me.id ? " (you)" : ""}
+                    {u.super_admin && (
+                      <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 align-middle text-[11px] font-semibold text-primary">
+                        <Crown className="size-3" /> Super admin
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {u.role === "owner" ? "Owner" : "Support"} · since {pDate(u.created_at)}
                   </p>
                 </div>
-                {owner && u.id !== me.id && (
+                {owner && u.id !== me.id && !u.super_admin && (
                   <Button variant="ghost" size="icon" aria-label={`Remove ${u.email}`} onClick={() => setRemoving(u)}>
                     <Trash2 className="size-4" />
                   </Button>
@@ -71,14 +78,18 @@ export default function TeamPage() {
 
       {owner && (
         <Card className="gap-3 p-4">
-          <p className="text-sm font-semibold">Add someone</p>
+          <div>
+            <p className="text-sm font-semibold">Add someone</p>
+            <p className="text-xs text-muted-foreground">We email them the portal link, their email and this password, what their role can do, and not to share it.</p>
+          </div>
           <form
             className="flex flex-wrap items-end gap-2"
             onSubmit={async (e) => {
               e.preventDefault();
               try {
-                await papi("/users", { body: { email, password, role } });
-                toast.success(`${email} can now sign in`);
+                const r = await papi<{ emailed?: boolean }>("/users", { body: { email, password, role } });
+                if (r.emailed) toast.success(`${email} can now sign in. Their portal link and sign-in were emailed to them.`);
+                else toast.warning(`${email} can now sign in, but the email didn't go out. Share the link and password with them yourself.`);
                 setEmail("");
                 setPassword("");
                 reload();

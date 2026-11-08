@@ -64,12 +64,18 @@ export function adminRepo(db: D1Database) {
     async userByEmail(email: string): Promise<PlatformUser | null> {
       return db.prepare("SELECT * FROM platform_users WHERE lower(email) = lower(?)").bind(email).first<PlatformUser>();
     },
+    /** The super admin: the first portal account (the founder). Nobody can remove it. */
+    async isSuperAdmin(id: number): Promise<boolean> {
+      return !!(await db.prepare("SELECT 1 FROM platform_users WHERE id = ? AND id = (SELECT MIN(id) FROM platform_users)").bind(id).first());
+    },
     async userById(id: number): Promise<PlatformUser | null> {
       return db.prepare("SELECT * FROM platform_users WHERE id = ?").bind(id).first<PlatformUser>();
     },
     async users(): Promise<Omit<PlatformUser, "password_hash" | "session_version">[]> {
-      const { results } = await db.prepare("SELECT id, email, role, created_at FROM platform_users ORDER BY id").all<Omit<PlatformUser, "password_hash" | "session_version">>();
-      return results;
+      const { results } = await db
+        .prepare("SELECT id, email, role, created_at, id = (SELECT MIN(id) FROM platform_users) AS super_admin FROM platform_users ORDER BY id")
+        .all<Omit<PlatformUser, "password_hash" | "session_version"> & { super_admin: number }>();
+      return results.map((u) => ({ ...u, super_admin: !!u.super_admin }));
     },
     async createUser(email: string, hash: string, role: PlatformRole, a: AuditInput): Promise<void> {
       await db.batch([
@@ -78,8 +84,14 @@ export function adminRepo(db: D1Database) {
       ]);
     },
     async deleteUser(id: number, a: AuditInput): Promise<boolean> {
-      // Their support codes go too (they reference the user); platform_audit keeps the history.
-      const [, del] = await db.batch([db.prepare("DELETE FROM support_sessions WHERE platform_user_id = ?").bind(id), db.prepare("DELETE FROM platform_users WHERE id = ?").bind(id), audit(a)]);
+      // Their support codes go too (they reference the user); platform_audit keeps the history. The super admin (the
+      // first account) is never deleted, whoever asks: the SQL itself refuses it.
+      const notSuper = "id <> (SELECT MIN(id) FROM platform_users)";
+      const [, del] = await db.batch([
+        db.prepare(`DELETE FROM support_sessions WHERE platform_user_id = ? AND platform_user_id <> (SELECT MIN(id) FROM platform_users)`).bind(id),
+        db.prepare(`DELETE FROM platform_users WHERE id = ? AND ${notSuper}`).bind(id),
+        audit(a),
+      ]);
       return (del!.meta.changes ?? 0) > 0;
     },
     /** New password and a bumped session_version (signs every other device out). Returns the new version. */

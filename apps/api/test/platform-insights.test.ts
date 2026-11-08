@@ -183,3 +183,33 @@ describe("push broadcast", () => {
     expect(j.devices).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe("adding someone to the portal team", () => {
+  it("emails them the portal link, sign-in, role and not to share it", async () => {
+    const f = fakeServices();
+    f.install();
+    const mailEnv = { ...E, RESEND_API_KEY: "re_test", MAIL_FROM: "SalonKit <hello@salonkit.online>", ADMIN_HOST: "admin" } as Env;
+    const r = await app.fetch(
+      new Request(`${ADMIN}/api/platform/users`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "CF-Connecting-IP": "10.80.0.1", cookie: owner },
+        body: JSON.stringify({ email: "New.Helper@salonkit.test", password: "s3cret-pass-1", role: "support" }),
+      }),
+      mailEnv,
+      ctx,
+    );
+    expect(r.status).toBe(201);
+    expect(await r.json()).toEqual({ ok: true, emailed: true });
+    const m = f.mails.at(-1)!;
+    expect(m.to).toBe("new.helper@salonkit.test");
+    expect(m.subject).toContain("Atlantic Portal");
+    for (const s of ["https://admin.salonkit.online/platform/login/", "new.helper@salonkit.test", "s3cret-pass-1", "Support", "Don't share", "ins-owner@salonkit.test"]) expect(m.text).toContain(s);
+    expect(m.html).toContain("Keep this to yourself");
+  });
+
+  it("without email set up, the account is still made and the page is told", async () => {
+    const r = await req("POST", "/users", owner, { email: "no-mail@salonkit.test", password: "s3cret-pass-2", role: "owner" });
+    expect(r.status).toBe(201);
+    expect(await r.json()).toEqual({ ok: true, emailed: false });
+  });
+});

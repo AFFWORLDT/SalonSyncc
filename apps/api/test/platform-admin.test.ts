@@ -259,6 +259,19 @@ describe("plans, users, audit, overview", () => {
     expect((await P("DELETE", `/users/${added.id}`, owner)).status).toBe(200);
   });
 
+  it("the first account is the super admin: marked, and no other owner can remove it", async () => {
+    const users = (await (await P("GET", "/users", owner)).json()) as { id: number; email: string; super_admin: boolean }[];
+    const sup = users.find((u) => u.super_admin)!;
+    expect(users.filter((u) => u.super_admin)).toHaveLength(1);
+    expect(sup.id).toBe(Math.min(...users.map((u) => u.id)));
+    await makePlatformUser("second-owner@salonkit.test", "owner");
+    const other = await platformLogin("second-owner@salonkit.test");
+    const r = await P("DELETE", `/users/${sup.id}`, other);
+    expect(r.status).toBe(403);
+    expect(((await r.json()) as { error: string }).error).toContain("super admin");
+    expect(await env.DB.prepare("SELECT 1 FROM platform_users WHERE id = ?").bind(sup.id).first()).not.toBeNull();
+  });
+
   it("audit and overview answer", async () => {
     const audit = (await (await P("GET", "/audit", owner)).json()) as { action: string }[];
     expect(audit.length).toBeGreaterThan(0);

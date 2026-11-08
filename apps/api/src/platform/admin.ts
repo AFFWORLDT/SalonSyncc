@@ -14,6 +14,8 @@ import { parseLimits, platformRepo } from "../data/platform";
 import { rateCount, rateHit } from "../data/infra";
 import { isLocked, loginWindow } from "../lib/limits";
 import { sha256 } from "../lib/hash";
+import { services } from "../core/services";
+import { portalInviteEmail } from "../emails/portal-invite";
 
 const DAY = 86_400_000;
 /** How long a "Log in as salon" code works, and the support session it opens. */
@@ -535,7 +537,23 @@ platformApi.post("/users", async (c) => {
   const repo = adminRepo(c.env.DB);
   if (await repo.userByEmail(email)) throw new HttpError(409, "This email already has an account");
   await repo.createUser(email, await hashPassword(b.password), role, auditOf(c, "user_create", null, undefined, { email, role }));
-  return c.json({ ok: true }, 201);
+  // Their sign-in by email (the owner asked for it): the portal link, email, password, role and "don't share it".
+  let emailed = false;
+  if (c.env.RESEND_API_KEY && c.env.MAIL_FROM) {
+    const root = c.env.ROOT_DOMAIN;
+    const origin = root ? `https://${c.env.ADMIN_HOST || "admin"}.${root}` : new URL(c.req.url).origin;
+    const mail = portalInviteEmail({
+      brand: c.env.BRAND_NAME,
+      siteUrl: root ? `https://${root}` : origin,
+      portalUrl: `${origin}/platform/login/`,
+      email,
+      password: b.password,
+      role,
+      invitedBy: c.var.platform.email,
+    });
+    emailed = await services(c.env).mail.send(c.env, { to: email, ...mail, replyTo: c.env.SUPPORT_EMAIL || undefined });
+  }
+  return c.json({ ok: true, emailed }, 201);
 });
 
 platformApi.delete("/users/:id", async (c) => {
@@ -543,9 +561,10 @@ platformApi.delete("/users/:id", async (c) => {
   if (!Number.isInteger(id)) throw new HttpError(404, "No such user");
   if (id === c.var.platform.id) throw bad("You can't remove your own account");
   const repo = adminRepo(c.env.DB);
+  if (await repo.isSuperAdmin(id)) throw new HttpError(403, "The super admin can't be removed", "super_admin");
   const u = await repo.userById(id);
   if (!u) throw new HttpError(404, "No such user");
-  await repo.deleteUser(id, auditOf(c, "user_delete", null, { email: u.email, role: u.role }));
+  if (!(await repo.deleteUser(id, auditOf(c, "user_delete", null, { email: u.email, role: u.role })))) throw new HttpError(403, "The super admin can't be removed", "super_admin");
   return c.json({ ok: true });
 });
 
