@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Plain black while Flutter starts; the intro animation (lib/core/ui/intro_overlay.dart) then plays on the same black. -->
+<!-- Warm cream while Flutter starts; the splash art (lib/core/ui/splash_art.dart) then appears on the same cream. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/black" />
+    <item android:drawable="@color/splash_cream" />
 </layer-list>

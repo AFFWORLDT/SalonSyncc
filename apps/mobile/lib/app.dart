@@ -11,7 +11,7 @@ import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/theme/tokens.dart';
 import 'core/ui/background.dart';
-import 'core/ui/intro_overlay.dart';
+import 'core/ui/splash_art.dart';
 import 'core/ui/motion.dart';
 import 'modules/modules.dart';
 import 'shell/shell.dart';
@@ -24,7 +24,7 @@ class SalonKitApp extends StatelessWidget {
   const SalonKitApp({super.key, this.registry, this.intro = false});
   final FeatureRegistry? registry;
 
-  /// Play the logo animation over the first screen (the real app; tests leave it off).
+  /// Show the splash art over the first screen for a moment (the real app; tests leave it off).
   final bool intro;
 
   @override
@@ -39,7 +39,7 @@ class SalonKitApp extends StatelessWidget {
           themeMode: theme.mode.value,
           builder: (context, child) {
             final app = appWrappers.fold(child ?? const SizedBox(), (w, wrap) => wrap(context, w));
-            return intro ? IntroOverlay(child: app) : app;
+            return intro ? SplashOverlay(child: app) : app;
           },
           home: _AuthGate(registry: reg),
         ));
