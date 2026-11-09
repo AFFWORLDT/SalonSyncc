@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="ic_launcher_background">#000000</color>
     <!-- The splash art's warm cream (lib/core/ui/splash_art.dart), so the hand-over from the system splash doesn't flash. -->
     <color name="splash_cream">#F3ECE1</color>
 </resources>
