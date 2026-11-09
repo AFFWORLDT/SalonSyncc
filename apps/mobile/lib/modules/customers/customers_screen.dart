@@ -92,7 +92,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
-        const SkHeading('Customers', subtitle: 'Saved when a mobile number is on a bill. Tap one for their visits.'),
+        const SkHeading('Customers', subtitle: 'Everyone your salon has served. Tap one for their visits.'),
         SkSearchField(
           controller: _q,
           hint: 'Search name or mobile',

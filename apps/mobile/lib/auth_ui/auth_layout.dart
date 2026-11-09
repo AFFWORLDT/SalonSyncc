@@ -7,8 +7,11 @@ import '../core/config.dart';
 /// The sign-in screens' shared look: the salon photo with a headline, a rounded sheet that rises over it, and a badge
 /// (SalonKit's logo or the salon's) sitting on the seam.
 class SkAuthLayout extends StatelessWidget {
-  const SkAuthLayout({super.key, required this.badge, required this.child, this.headline = 'Your salon.\nSmarter.', this.tagline = 'Bills, staff and daily reports, all in one app.'});
+  const SkAuthLayout({super.key, required this.badge, required this.child, this.headline = 'Your salon.\nSmarter.', this.tagline = 'Bills, staff and daily reports, all in one app.', this.back});
   final Widget badge;
+
+  /// A round back button on the photo; null = shown whenever there is a screen to go back to.
+  final bool? back;
   final Widget child;
   final String headline, tagline;
 
@@ -21,7 +24,7 @@ class SkAuthLayout extends StatelessWidget {
         backgroundColor: c.surface,
         body: SingleChildScrollView(
           child: Column(children: [
-            _Hero(headline: headline, tagline: tagline),
+            _Hero(headline: headline, tagline: tagline, back: back ?? Navigator.of(context).canPop()),
             Transform.translate(
               offset: const Offset(0, -32),
               child: Stack(clipBehavior: Clip.none, alignment: Alignment.topCenter, children: [
@@ -43,8 +46,9 @@ class SkAuthLayout extends StatelessWidget {
 
 /// The salon photo with the headline on a dark green wash (dark in both themes, so the text stays white).
 class _Hero extends StatelessWidget {
-  const _Hero({required this.headline, required this.tagline});
+  const _Hero({required this.headline, required this.tagline, this.back = false});
   final String headline, tagline;
+  final bool back;
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
@@ -64,7 +68,22 @@ class _Hero extends StatelessWidget {
             widthFactor: 0.66,
             alignment: Alignment.topLeft,
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const SkWordmark(color: Colors.white, size: 17),
+              Row(children: [
+                if (back) ...[
+                  Material(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      key: const ValueKey('auth-back'),
+                      tooltip: 'Back',
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                const SkWordmark(color: Colors.white, size: 17),
+              ]),
               const SizedBox(height: 16),
               Text(headline, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 28, height: 1.12, fontWeight: FontWeight.w800, letterSpacing: -0.6)),
               const SizedBox(height: 10),

@@ -7,8 +7,8 @@ import 'package:salonkit/core/theme/tokens.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  test('light and dark palettes differ and primary matches web hex values', () {
-    expect(SkTokens.light.primary, const Color(0xFF1F7A6A));
+  test('light and dark palettes differ; light primary is the redesign\'s deep green', () {
+    expect(SkTokens.light.primary, const Color(0xFF0E5A48));
     expect(SkTokens.dark.primary, const Color(0xFF2A9D88));
     expect(SkTokens.light.background, const Color(0xFFF6F2E9));
     expect(SkTokens.dark.background, const Color(0xFF08110F));
@@ -20,7 +20,9 @@ void main() {
     expect(t.textTheme.bodyMedium!.fontFamily, 'GoogleSansFlex');
     expect(t.colorScheme.primary, SkTokens.light.primary);
     expect(buildTheme(SkTokens.dark, Brightness.dark).brightness, Brightness.dark);
-    expect(SkText.mono.fontFamily, 'GoogleSansCode');
+    // Numbers use the text face with even-width figures; only the printed bill keeps the typewriter face.
+    expect(SkText.mono.fontFamily, 'GoogleSansFlex');
+    expect(SkText.mono.fontFeatures, contains(const FontFeature.tabularFigures()));
   });
 
   test('ThemeController persists dark', () async {

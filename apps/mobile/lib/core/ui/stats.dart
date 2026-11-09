@@ -5,6 +5,18 @@ import '../theme/scale.dart';
 import 'count_up.dart';
 import 'states.dart';
 
+/// The look of every card: white, big rounded corners, a hairline and (in light) a soft shadow.
+BoxDecoration skSoftCard(BuildContext context, {double radius = 22}) {
+  final cs = Theme.of(context).colorScheme;
+  final dark = Theme.of(context).brightness == Brightness.dark;
+  return BoxDecoration(
+    color: cs.surface,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: cs.outlineVariant.withValues(alpha: dark ? 0.6 : 0.35)),
+    boxShadow: dark ? null : const [BoxShadow(color: Color(0x0F1C1B18), blurRadius: 16, offset: Offset(0, 6))],
+  );
+}
+
 /// The one big number at the top of a screen (Groww's portfolio value): a small grey label, the amount large in the
 /// mono face, then a line of [chips] (e.g. the change vs yesterday) and plain [notes].
 class SkHero extends StatelessWidget {
@@ -24,7 +36,7 @@ class SkHero extends StatelessWidget {
       const SizedBox(height: SkSpace.xs),
       value == null
           ? const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: SkSkeleton(height: 34, width: 180))
-          : CountUp(value: value!, format: format, style: SkText.mono.copyWith(fontSize: 38, height: 1.1, fontWeight: FontWeight.w700, letterSpacing: -1, color: color)),
+          : CountUp(value: value!, format: format, style: SkText.mono.copyWith(fontSize: 38, height: 1.1, fontWeight: FontWeight.w800, letterSpacing: -1, color: color)),
       if (chips.isNotEmpty || notes.isNotEmpty) ...[
         const SizedBox(height: SkSpace.sm),
         Wrap(spacing: SkSpace.sm, runSpacing: SkSpace.xs, crossAxisAlignment: WrapCrossAlignment.center, children: [
@@ -83,11 +95,7 @@ class SkStatStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(SkRadius.lg),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
-      ),
+      decoration: skSoftCard(context),
       child: IntrinsicHeight(
         child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           for (var i = 0; i < stats.length; i++) ...[
@@ -114,7 +122,7 @@ class SkStatStrip extends StatelessWidget {
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: Text(s.text!, style: SkText.mono.copyWith(fontSize: 16, fontWeight: FontWeight.w700, color: s.color)),
+              child: Text(s.text!, style: SkText.mono.copyWith(fontSize: 16, fontWeight: FontWeight.w800, color: s.color)),
             )
           else if (s.value == null || s.loading)
             const SkSkeleton(height: 18, width: 64)
@@ -122,7 +130,7 @@ class SkStatStrip extends StatelessWidget {
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
-              child: CountUp(value: s.value!, format: format, style: SkText.mono.copyWith(fontSize: 16, fontWeight: FontWeight.w700, color: s.color)),
+              child: CountUp(value: s.value!, format: format, style: SkText.mono.copyWith(fontSize: 16, fontWeight: FontWeight.w800, color: s.color)),
             ),
           if (s.hint != null) ...[const SizedBox(height: 2), Text(s.hint!, maxLines: 2, style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant))],
         ]),
@@ -142,11 +150,7 @@ class SkFlatList extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(SkRadius.lg),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
-      ),
+      decoration: skSoftCard(context),
       clipBehavior: Clip.antiAlias,
       child: Column(children: [
         for (var i = 0; i < children.length; i++) ...[
@@ -166,15 +170,10 @@ class SkCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Container(
       padding: padding,
       clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: cs.surfaceContainerLowest.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(SkRadius.lg),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
-      ),
+      decoration: skSoftCard(context),
       child: child,
     );
   }

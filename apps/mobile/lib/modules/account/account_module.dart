@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../core/ui/brand.dart';
 import '../../core/theme/scale.dart';
 import '../../core/ui/stats.dart';
 import '../../core/ui/confirm_sign_out.dart';
@@ -39,7 +41,8 @@ Widget _lockToggle(BuildContext context) {
   return Obx(() => !lock.available.value
       ? const SizedBox.shrink()
       : SkSwitchTile(
-          secondary: const Icon(Icons.fingerprint),
+          contentPadding: const EdgeInsets.fromLTRB(14, 4, 12, 4),
+          secondary: const SkIconCircle(Icons.fingerprint, size: 48),
           title: const Text('Unlock with Face ID / fingerprint'),
           value: lock.enabled.value,
           onChanged: (on) => on ? lock.enable() : lock.disable(),
@@ -69,13 +72,13 @@ class AccountScreen extends StatelessWidget {
       const SizedBox(height: SkSpace.lg),
       SkFlatList(children: [
         ListTile(
-          leading: const Icon(Icons.lock_reset_rounded),
+          leading: const SkIconCircle(Icons.lock_reset_rounded),
           title: const Text('Change password'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => showChangePassword(context, AccountApi(auth.api)),
         ),
         Obx(() => ListTile(
-              leading: const Icon(Icons.brightness_6_outlined),
+              leading: const SkIconCircle(Icons.brightness_6_outlined),
               title: const Text('Appearance'),
               trailing: DropdownButton<ThemeMode>(
                 value: theme.mode.value,
@@ -89,9 +92,9 @@ class AccountScreen extends StatelessWidget {
               ),
             )),
         for (final b in accountExtras) b(context),
-        ListTile(leading: const Icon(Icons.swap_horiz), title: const Text('Switch salon'), onTap: () => auth.switchSalon()),
+        ListTile(leading: const SkIconCircle(Icons.swap_horiz), title: const Text('Switch salon'), onTap: () => auth.switchSalon()),
         ListTile(
-          leading: Icon(Icons.logout, color: Theme.of(context).colorScheme.error),
+          leading: SkIconCircle(Icons.logout, color: Theme.of(context).colorScheme.error),
           title: Text('Sign out', style: TextStyle(color: Theme.of(context).colorScheme.error)),
           onTap: () async {
             if (await confirmSignOut(context)) await auth.signOut();

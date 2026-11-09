@@ -23,7 +23,7 @@ class SkHeading extends StatelessWidget {
       child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(title, style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+            Text(title, style: t.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.6)),
             if (subtitle != null) ...[const SizedBox(height: 2), Text(subtitle!, style: sub)],
           ]),
         ),
@@ -47,14 +47,18 @@ class SkSection extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(top: top, bottom: SkSpace.sm),
       child: Row(children: [
-        Expanded(child: Text(label, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
+        Expanded(child: Text(label, style: t.titleLarge?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.3))),
         if (action != null && onAction != null)
           Tooltip(
             message: actionTooltip ?? action!,
             child: TextButton(
               style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: SkSpace.sm), tapTargetSize: MaterialTapTargetSize.padded),
               onPressed: onAction,
-              child: Text(action!, style: TextStyle(color: cs.primary, fontWeight: FontWeight.w600)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(action!, style: TextStyle(color: cs.primary, fontWeight: FontWeight.w700)),
+                const SizedBox(width: 4),
+                Icon(Icons.arrow_forward_rounded, size: 17, color: cs.primary),
+              ]),
             ),
           ),
       ]),

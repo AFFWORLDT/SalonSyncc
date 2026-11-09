@@ -40,7 +40,7 @@ void main() {
     await t.pumpWidget(MaterialApp(home: Scaffold(body: CustomersScreen(me: owner(), api: CustomersApi(client(a)), onOpen: (_) async {}))));
     await t.pumpAndSettle();
     expect(find.text('Customers'), findsOneWidget);
-    expect(find.text('Saved when a mobile number is on a bill. Tap one for their visits.'), findsOneWidget);
+    expect(find.text('Everyone your salon has served. Tap one for their visits.'), findsOneWidget);
     expect(find.text('1 customers'), findsOneWidget);
     expect(find.text('Omar'), findsOneWidget);
     await t.enterText(find.byType(TextField), 'om');

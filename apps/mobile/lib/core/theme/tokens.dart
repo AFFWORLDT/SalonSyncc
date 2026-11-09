@@ -37,7 +37,7 @@ abstract final class SkTokens {
     background: Color(0xFFF6F2E9),
     foreground: Color(0xFF1C1B18),
     card: Color(0xFFFFFDF8),
-    primary: Color(0xFF1F7A6A),
+    primary: Color(0xFF0E5A48),
     primaryForeground: Color(0xFFFFFFFF),
     muted: Color(0xFFECE6D9),
     mutedForeground: Color(0xFF67635B),

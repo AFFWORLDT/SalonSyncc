@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../core/ui/brand.dart';
 import '../../core/ui/haptics.dart';
 import '../../core/theme/scale.dart';
 import '../../core/ui/stats.dart';
@@ -377,8 +379,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(SkSpace.lg, SkSpace.md, SkSpace.sm, SkSpace.md),
                 child: Row(children: [
-                  Icon(icon, size: 26, color: cs.onSurfaceVariant),
-                  const SizedBox(width: SkSpace.lg),
+                  SkIconCircle(icon),
+                  const SizedBox(width: SkSpace.md + 2),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),

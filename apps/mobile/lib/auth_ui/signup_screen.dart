@@ -2,13 +2,12 @@ import 'dart:async';
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/material.dart';
+import 'auth_layout.dart';
 import 'package:get/get.dart';
 
 import '../core/api/api_error.dart';
 import '../core/auth/auth_controller.dart';
 import '../core/config.dart';
-import '../core/ui/background.dart';
-import '../core/ui/glass.dart';
 
 /// The countries a new salon can start in (the server's COUNTRY_DEFAULTS: currency, time zone, phone code).
 const kSignupCountries = <(String, String)>[
@@ -154,18 +153,13 @@ class _SignupScreenState extends State<SignupScreen> {
     final t = Theme.of(context).textTheme, c = Theme.of(context).colorScheme;
     const gap = SizedBox(height: 12);
     final note = _slugNote;
-    return Scaffold(
-      appBar: AppBar(backgroundColor: Colors.transparent, scrolledUnderElevation: 0),
-      extendBodyBehindAppBar: true,
-      body: SkBackground(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-            child: SkGlass(
-              padding: const EdgeInsets.all(24),
-              child: AutofillGroup(
+    return SkAuthLayout(
+      badge: Image.asset('assets/brand/icon.png', fit: BoxFit.cover),
+      headline: 'Your salon,\nlive in a minute.',
+      tagline: '7 days of every feature. No card needed.',
+      child: AutofillGroup(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Text('Start your free trial', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+                  Text('Start your free trial', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.4)),
                   const SizedBox(height: 6),
                   Text(
                     social == null ? '7 days free, every feature. No card needed.' : 'Signed in as ${social!.email}. Now tell us about your salon: 7 days free, no card needed.',
@@ -263,10 +257,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                 ]),
               ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -95,3 +95,23 @@ class SkChoicePill extends StatelessWidget {
     );
   }
 }
+
+/// A row's icon in a soft green circle (settings, profile and other menu lists).
+class SkIconCircle extends StatelessWidget {
+  const SkIconCircle(this.icon, {super.key, this.size = 46, this.color});
+  final IconData icon;
+  final double size;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final tint = color ?? (dark ? kSkMint : kSkDeep);
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: tint.withValues(alpha: dark ? 0.16 : 0.09), shape: BoxShape.circle),
+      child: Icon(icon, size: size * 0.5, color: tint),
+    );
+  }
+}

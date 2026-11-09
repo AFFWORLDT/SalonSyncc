@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'brand.dart';
+
 import '../theme/scale.dart';
 import 'haptics.dart';
 
@@ -43,7 +45,7 @@ class _SkFilterPillState extends State<SkFilterPill> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final w = widget;
-    final fg = w.active ? cs.surface : cs.onSurface;
+    final fg = w.active ? Colors.white : cs.onSurface;
     final clear = w.onClear != null && w.active;
     final main = Row(mainAxisSize: MainAxisSize.min, children: [
       const SizedBox(width: 12),
@@ -64,8 +66,8 @@ class _SkFilterPillState extends State<SkFilterPill> {
           bottom: 6,
           child: DecoratedBox(
             decoration: ShapeDecoration(
-              color: w.active ? cs.onSurface : cs.surfaceContainerHighest.withValues(alpha: 0.6),
-              shape: StadiumBorder(side: BorderSide(color: w.active ? cs.onSurface : cs.outlineVariant.withValues(alpha: 0.7))),
+              color: w.active ? kSkDeep : cs.surface,
+              shape: StadiumBorder(side: BorderSide(color: w.active ? kSkDeep : cs.outlineVariant.withValues(alpha: 0.7))),
             ),
           ),
         ),

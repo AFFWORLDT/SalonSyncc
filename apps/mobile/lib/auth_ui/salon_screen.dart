@@ -1,13 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'auth_layout.dart';
 import 'package:get/get.dart';
 
 import '../core/api/api_error.dart';
 import '../core/auth/auth_controller.dart';
 import '../core/config.dart';
-import '../core/ui/background.dart';
-import '../core/ui/glass.dart';
 import '../core/ui/motion.dart';
 import '../core/ui/salon_logo.dart';
 import '../models/brand.dart';
@@ -78,16 +77,10 @@ class _SalonScreenState extends State<SalonScreen> {
     final t = Theme.of(context).textTheme;
     final c = Theme.of(context).colorScheme;
     final f = _found;
-    return Scaffold(
-      body: SkBackground(
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: SkGlass(
-                padding: const EdgeInsets.all(24),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Text('Enter your salon ID', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+    return SkAuthLayout(
+      badge: Image.asset('assets/brand/icon.png', fit: BoxFit.cover),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Text('Enter your salon ID', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.4)),
                   const SizedBox(height: 6),
                   Text('Your salon owner can tell you this.', style: t.bodyMedium?.copyWith(color: c.onSurfaceVariant)),
                   const SizedBox(height: 20),
@@ -129,11 +122,6 @@ class _SalonScreenState extends State<SalonScreen> {
                             : const SizedBox(key: ValueKey('empty')),
                   ),
                 ]),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 

@@ -12,6 +12,9 @@ const _faint = Color(0x4D000000);
 
 /// The bill laid out like the web's `<Bill>` (apps/web/src/components/app/bill.tsx) and the public receipt: logo and
 /// salon header, bill details, a Service / Qty / Price / Amount table, totals with VAT inside the total, and the footer.
+/// The receipt's typewriter face (its own, so app-wide number styling never changes the printed bill).
+const _paperMono = TextStyle(fontFamily: kMonoFont, fontFeatures: [FontFeature.tabularFigures()]);
+
 /// Always dark on white, like paper, in the mono face.
 class BillView extends StatelessWidget {
   const BillView({super.key, required this.sale, required this.settings, required this.fmt, this.slug, this.onFillDetails});
@@ -32,7 +35,7 @@ class BillView extends StatelessWidget {
     final lines = sale.items.isNotEmpty ? sale.items : [SaleItem(name: (sale.note ?? '').isNotEmpty ? sale.note! : 'Salon service', price: sale.amount, qty: 1)];
     final rate = sale.vatRate == sale.vatRate.roundToDouble() ? '${sale.vatRate.round()}%' : '${sale.vatRate}%';
     final name = settings.displayName;
-    final base = SkText.mono.copyWith(fontSize: 12, height: 1.45, color: _ink);
+    final base = _paperMono.copyWith(fontSize: 12, height: 1.45, color: _ink);
     final bold = base.copyWith(fontWeight: FontWeight.w600);
     final sans = TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: _ink, fontFamily: Theme.of(context).textTheme.bodyMedium?.fontFamily);
     String fixed(int v) => (v / fmt.minor).toStringAsFixed(fmt.digits);

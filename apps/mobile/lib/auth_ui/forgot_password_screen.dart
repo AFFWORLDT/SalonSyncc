@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'auth_layout.dart';
 import 'package:get/get.dart';
 
 import '../core/api/api_error.dart';
 import '../core/auth/auth_controller.dart';
-import '../core/ui/background.dart';
-import '../core/ui/glass.dart';
 
 /// "Forgot password?": a code to the email on their staff profile, then a new password; signed in with it after.
 class ForgotPasswordScreen extends StatefulWidget {
@@ -61,18 +60,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme, c = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(backgroundColor: Colors.transparent, scrolledUnderElevation: 0),
-      extendBodyBehindAppBar: true,
-      body: SkBackground(
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: SkGlass(
-                padding: const EdgeInsets.all(24),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Text('Reset your password', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+    return SkAuthLayout(
+      badge: Image.asset('assets/brand/icon.png', fit: BoxFit.cover),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  Text('Reset your password', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.4)),
                   const SizedBox(height: 6),
                   Text(
                     _sent ? 'If ${_email.text.trim()} is on your staff profile, a code is on its way. Enter it and choose a new password.' : "We'll email a code to the address on your staff profile.",
@@ -130,11 +121,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                   if (_sent) TextButton(onPressed: _busy ? null : _send, child: const Text('Send a new code')),
                 ]),
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

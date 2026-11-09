@@ -6,8 +6,9 @@ const kTextFont = 'GoogleSansFlex';
 const kMonoFont = 'GoogleSansCode';
 
 abstract final class SkText {
-  /// Numbers, ids and uppercase labels (web: font-mono).
-  static const mono = TextStyle(fontFamily: kMonoFont, fontFeatures: [FontFeature.tabularFigures()]);
+  /// Numbers, ids and amounts: the text face with even-width figures, so columns line up (the printed bill keeps
+  /// its own typewriter face).
+  static const mono = TextStyle(fontFamily: kTextFont, fontFeatures: [FontFeature.tabularFigures()]);
 }
 
 ThemeData buildTheme(SkPalette p, Brightness b) {

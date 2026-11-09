@@ -7,6 +7,7 @@ import '../../core/ui/tour.dart';
 import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/ui/brand.dart';
 import '../../core/ui/glass.dart';
 import '../../core/ui/states.dart';
 import '../../data/report_api.dart';
@@ -137,12 +138,7 @@ class TodayScreenState extends State<TodayScreen> {
           else
             tourTarget(
               'new-sale-today',
-              FilledButton.icon(
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), textStyle: const TextStyle(fontFamily: kTextFont, fontSize: 16, fontWeight: FontWeight.w600)),
-                onPressed: () => _after(widget.onNewSale),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('New sale'),
-              ),
+              SkGreenButton(label: 'New sale', onPressed: () => _after(widget.onNewSale)),
             ),
           Padding(
             padding: const EdgeInsets.only(top: SkSpace.xl, bottom: SkSpace.sm),
