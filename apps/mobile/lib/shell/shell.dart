@@ -151,13 +151,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         ),
         bottomNavigationBar: ids.length < 2
             ? null
-            : NavigationBar(
-                selectedIndex: index,
-                onDestinationSelected: (i) {
+            : _PillNavBar(
+                index: index,
+                onSelect: (i) {
                   if (i != index) HapticFeedback.selectionClick();
                   setState(() => _tab = ids[i]);
                 },
-                destinations: [for (final m in tabs) NavigationDestination(icon: tourTarget('tab-${m.id}', _Badged(icon: m.icon, counts: [?m.badge])), label: m.title)],
+                items: [for (final m in tabs) (icon: tourTarget('tab-${m.id}', _Badged(icon: m.icon, counts: [?m.badge])), label: m.title)],
               ),
       );
     });
@@ -179,6 +179,67 @@ class _Badged extends StatelessWidget {
         final n = counts.fold<int>(0, (s, c) => s + c.value);
         return Badge(isLabelVisible: n > 0, label: Text(n > 99 ? '99+' : '$n'), child: Icon(icon));
       },
+    );
+  }
+}
+
+/// The tab bar: a floating rounded bar; the open tab is a deep green pill with its icon and name in white.
+class _PillNavBar extends StatelessWidget {
+  const _PillNavBar({required this.index, required this.onSelect, required this.items});
+  final int index;
+  final ValueChanged<int> onSelect;
+  final List<({Widget icon, String label})> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    const deep = Color(0xFF0E5A48);
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: dark ? 0.7 : 0.4)),
+          boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 20, offset: Offset(0, 6))],
+        ),
+        child: Row(children: [
+          for (var i = 0; i < items.length; i++)
+            Expanded(
+              child: Semantics(
+                selected: i == index,
+                button: true,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => onSelect(i),
+                  child: AnimatedContainer(
+                    duration: MediaQuery.of(context).disableAnimations ? Duration.zero : const Duration(milliseconds: 180),
+                    curve: Curves.easeOut,
+                    height: 58,
+                    decoration: BoxDecoration(color: i == index ? deep : Colors.transparent, borderRadius: BorderRadius.circular(24)),
+                    child: IconTheme(
+                      data: IconThemeData(color: i == index ? Colors.white : cs.onSurfaceVariant, size: 24),
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        items[i].icon,
+                        const SizedBox(height: 3),
+                        Text(
+                          items[i].label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 12, fontWeight: i == index ? FontWeight.w700 : FontWeight.w500, color: i == index ? Colors.white : cs.onSurfaceVariant),
+                        ),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ]),
+      ),
     );
   }
 }
