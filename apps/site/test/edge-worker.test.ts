@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-// @ts-expect-error plain JS Worker module
 import worker, { canonicalRedirect } from "../edge/worker.js";
 
 describe("site edge worker", () => {
