@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../shell/nav.dart';
 import '../../core/format/fmt.dart';
+import '../../core/ui/page_header.dart';
 import '../../core/ui/route.dart';
 import '../../data/sales_api.dart';
 import '../../data/staff_api.dart';
@@ -44,19 +45,28 @@ class _BillScreenState extends State<BillScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(
-          title: Text(_sale.billNo),
-          actions: [if (_canEdit) TextButton.icon(onPressed: _edit, icon: const Icon(Icons.edit_outlined), label: const Text('Edit'))],
+        body: SafeArea(
+          bottom: false,
+          child: Column(children: [
+            SkPageHeader(
+              title: 'Bill Details',
+              subtitle: _sale.billNo,
+              actions: [if (_canEdit) SkPillAction(icon: Icons.edit_outlined, label: 'Edit', onTap: _edit)],
+            ),
+            Expanded(
+              child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
+                // The bill itself stays exactly as the customer gets it (paper look).
+                BillView(
+                  sale: _sale,
+                  settings: widget.me.salon,
+                  fmt: widget.me.fmt,
+                  slug: widget.me.org.slug,
+                  onFillDetails: _admin && !widget.me.readOnly ? () => openModule('settings') : null,
+                ),
+              ]),
+            ),
+          ]),
         ),
-        body: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 24), children: [
-          BillView(
-            sale: _sale,
-            settings: widget.me.salon,
-            fmt: widget.me.fmt,
-            slug: widget.me.org.slug,
-            onFillDetails: _admin && !widget.me.readOnly ? () => openModule('settings') : null,
-          ),
-        ]),
         // Sharing stays under the thumb, however long the bill is.
         bottomNavigationBar: SafeArea(
           child: Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 12), child: shareActionsFor(context, _sale)),

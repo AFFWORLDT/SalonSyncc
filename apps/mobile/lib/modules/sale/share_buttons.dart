@@ -88,10 +88,12 @@ class _ShareButtonsState extends State<ShareButtons> {
   @override
   Widget build(BuildContext context) {
     final b = _b, s = widget.sale;
+    final pill = FilledButton.styleFrom(minimumSize: const Size.fromHeight(50), shape: const StadiumBorder(), textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700));
     return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
         Expanded(
           child: FilledButton.tonalIcon(
+            style: pill,
             onPressed: () {
               Haptic.tap();
               widget.open(b.whatsAppLink(s));
@@ -103,6 +105,7 @@ class _ShareButtonsState extends State<ShareButtons> {
         const SizedBox(width: 10),
         Expanded(
           child: FilledButton.tonalIcon(
+            style: pill,
             onPressed: () {
               Haptic.tap();
               widget.share(b.shareText(s), b.shareTitle(s));
@@ -115,6 +118,7 @@ class _ShareButtonsState extends State<ShareButtons> {
       if (_cloud) ...[
         const SizedBox(height: 10),
         OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50), shape: const StadiumBorder()),
           onPressed: _sending ? null : _send,
           icon: const Icon(Icons.send_rounded),
           label: const Text('Send from the salon number'),

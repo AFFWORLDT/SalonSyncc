@@ -26,6 +26,7 @@ import 'package:salonkit/models/sale.dart';
 import 'package:salonkit/modules/customers/customers_screen.dart';
 import 'package:salonkit/modules/dashboard/dashboard_screen.dart';
 import 'package:salonkit/modules/sale/bill_view.dart';
+import 'package:salonkit/modules/sale/sale_done.dart';
 import 'package:salonkit/modules/sales/sales_screen.dart';
 import 'package:salonkit/modules/services/services_screen.dart';
 import 'package:salonkit/modules/settings/settings_screen.dart';
@@ -79,6 +80,7 @@ void main() {
     'services': () => ServicesScreen(me: owner, api: ServicesAdminApi(c)),
     'customers': () => CustomersScreen(me: owner, api: CustomersApi(c), onOpen: (_) async {}),
     'settings': () => SettingsScreen(me: owner, api: SettingsApi(c), onSaved: () async {}),
+    'sale-done': () => SaleDone(sale: sale, fmt: owner.fmt, settings: owner.salon, slug: owner.org.slug, onDone: () {}, onNew: () {}),
     'bill': () => ListView(padding: const EdgeInsets.all(16), children: [BillView(sale: sale, settings: owner.salon, fmt: owner.fmt)]),
   };
 
