@@ -61,14 +61,18 @@ void main() {
 
   testWidgets('just your email: code from the bare domain; the server names the salon', (t) async {
     final a = await open(t);
-    expect(find.text('Sign in to your salon'), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
     await t.enterText(find.byKey(const ValueKey('start-email')), 'ali@mail.com');
-    await t.tap(find.widgetWithText(FilledButton, 'Continue'));
+    await t.ensureVisible(find.widgetWithText(FilledButton, 'Email me a sign-in code'));
+    await t.tap(find.widgetWithText(FilledButton, 'Email me a sign-in code'));
     await t.pumpAndSettle();
     final ask = a.calls.singleWhere((c) => c.path == '/api/auth/code');
     expect([ask.uri.host, ask.data], ['salonkit.online', {'email': 'ali@mail.com'}]);
     expect(find.text('Check your email'), findsOneWidget);
     await t.enterText(find.byKey(const ValueKey('start-code')), '123456');
+    FocusManager.instance.primaryFocus?.unfocus(); // the code field's cursor handle hangs over the button
+    await t.pumpAndSettle();
+    await t.ensureVisible(find.widgetWithText(FilledButton, 'Sign in'));
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await t.pumpAndSettle();
     final s = a.calls.singleWhere((c) => c.path == '/api/mobile/session');
@@ -100,6 +104,7 @@ void main() {
 
   testWidgets('new salon: free trial from the app, signed in as its owner', (t) async {
     final a = await open(t);
+    await t.ensureVisible(find.byKey(const ValueKey('start-trial')));
     await t.tap(find.byKey(const ValueKey('start-trial')));
     await t.pumpAndSettle();
     expect(find.text('Start your free trial'), findsOneWidget);
@@ -125,6 +130,7 @@ void main() {
 
   testWidgets('a taken salon ID is shown before submitting', (t) async {
     await open(t);
+    await t.ensureVisible(find.byKey(const ValueKey('start-trial')));
     await t.tap(find.byKey(const ValueKey('start-trial')));
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('su-slug')), 'taken-id');
@@ -151,6 +157,7 @@ void main() {
 
   testWidgets('Google, email on a team: signed in to that salon', (t) async {
     final a = await open(t, social: FakeSocial(token: 'tok-known'));
+    await t.ensureVisible(find.byKey(const ValueKey('start-google')));
     await t.tap(find.byKey(const ValueKey('start-google')));
     await t.pumpAndSettle();
     final call = a.calls.singleWhere((c) => c.path == '/api/auth/social');
@@ -160,6 +167,7 @@ void main() {
 
   testWidgets('Google, new email: sign-up without email or password, then setup opens', (t) async {
     final a = await open(t, social: FakeSocial(token: 'tok-new'));
+    await t.ensureVisible(find.byKey(const ValueKey('start-google')));
     await t.tap(find.byKey(const ValueKey('start-google')));
     await t.pumpAndSettle();
     expect(find.textContaining('Signed in as nina@gmail.com'), findsOneWidget);
@@ -179,14 +187,16 @@ void main() {
 
   testWidgets('closing the Google sheet does nothing', (t) async {
     final a = await open(t, social: FakeSocial(token: null));
+    await t.ensureVisible(find.byKey(const ValueKey('start-google')));
     await t.tap(find.byKey(const ValueKey('start-google')));
     await t.pumpAndSettle();
     expect(a.calls.where((c) => c.path == '/api/auth/social'), isEmpty);
-    expect(find.text('Sign in to your salon'), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
   });
 
   testWidgets('a Google sheet error is shown', (t) async {
     await open(t, social: FakeSocial(error: "You're offline"));
+    await t.ensureVisible(find.byKey(const ValueKey('start-google')));
     await t.tap(find.byKey(const ValueKey('start-google')));
     await t.pumpAndSettle();
     expect(find.text("You're offline"), findsOneWidget);
@@ -194,6 +204,7 @@ void main() {
 
   /// From the first screen to a salon's own sign-in screen (salon ID, then Continue).
   Future<void> toSalonLogin(WidgetTester t) async {
+    await t.ensureVisible(find.text('Use salon ID and password'));
     await t.tap(find.text('Use salon ID and password'));
     await t.pumpAndSettle();
     await t.enterText(find.byType(TextField), 'supersalon');

@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/api/api_error.dart';
 import '../core/auth/auth_controller.dart';
 import '../core/auth/social_auth.dart';
-import '../core/ui/background.dart';
-import '../core/ui/glass.dart';
+import '../core/config.dart';
 import '../core/ui/google_mark.dart';
 import '../core/ui/route.dart';
 import '../core/ui/social_button.dart';
@@ -104,30 +105,34 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme, c = Theme.of(context).colorScheme;
-    const wide = Size.fromHeight(50);
-    return Scaffold(
-      body: SkBackground(
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(children: [
-                SkGlass(
-                  padding: const EdgeInsets.all(24),
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final pill = OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide(color: c.outlineVariant));
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light, // white status bar over the dark photo
+      child: Scaffold(
+        backgroundColor: c.surface,
+        body: SingleChildScrollView(
+          child: Column(children: [
+            const _Hero(),
+            Transform.translate(
+              offset: const Offset(0, -32),
+              child: Stack(clipBehavior: Clip.none, alignment: Alignment.topCenter, children: [
+                Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(color: c.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(32))),
+                  padding: EdgeInsets.fromLTRB(24, 52, 24, 24 + MediaQuery.paddingOf(context).bottom),
                   child: AutofillGroup(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                      Center(child: ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.asset('assets/brand/icon.png', width: 64, height: 64))),
-                      const SizedBox(height: 16),
-                      Text(_sent ? 'Check your email' : 'Sign in to your salon', textAlign: TextAlign.center, style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
+                      Text(_sent ? 'Check your email' : 'Welcome back', textAlign: TextAlign.center, style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.4)),
                       const SizedBox(height: 6),
                       Text(
                         _sent
                             ? 'If ${_email.text.trim()} is on a salon\'s team, we sent a code. Tap the link in the email on this phone, or type the code.'
-                            : 'Enter your email. We\'ll send you a code, no salon ID needed.',
+                            : 'Sign in to your salon. No salon ID needed.',
                         textAlign: TextAlign.center,
                         style: t.bodyMedium?.copyWith(color: c.onSurfaceVariant),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 22),
                       if (!_sent && _social != null) ...[
                         SkSocialButton(
                           key: const ValueKey('start-google'),
@@ -136,7 +141,7 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
                           onPressed: _busy ? null : () => _socially((s) => s.google()),
                         ),
                         if (_social!.appleAvailable) ...[
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           SkSocialButton(
                             key: const ValueKey('start-apple'),
                             label: 'Continue with Apple',
@@ -144,29 +149,39 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
                             onPressed: _busy ? null : () => _socially((s) => s.apple()),
                           ),
                         ],
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          child: Row(children: [
-                            const Expanded(child: Divider()),
-                            Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Text('or', style: t.bodySmall?.copyWith(color: c.onSurfaceVariant))),
-                            const Expanded(child: Divider()),
-                          ]),
-                        ),
+                        const SizedBox(height: 20),
+                        Stack(alignment: Alignment.center, children: [
+                          const Divider(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                            decoration: BoxDecoration(color: c.surfaceContainerHighest, borderRadius: BorderRadius.circular(999)),
+                            child: Text('OR USE YOUR EMAIL', style: t.labelSmall?.copyWith(color: c.onSurfaceVariant, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+                          ),
+                        ]),
+                        const SizedBox(height: 18),
                       ],
-                      if (!_sent)
+                      if (!_sent) ...[
+                        Padding(padding: const EdgeInsets.only(left: 4, bottom: 6), child: Text('Email', style: t.labelLarge?.copyWith(fontWeight: FontWeight.w700))),
                         TextField(
                           key: const ValueKey('start-email'),
                           controller: _email,
-                          autofocus: true,
                           keyboardType: TextInputType.emailAddress,
                           autocorrect: false,
                           enableSuggestions: false,
                           autofillHints: const [AutofillHints.email],
                           textInputAction: TextInputAction.go,
                           onSubmitted: (_) => _send(),
-                          decoration: const InputDecoration(labelText: 'Email'),
-                        )
-                      else
+                          decoration: InputDecoration(
+                            hintText: 'you@salon.com',
+                            prefixIcon: const Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.mail_outline_rounded, size: 20)),
+                            fillColor: c.surface,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
+                            border: pill,
+                            enabledBorder: pill,
+                            focusedBorder: pill.copyWith(borderSide: BorderSide(color: c.primary, width: 1.6)),
+                          ),
+                        ),
+                      ] else
                         TextField(
                           key: const ValueKey('start-code'),
                           controller: _code,
@@ -177,7 +192,15 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
                           textAlign: TextAlign.center,
                           style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.w600),
                           onSubmitted: (_) => _verify(),
-                          decoration: const InputDecoration(labelText: '6-digit code', counterText: ''),
+                          decoration: InputDecoration(
+                            hintText: '6-digit code',
+                            hintStyle: TextStyle(fontSize: 16, letterSpacing: 0, color: c.onSurfaceVariant, fontWeight: FontWeight.w400),
+                            counterText: '',
+                            fillColor: c.surface,
+                            border: pill,
+                            enabledBorder: pill,
+                            focusedBorder: pill.copyWith(borderSide: BorderSide(color: c.primary, width: 1.6)),
+                          ),
                         ),
                       Obx(() {
                         final msg = _error ?? auth.linkMessage.value;
@@ -185,36 +208,181 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
                             ? const SizedBox(height: 0)
                             : Padding(padding: const EdgeInsets.only(top: 12), child: Text(msg, textAlign: TextAlign.center, style: t.bodyMedium?.copyWith(color: c.error)));
                       }),
-                      const SizedBox(height: 20),
-                      FilledButton(
-                        style: FilledButton.styleFrom(minimumSize: wide),
-                        onPressed: _busy ? null : (_sent ? _verify : _send),
-                        child: _busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(_sent ? 'Sign in' : 'Continue'),
+                      const SizedBox(height: 16),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [BoxShadow(color: c.primary.withValues(alpha: dark ? 0.25 : 0.32), blurRadius: 20, offset: const Offset(0, 8), spreadRadius: -6)],
+                        ),
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), shape: const StadiumBorder(), textStyle: t.labelLarge?.copyWith(fontSize: 15, fontWeight: FontWeight.w600)),
+                          onPressed: _busy ? null : (_sent ? _verify : _send),
+                          child: _busy
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                              : Row(mainAxisSize: MainAxisSize.min, children: [
+                                  Text(_sent ? 'Sign in' : 'Email me a sign-in code'),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.arrow_forward_rounded, size: 18),
+                                ]),
+                        ),
                       ),
                       if (_sent) ...[
+                        const SizedBox(height: 8),
                         TextButton(onPressed: _busy ? null : _send, child: const Text('Send a new code')),
                         TextButton(onPressed: _busy ? null : _restart, child: const Text('Use a different email')),
-                      ] else
-                        TextButton(
+                      ] else ...[
+                        const SizedBox(height: 12),
+                        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Icon(Icons.schedule_rounded, size: 16, color: c.onSurfaceVariant),
+                          const SizedBox(width: 6),
+                          Flexible(child: Text("We'll email a 6-digit code. Works for 10 minutes.", style: t.bodySmall?.copyWith(color: c.onSurfaceVariant))),
+                        ]),
+                        const SizedBox(height: 10),
+                        TextButton.icon(
                           onPressed: () => Navigator.of(context).push(SkRoute<void>(builder: (_) => const SalonScreen())),
-                          child: const Text('Use salon ID and password'),
+                          icon: const Icon(Icons.verified_user_outlined, size: 18),
+                          label: const Text('Use salon ID and password', style: TextStyle(fontWeight: FontWeight.w600)),
                         ),
+                      ],
+                      const SizedBox(height: 14),
+                      _TrialPill(onTap: () => Navigator.of(context).push(SkRoute<void>(builder: (_) => const SignupScreen()))),
+                      const SizedBox(height: 18),
+                      _Legal(style: t.bodySmall?.copyWith(color: c.onSurfaceVariant)),
                     ]),
                   ),
                 ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  key: const ValueKey('start-trial'),
-                  style: OutlinedButton.styleFrom(minimumSize: wide),
-                  onPressed: () => Navigator.of(context).push(SkRoute<void>(builder: (_) => const SignupScreen())),
-                  icon: const Icon(Icons.storefront_outlined),
-                  label: const Text('New salon? Start a 7-day free trial'),
-                ),
+                const Positioned(top: -36, child: _Badge()),
               ]),
             ),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// The salon photo with "Your salon. Smarter." on a dark green wash (dark in both themes, so the text stays white).
+class _Hero extends StatelessWidget {
+  const _Hero();
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.paddingOf(context).top;
+    return SizedBox(
+      height: 250 + top,
+      width: double.infinity,
+      child: Stack(fit: StackFit.expand, children: [
+        Image.asset('assets/brand/sign-in-hero.jpg', fit: BoxFit.cover, alignment: const Alignment(0.5, 0)),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xF2031D17), Color(0xBF04241D), Color(0x0004241D)],
+              stops: [0, 0.5, 1],
+            ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(24, top + 20, 24, 0),
+          child: FractionallySizedBox(
+            widthFactor: 0.66,
+            alignment: Alignment.topLeft,
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const _Wordmark(color: Colors.white, size: 17),
+              const SizedBox(height: 16),
+              const Text('Your salon.\nSmarter.', style: TextStyle(color: Colors.white, fontSize: 28, height: 1.12, fontWeight: FontWeight.w800, letterSpacing: -0.6)),
+              const SizedBox(height: 10),
+              Text('Bills, staff and daily reports, all in one app.', style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 13, height: 1.35, fontWeight: FontWeight.w500)),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+/// "SalonKit" with the gold spark.
+class _Wordmark extends StatelessWidget {
+  const _Wordmark({required this.color, required this.size});
+  final Color color;
+  final double size;
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('SalonKit', style: TextStyle(color: color, fontSize: size, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+        Icon(Icons.auto_awesome, size: size * 0.6, color: const Color(0xFFE6A852)),
+      ]);
+}
+
+/// The SalonKit logo in a white ring, sitting on the seam between the photo and the sheet.
+class _Badge extends StatelessWidget {
+  const _Badge();
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Theme.of(context).colorScheme.surface, width: 3.5),
+          boxShadow: const [BoxShadow(color: Color(0x26000000), blurRadius: 14, offset: Offset(0, 4))],
+        ),
+        child: ClipOval(child: Image.asset('assets/brand/icon.png', fit: BoxFit.cover)),
+      );
+}
+
+/// "New salon? Start a 7-day free trial" on a soft sage pill.
+class _TrialPill extends StatelessWidget {
+  const _TrialPill({required this.onTap});
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final fg = dark ? c.onSurface : const Color(0xFF0E523F);
+    return Material(
+      color: Colors.transparent,
+      child: Ink(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          gradient: LinearGradient(
+            colors: dark ? [c.primary.withValues(alpha: 0.16), c.primary.withValues(alpha: 0.28)] : const [Color(0xFFE7F5EC), Color(0xFFD8F0E2)],
+          ),
+          border: Border.all(color: dark ? c.primary.withValues(alpha: 0.35) : const Color(0xFFD2EDD9)),
+        ),
+        child: InkWell(
+          key: const ValueKey('start-trial'),
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: SizedBox(
+            height: 54,
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Icon(Icons.edit_calendar_outlined, size: 22, color: fg),
+              const SizedBox(width: 10),
+              Flexible(child: Text('New salon? Start a 7-day free trial', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.onSurface))),
+              const SizedBox(width: 6),
+              Icon(Icons.arrow_forward_rounded, size: 18, color: fg),
+            ]),
           ),
         ),
       ),
     );
+  }
+}
+
+/// "By continuing you agree to our Terms and Privacy Policy", linking to the site.
+class _Legal extends StatelessWidget {
+  const _Legal({this.style});
+  final TextStyle? style;
+  @override
+  Widget build(BuildContext context) {
+    final link = style?.copyWith(decoration: TextDecoration.underline, color: Theme.of(context).colorScheme.onSurface);
+    Widget a(String label, String path) => GestureDetector(
+          onTap: () => launchUrl(Uri.https(kRootDomain, path), mode: LaunchMode.externalApplication),
+          child: Text(label, style: link),
+        );
+    return Wrap(alignment: WrapAlignment.center, children: [
+      Text('By continuing you agree to our ', style: style),
+      a('Terms', '/terms/'),
+      Text(' and ', style: style),
+      a('Privacy Policy', '/privacy/'),
+      Text('.', style: style),
+    ]);
   }
 }

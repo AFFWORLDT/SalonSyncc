@@ -171,7 +171,7 @@ void main() {
     await t.pumpAndSettle();
     await t.tap(find.text('Not your salon?'));
     await t.pumpAndSettle();
-    expect(find.text('Sign in to your salon'), findsOneWidget);
+    expect(find.text('Welcome back'), findsOneWidget);
     expect(find.text('Use salon ID and password'), findsOneWidget);
   });
 

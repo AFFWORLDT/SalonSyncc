@@ -47,6 +47,7 @@ flutter:
   assets:
     - assets/brand/icon.png
     - assets/brand/intro.gif
+    - assets/brand/sign-in-hero.jpg
   fonts:
     # Google Sans Flex (text) and Google Sans Code (numbers, ids, uppercase labels): the web app's faces, bundled (OFL).
     - family: GoogleSansFlex
