@@ -6,9 +6,9 @@ import '../../core/screen_cache.dart';
 import '../../core/theme/scale.dart';
 import '../../core/ui/avatar.dart';
 import '../../core/ui/tour.dart';
+import '../../core/ui/brand.dart';
 import '../../core/ui/count_up.dart';
 import '../../core/format/fmt.dart';
-import '../../core/theme/app_theme.dart';
 import '../../core/ui/bar_chart.dart';
 import '../../core/ui/states.dart';
 import '../../data/admin_reports_api.dart';
@@ -186,7 +186,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Text('${o.seriesByMonth ? 'By month' : 'By day'} · sales and profit', style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
           ],
           const SizedBox(height: SkSpace.lg),
-          if (widget.onNewSale != null && !me.readOnly) tourTarget('new-sale', _NewSaleButton(onPressed: () => widget.onNewSale!().then((_) => _load()))),
+          if (widget.onNewSale != null && !me.readOnly) tourTarget('new-sale', SkGreenButton(label: 'New sale', onPressed: () => widget.onNewSale!().then((_) => _load()))),
           const SizedBox(height: SkSpace.lg),
           if (_setup != null && !me.readOnly) SetupChecklist(slug: me.org.slug, setup: _setup!, withRatings: me.features.contains('ratings')),
           _Section('Barbers $word', action: 'Daily sheet', onAction: widget.onDailySheet),
@@ -198,7 +198,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             for (final b in o.perBarber)
               Padding(
                 padding: const EdgeInsets.only(bottom: SkSpace.md),
-                child: _SoftCard(onTap: widget.onDailySheet, child: _BarberRow(b: b, fmt: fmt, slug: me.org.slug, max: best, single: single)),
+                child: SkSoftCard(onTap: widget.onDailySheet, child: _BarberRow(b: b, fmt: fmt, slug: me.org.slug, max: best, single: single)),
               ),
           _Section('Latest sales $word', action: 'All sales', onAction: () => widget.onAllSales(single ? _to : null)),
           if (o == null)
@@ -209,7 +209,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             for (final s in o.recent.take(8))
               Padding(
                 padding: const EdgeInsets.only(bottom: SkSpace.md),
-                child: _SoftCard(child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: SaleRow(sale: s, fmt: fmt, showBarber: true, onTap: () => widget.onOpenSale(s).then((_) => _load())))),
+                child: SkSoftCard(child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: SaleRow(sale: s, fmt: fmt, showBarber: true, onTap: () => widget.onOpenSale(s).then((_) => _load())))),
               ),
         ],
       ]),
@@ -218,7 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 /// The deep green brand colours of the sales card (the same in light and dark).
-const _deep = Color(0xFF0E5A48), _deeper = Color(0xFF0A3E32), _mint = Color(0xFF7FE3B0);
+const _deep = kSkDeep, _deeper = kSkDeeper, _mint = kSkMint;
 
 /// A salon photo fading in from the right behind the title (decoration only).
 class _HeaderPhoto extends StatelessWidget {
@@ -435,33 +435,6 @@ class _CardStat extends StatelessWidget {
   }
 }
 
-/// "+ New sale": a tall deep green pill.
-class _NewSaleButton extends StatelessWidget {
-  const _NewSaleButton({required this.onPressed});
-  final VoidCallback onPressed;
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          gradient: const LinearGradient(colors: [_deep, _deeper]),
-          boxShadow: const [BoxShadow(color: Color(0x400A3E32), blurRadius: 18, offset: Offset(0, 8), spreadRadius: -6)],
-        ),
-        child: FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            foregroundColor: Colors.white,
-            minimumSize: const Size.fromHeight(58),
-            shape: const StadiumBorder(),
-            textStyle: const TextStyle(fontFamily: kTextFont, fontSize: 17, fontWeight: FontWeight.w700),
-          ),
-          onPressed: onPressed,
-          icon: const Icon(Icons.add_rounded, size: 24),
-          label: const Text('New sale'),
-        ),
-      );
-}
-
 /// A section title with a green "Action →" link on the right.
 class _Section extends StatelessWidget {
   const _Section(this.label, {required this.action, required this.onAction});
@@ -484,28 +457,6 @@ class _Section extends StatelessWidget {
           ]),
         ),
       ]),
-    );
-  }
-}
-
-/// A white card with a soft shadow, rounded like the sales card.
-class _SoftCard extends StatelessWidget {
-  const _SoftCard({required this.child, this.onTap});
-  final Widget child;
-  final VoidCallback? onTap;
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: dark ? 0.6 : 0.35)),
-        boxShadow: dark ? null : const [BoxShadow(color: Color(0x0F1C1B18), blurRadius: 16, offset: Offset(0, 6))],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Material(type: MaterialType.transparency, child: onTap == null ? child : InkWell(onTap: onTap, child: child)),
     );
   }
 }

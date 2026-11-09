@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/share/bill_share.dart';
+import '../../core/ui/brand.dart';
 import '../../core/ui/motion.dart';
 import '../../core/ui/page_header.dart';
 import '../../models/sale.dart';
@@ -62,7 +63,7 @@ class SaleDone extends StatelessWidget {
           child: Row(children: [
             Expanded(child: _DoneButton(onPressed: onDone)),
             const SizedBox(width: 12),
-            Expanded(child: _NewSaleButton(onPressed: onNew)),
+            Expanded(child: SkGreenButton(label: 'New sale', height: 56, onPressed: onNew)),
           ]),
         ),
       ),
@@ -70,7 +71,7 @@ class SaleDone extends StatelessWidget {
   }
 }
 
-const _deep = Color(0xFF0E5A48), _deeper = Color(0xFF0A3E32), _gold = Color(0xFFD9A14E);
+const _deep = kSkDeep, _deeper = kSkDeeper, _gold = kSkGold;
 
 /// "Congrats! Bill generated": a deep green tick that pops in, the bill number, amount and payment, and confetti.
 class _Congrats extends StatelessWidget {
@@ -155,31 +156,4 @@ class _DoneButton extends StatelessWidget {
       label: const Text('Done'),
     );
   }
-}
-
-/// "+ New sale": the deep green pill.
-class _NewSaleButton extends StatelessWidget {
-  const _NewSaleButton({required this.onPressed});
-  final VoidCallback onPressed;
-  @override
-  Widget build(BuildContext context) => DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          gradient: const LinearGradient(colors: [_deep, _deeper]),
-          boxShadow: const [BoxShadow(color: Color(0x400A3E32), blurRadius: 16, offset: Offset(0, 7), spreadRadius: -5)],
-        ),
-        child: FilledButton.icon(
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            foregroundColor: Colors.white,
-            minimumSize: const Size.fromHeight(56),
-            shape: const StadiumBorder(),
-            textStyle: const TextStyle(fontFamily: kTextFont, fontSize: 17, fontWeight: FontWeight.w700),
-          ),
-          onPressed: onPressed,
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('New sale'),
-        ),
-      );
 }
