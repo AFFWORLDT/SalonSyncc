@@ -61,3 +61,37 @@ class SkSoftCard extends StatelessWidget {
     );
   }
 }
+
+/// A choice pill (range, view): white with a hairline, or deep green when picked.
+class SkChoicePill extends StatelessWidget {
+  const SkChoicePill({super.key, required this.label, required this.active, required this.onTap, this.icon});
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final fg = active ? Colors.white : cs.onSurface;
+    return Semantics(
+      button: true,
+      selected: active,
+      child: Material(
+        color: active ? kSkDeep : cs.surface,
+        shape: StadiumBorder(side: BorderSide(color: active ? kSkDeep : cs.outlineVariant.withValues(alpha: 0.7))),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              if (icon != null) ...[Icon(icon, size: 18, color: fg), const SizedBox(width: 6)],
+              Text(label, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: fg)),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}

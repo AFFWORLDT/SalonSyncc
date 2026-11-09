@@ -4,11 +4,10 @@ import '../../core/screen_cache.dart';
 import '../../data/staff_api.dart';
 import '../../core/ui/haptics.dart';
 import '../../core/ui/avatar.dart';
-import '../../core/ui/filter_chip_menu.dart';
 import '../../core/theme/scale.dart';
-import '../../core/ui/stats.dart';
+import '../../core/ui/brand.dart';
+import '../../core/ui/count_up.dart';
 import '../../core/ui/toast.dart';
-import '../../core/ui/heading.dart';
 import '../../core/ui/toggle.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
@@ -136,41 +135,64 @@ class _SheetScreenState extends State<SheetScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
-        SkHeading(
-          'Daily sheet',
-          action: !me.features.contains('excel_export')
-              ? null
-              : OutlinedButton.icon(
+        // Title with its icon, then the month and Excel.
+        Row(children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(color: kSkDeep.withValues(alpha: 0.1), shape: BoxShape.circle),
+            child: Icon(Icons.calendar_month_rounded, size: 28, color: Theme.of(context).brightness == Brightness.dark ? kSkMint : kSkDeep),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Daily sheet', style: t.headlineMedium?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.6)),
+              Text('Track your salon performance', style: t.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: SkSpace.lg),
+        Row(children: [
+          // ‹ November 2026 › in one pill.
+          Expanded(
+            child: Material(
+            color: cs.surface,
+            shape: StadiumBorder(side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.7))),
+            child: Row(children: [
+              IconButton(tooltip: 'Previous month', onPressed: () => _go(prevMonth(_month)), icon: const Icon(Icons.chevron_left_rounded)),
+              Expanded(
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(Icons.calendar_month_outlined, size: 18, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Flexible(child: Text(fmt.monthLabel(_month), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+                ]),
+              ),
+              IconButton(tooltip: 'Next month', onPressed: _month == _current ? null : () => _go(nextMonth(_month)), icon: const Icon(Icons.chevron_right_rounded)),
+            ]),
+            ),
+          ),
+        ]),
+        const SizedBox(height: SkSpace.lg),
+        if (_error != null && d == null)
+          ErrorState(error: _error!, onRetry: _load)
+        else ...[
+          _Summary(d: d, fmt: fmt),
+          const SizedBox(height: SkSpace.lg),
+          // What the table shows.
+          SizedBox(
+            height: 48,
+            child: ListView(scrollDirection: Axis.horizontal, children: [
+              for (final (id, label, icon) in const [('all', 'Full sheet', Icons.grid_on_rounded), ('shop', 'Shop', Icons.storefront_outlined), ('barber', 'By barber', Icons.person_outline_rounded)]) ...[
+                SkChoicePill(key: ValueKey('view-$id'), label: label, icon: icon, active: _view == id, onTap: () => setState(() => _view = id)),
+                const SizedBox(width: SkSpace.sm),
+              ],
+              if (me.features.contains('excel_export'))
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(shape: const StadiumBorder(), minimumSize: const Size(0, 48)),
                   onPressed: d == null || _exporting ? null : _excel,
                   icon: const Icon(Icons.table_view_outlined),
                   label: Text(_exporting ? 'Preparing…' : 'Excel'),
                 ),
-        ),
-        Row(children: [
-          IconButton(tooltip: 'Previous month', onPressed: () => _go(prevMonth(_month)), icon: const Icon(Icons.chevron_left_rounded)),
-          Expanded(child: Text(fmt.monthLabel(_month), textAlign: TextAlign.center, style: t.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
-          IconButton(tooltip: 'Next month', onPressed: _month == _current ? null : () => _go(nextMonth(_month)), icon: const Icon(Icons.chevron_right_rounded)),
-        ]),
-        const SizedBox(height: SkSpace.sm),
-        if (_error != null && d == null)
-          ErrorState(error: _error!, onRetry: _load)
-        else ...[
-          SkHero(label: 'Total sale', value: d?.totals.sales, format: fmt.money),
-          const SizedBox(height: SkSpace.lg),
-          SkStatStrip(format: fmt.money, stats: [
-            SkStat(label: 'Expense', value: d?.totals.expense, hint: d == null || d.totals.companyExpense == 0 ? null : 'incl. ${fmt.money(d.totals.companyExpense)} company'),
-            SkStat(label: 'Total commission', value: d?.totals.commission),
-            SkStat(label: 'Total profit', value: d?.totals.profit, color: d == null ? null : (d.totals.profit < 0 ? cs.error : skPalette(context).success)),
-          ]),
-          const SizedBox(height: SkSpace.lg),
-          // What the table shows.
-          SizedBox(
-            height: 38,
-            child: ListView(scrollDirection: Axis.horizontal, children: [
-              for (final (id, label, icon) in const [('all', 'Full sheet', Icons.grid_on_rounded), ('shop', 'Shop', Icons.storefront_outlined), ('barber', 'By barber', Icons.person_outline_rounded)]) ...[
-                SkFilterPill(key: ValueKey('view-$id'), label: label, icon: icon, active: _view == id, onTap: () => setState(() => _view = id)),
-                const SizedBox(width: SkSpace.sm),
-              ],
             ]),
           ),
           if (_view == 'barber' && d != null && d.barbers.isNotEmpty) ...[
@@ -195,13 +217,9 @@ class _SheetScreenState extends State<SheetScreen> {
           if (d == null)
             const SkSkeleton(height: 240, radius: 18)
           else
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerLowest.withValues(alpha: 0.7),
-                borderRadius: BorderRadius.circular(SkRadius.lg),
-                border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
-              ),
+            SkSoftCard(
+              radius: 24,
+              padding: const EdgeInsets.symmetric(vertical: 10),
               child: _Table(
                 d: d,
                 me: me,
@@ -211,9 +229,75 @@ class _SheetScreenState extends State<SheetScreen> {
                 shop: _view != 'barber',
               ),
             ),
-          const SizedBox(height: 10),
-          Text(kSheetNote.replaceAll('{CUR}', fmt.currency), style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          const SizedBox(height: SkSpace.lg),
+          // How to read it, on a soft mint card.
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: kSkDeep.withValues(alpha: Theme.of(context).brightness == Brightness.dark ? 0.18 : 0.07),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.info_rounded, color: Theme.of(context).brightness == Brightness.dark ? kSkMint : kSkDeep),
+              const SizedBox(width: 10),
+              Expanded(child: Text(kSheetNote.replaceAll('{CUR}', fmt.currency), style: t.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.4))),
+            ]),
+          ),
         ],
+      ]),
+    );
+  }
+}
+
+/// The month at a glance: the total sale large, then expense, commission and profit, each with its icon.
+class _Summary extends StatelessWidget {
+  const _Summary({required this.d, required this.fmt});
+  final DailySheet? d;
+  final Fmt fmt;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = this.d, cs = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final green = dark ? kSkMint : kSkDeep;
+    Widget stat(IconData icon, String label, int? v, {Color? color, String? hint}) => Expanded(
+          child: Column(children: [
+            Icon(icon, size: 24, color: green),
+            const SizedBox(height: 6),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
+            const SizedBox(height: 2),
+            v == null
+                ? const SkSkeleton(height: 18, width: 56)
+                : FittedBox(fit: BoxFit.scaleDown, child: CountUp(value: v, format: fmt.money, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color))),
+            if (hint != null) Text(hint, textAlign: TextAlign.center, maxLines: 2, style: TextStyle(fontSize: 10.5, color: cs.onSurfaceVariant)),
+          ]),
+        );
+    final divider = VerticalDivider(width: 12, color: cs.outlineVariant.withValues(alpha: 0.6));
+    return SkSoftCard(
+      radius: 24,
+      padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Total sale', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: cs.onSurfaceVariant)),
+        const SizedBox(height: 2),
+        d == null
+            ? const Padding(padding: EdgeInsets.symmetric(vertical: 6), child: SkSkeleton(height: 34, width: 160))
+            : FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: CountUp(value: d.totals.sales, format: fmt.money, style: const TextStyle(fontSize: 34, height: 1.15, fontWeight: FontWeight.w800, letterSpacing: -1)),
+              ),
+        const SizedBox(height: 12),
+        Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.6)),
+        const SizedBox(height: 12),
+        IntrinsicHeight(
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            stat(Icons.account_balance_wallet_outlined, 'Expense', d?.totals.expense, hint: d == null || d.totals.companyExpense == 0 ? null : 'incl. ${fmt.money(d.totals.companyExpense)} company'),
+            divider,
+            stat(Icons.groups_outlined, 'Commission', d?.totals.commission),
+            divider,
+            stat(Icons.insights_rounded, 'Profit', d?.totals.profit, color: d == null ? null : (d.totals.profit < 0 ? cs.error : (dark ? kSkMint : skPalette(context).success))),
+          ]),
+        ),
       ]),
     );
   }

@@ -51,7 +51,7 @@ void main() {
     expect(find.text('Daily sheet'), findsOneWidget);
     expect(find.text('Total sale'), findsOneWidget);
     expect(find.text('incl. AED 200 company'), findsOneWidget);
-    expect(find.text('Total profit'), findsOneWidget);
+    expect(find.text('Profit'), findsWidgets);
     expect(find.text('Barber Ali'), findsOneWidget);
     expect(find.text('Barber Sam'), findsOneWidget);
     expect(find.text('Total'), findsOneWidget);
