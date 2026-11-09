@@ -164,7 +164,7 @@ sales.post("/", async (c) => {
         bill_no: billNo,
         day,
         barber,
-        customer: phone ? { phone, name, rename: isAdmin(me) } : null,
+        customer: phone || name ? { phone: phone ?? null, name, rename: isAdmin(me) } : null,
         customer_label: label,
         amount,
         payment_mode,
@@ -245,7 +245,7 @@ sales.put("/:id", async (c) => {
     {
       day,
       barber,
-      customer: phone ? { phone, name, rename: isAdmin(me) } : null,
+      customer: phone || name ? { phone: phone ?? null, name, rename: isAdmin(me) } : null,
       customer_label: label,
       amount,
       payment_mode,

@@ -58,7 +58,7 @@ export interface NewSale {
   bill_no: string;
   day: string;
   barber: SaleBarber;
-  customer: { phone: string; name: string | null; rename: boolean } | null;
+  customer: { phone: string | null; name: string | null; rename: boolean } | null;
   customer_label: string;
   amount: number;
   payment_mode: PaymentMode;
@@ -74,7 +74,7 @@ export interface NewSale {
 export interface SaleEdit {
   day: string;
   barber: { id: number; name: string };
-  customer: { phone: string; name: string | null; rename: boolean } | null;
+  customer: { phone: string | null; name: string | null; rename: boolean } | null;
   customer_label: string;
   amount: number;
   payment_mode: PaymentMode;
@@ -181,7 +181,8 @@ export function salesRepo(db: D1Database, orgId: string) {
                 AND day = ? AND barber_id = ? AND amount = ? AND payment_mode = ? AND commission = ?)`,
         binds: [orgId, old.id, at, e.day, e.barber.id, e.amount, e.payment_mode, e.commission],
       };
-      const cust = e.customer ? customers.idByPhone(e.customer.phone) : { sql: "NULL", binds: [] };
+      const link = e.customer ? customers.forSale(e.customer) : null;
+      const cust = link ? link.id : { sql: "NULL", binds: [] };
       const { updated_at: _v, ...prev } = old;
       const next = {
         ...prev,
@@ -201,7 +202,7 @@ export function salesRepo(db: D1Database, orgId: string) {
       const oldLines = linesOf(prev);
       const newLines = linesOf(next);
       const stmts: D1PreparedStatement[] = [];
-      if (e.customer) stmts.push(customers.upsertStmt(e.customer.name, e.customer.phone, e.customer.rename));
+      if (link) stmts.push(link.stmt);
       const updIdx = stmts.length;
       // The row moves only from the version we read; every other statement is gated on G (this UPDATE took effect).
       stmts.push(
@@ -248,7 +249,8 @@ export function salesRepo(db: D1Database, orgId: string) {
     async create(n: NewSale, actor: AuditInput["actor"]): Promise<Sale> {
       const at = Date.now();
       const saleId = { sql: "(SELECT id FROM sales WHERE org_id = ? AND bill_no = ?)", binds: [orgId, n.bill_no] };
-      const cust = n.customer ? customers.idByPhone(n.customer.phone) : { sql: "NULL", binds: [] };
+      const link = n.customer ? customers.forSale(n.customer) : null;
+      const cust = link ? link.id : { sql: "NULL", binds: [] };
       const snapshot = saleSnapshot({
         day: n.day,
         barber_id: n.barber.id,
@@ -265,7 +267,7 @@ export function salesRepo(db: D1Database, orgId: string) {
         items: n.items,
       });
       const stmts: D1PreparedStatement[] = [];
-      if (n.customer) stmts.push(customers.upsertStmt(n.customer.name, n.customer.phone, n.customer.rename));
+      if (link) stmts.push(link.stmt);
       const saleIdx = stmts.length;
       stmts.push(
         db

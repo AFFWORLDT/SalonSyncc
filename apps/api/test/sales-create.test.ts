@@ -275,27 +275,55 @@ describe("GET /api/sales", () => {
 });
 
 describe("GET /api/customers (autocomplete)", () => {
-  it("is scoped by org and by the barber's own sales; q needs 3+ chars or an exact phone", async () => {
+  it("is shared by the whole salon and scoped by org; q needs 2+ chars", async () => {
     const a = await setup("ac-a");
     await post(a.k1, { amount: 10, payment_mode: "cash", customer_name: "Alice", customer_phone: "0501234567" });
     await post(a.k2, { amount: 10, payment_mode: "cash", customer_name: "Zed", customer_phone: "0551112222" });
     await flush();
     const names = async (ck: string, q?: string) =>
       ((await json(await call("GET", `/customers${q === undefined ? "" : `?q=${encodeURIComponent(q)}`}`, ck))).items as any[]).map((x) => x.name);
-    expect(await names(a.k1)).toEqual(["Alice"]);
+    // Every barber sees the salon's customers, whoever added them.
+    expect((await names(a.k1)).sort()).toEqual(["Alice", "Zed"]);
+    expect((await names(a.k2)).sort()).toEqual(["Alice", "Zed"]);
     const first = await json(await call("GET", "/customers", a.k1));
     expect(Object.keys(first.items[0]).sort()).toEqual(["id", "name", "phone"]);
-    expect(await names(a.k1, "Al")).toEqual([]);
-    expect(await names(a.k1, "Ali")).toEqual(["Alice"]);
+    expect(await names(a.k1, "A")).toEqual([]);
+    expect(await names(a.k1, "Al")).toEqual(["Alice"]);
     expect(await names(a.k1, "1234")).toEqual(["Alice"]);
-    expect(await names(a.k1, "Zed")).toEqual([]);
-    expect(await names(a.k1, "222")).toEqual([]);
+    expect(await names(a.k1, "Zed")).toEqual(["Zed"]);
     expect(await names(a.k1, "055 111 2222")).toEqual(["Zed"]);
-    expect(await names(a.k2)).toEqual(["Zed"]);
     const b = await setup("ac-b");
     expect(await names(b.k1)).toEqual([]);
     expect(await names(b.k1, "0501234567")).toEqual([]);
     expect(await names(b.ck, "Alice")).toEqual([]);
+  });
+
+  it("a name-only customer is saved once for the salon and shows up for every barber", async () => {
+    const a = await setup("ac-name");
+    const s1 = await json(await post(a.k1, { amount: 10, payment_mode: "cash", customer_name: "Garam" }));
+    const s2 = await json(await post(a.k2, { amount: 10, payment_mode: "cash", customer_name: "garam" }));
+    await flush();
+    expect(s1.customer_id).toBeGreaterThan(0);
+    expect(s2.customer_id).toBe(s1.customer_id);
+    const items = (await json(await call("GET", "/customers", a.k2))).items as any[];
+    expect(items).toEqual([{ id: s1.customer_id, name: "Garam", phone: null }]);
+    // A walk-in with no name stays off the list.
+    await post(a.k1, { amount: 10, payment_mode: "cash" });
+    expect((await json(await call("GET", "/customers", a.k1))).items).toHaveLength(1);
+  });
+
+  it("PUT /customers/:id: any barber adds the mobile; a mobile in use is refused", async () => {
+    const a = await setup("ac-edit");
+    const s = await json(await post(a.k1, { amount: 10, payment_mode: "cash", customer_name: "Garam" }));
+    await post(a.k1, { amount: 10, payment_mode: "cash", customer_name: "Ali", customer_phone: "0501234567" });
+    await flush();
+    const r = await call("PUT", `/customers/${s.customer_id}`, a.k2, { name: "Garam K", phone: "055 111 2222" });
+    expect(r.status).toBe(200);
+    expect(await json(r)).toEqual({ id: s.customer_id, name: "Garam K", phone: "0551112222" });
+    expect((await call("PUT", `/customers/${s.customer_id}`, a.k2, { name: "Garam", phone: "0501234567" })).status).toBe(409);
+    expect((await call("PUT", `/customers/${s.customer_id}`, a.k2, { name: "", phone: "" })).status).toBe(400);
+    expect((await call("PUT", `/customers/${s.customer_id}`, a.k2, { name: "X", phone: "12" })).status).toBe(400);
+    expect((await call("PUT", "/customers/999999", a.k2, { name: "X" })).status).toBe(404);
   });
 });
 

@@ -74,8 +74,8 @@ describe("GET /api/customers", () => {
     const r = await call("GET", "/customers", f.ck);
     expect(r.status).toBe(200);
     const body = await json(r);
-    // The owner served nobody: own-recent list is empty, and rows never carry CRM fields.
-    expect(body).toEqual({ items: [], total: 0, page: 1, page_size: 8 });
+    // The salon's shared recent list, without CRM fields.
+    expect(body).toEqual({ items: [{ id: f.sara, name: "Sara", phone: "0502222222" }, { id: f.ali, name: "Ali", phone: "0501111111" }], total: 2, page: 1, page_size: 8 });
     expect((await json(await call("GET", "/customers?q=0501111111", f.ck))).items).toEqual([{ id: f.ali, name: "Ali", phone: "0501111111" }]);
 
     const p = await fixture("cu-barber");

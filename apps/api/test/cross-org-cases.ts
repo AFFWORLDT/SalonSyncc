@@ -139,6 +139,14 @@ CASES.push({
   seed: seedCustomer,
   read: (orgId, id) => env.DB.prepare("SELECT * FROM customers WHERE org_id = ? AND id = ?").bind(orgId, id).first(),
 });
+CASES.push({
+  name: "PUT /api/customers/:id",
+  method: "PUT",
+  path: (id) => `/api/customers/${id}`,
+  body: { name: "Pwned", phone: "0509999999" },
+  seed: seedCustomer,
+  read: (orgId, id) => env.DB.prepare("SELECT * FROM customers WHERE org_id = ? AND id = ?").bind(orgId, id).first(),
+});
 
 // ---- Task 10: ledger (payouts, transfers, barber book) ----
 const seedPayout = async (orgId: string): Promise<number> => {

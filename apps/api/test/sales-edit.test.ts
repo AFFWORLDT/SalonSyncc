@@ -155,11 +155,13 @@ describe("PUT /api/sales/:id", () => {
     await flush();
     expect(await stats(s.customer_id)).toMatchObject({ visits: 0, spent: 0 });
     expect(await stats(e.customer_id)).toMatchObject({ visits: 1, spent: 2000 });
-    // Removing the phone drops the customer link.
+    // Removing the phone moves the sale to a name-only customer "Zed" (saved for the whole salon).
     const n = await json(await put(a.k1, s.id, { amount: 20, payment_mode: "cash", customer_name: "Zed" }));
-    expect(n).toMatchObject({ customer_id: null, customer_phone: null, customer_label: "Zed" });
+    expect(n).toMatchObject({ customer_phone: null, customer_label: "Zed" });
+    expect(n.customer_id).not.toBe(e.customer_id);
     await flush();
     expect(await stats(e.customer_id)).toMatchObject({ visits: 0 });
+    expect(await stats(n.customer_id)).toMatchObject({ name: "Zed", visits: 1 });
     expect((await put(a.k1, s.id, { amount: 20, payment_mode: "cash", customer_phone: "12" })).status).toBe(400);
   });
 });

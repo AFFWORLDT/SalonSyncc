@@ -27,6 +27,12 @@ class CustomerPicker extends StatefulWidget {
 class _CustomerPickerState extends State<CustomerPicker> {
   final _q = TextEditingController();
   bool _open = false, _adding = false;
+
+  /// The saved customer being edited in place (name and mobile), or null.
+  CustomerHint? _editing;
+  final _editName = TextEditingController(), _editPhone = TextEditingController();
+  bool _saving = false;
+  String? _editError;
   List<CustomerHint>? _hints;
   String? _phoneError;
   Timer? _debounce;
@@ -45,6 +51,8 @@ class _CustomerPickerState extends State<CustomerPicker> {
   void dispose() {
     _debounce?.cancel();
     _q.dispose();
+    _editName.dispose();
+    _editPhone.dispose();
     super.dispose();
   }
 
@@ -75,6 +83,7 @@ class _CustomerPickerState extends State<CustomerPicker> {
     setState(() {
       _open = !_open;
       _adding = false;
+      _editing = null;
       if (!_open) _q.clear();
     });
     if (!_open) FocusScope.of(context).unfocus();
@@ -111,11 +120,60 @@ class _CustomerPickerState extends State<CustomerPicker> {
     _close();
   }
 
+  void _startEdit(CustomerHint h) {
+    Haptic.select();
+    _editName.text = h.name;
+    _editPhone.text = h.phone == null ? '' : (widget.formatPhone?.call(h.phone!) ?? h.phone!);
+    setState(() {
+      _editing = h;
+      _editError = null;
+    });
+  }
+
+  /// Saves the edit for the whole salon; if this customer is the one on the bill, the bill follows.
+  Future<void> _saveEdit() async {
+    final h = _editing;
+    if (h == null || _saving) return;
+    if (_editName.text.trim().isEmpty && _editPhone.text.trim().isEmpty) {
+      return setState(() => _editError = 'Enter a name or a mobile');
+    }
+    try {
+      phoneForApi(_editPhone.text, widget.phoneCountry);
+    } on FormatException catch (e) {
+      Haptic.error();
+      return setState(() => _editError = e.message);
+    }
+    setState(() {
+      _saving = true;
+      _editError = null;
+    });
+    try {
+      final saved = await widget.sales.updateCustomer(h.id, name: _editName.text, phone: _editPhone.text);
+      if (!mounted) return;
+      final onBill = widget.name.text.trim() == h.name.trim() && widget.phone.text.replaceAll(RegExp(r'\D'), '') == (h.phone ?? '').replaceAll(RegExp(r'\D'), '');
+      if (onBill) {
+        widget.name.text = saved.name;
+        widget.phone.text = saved.phone ?? '';
+      }
+      Haptic.success();
+      setState(() {
+        _editing = null;
+        _hints = [for (final x in _hints ?? const <CustomerHint>[]) x.id == saved.id ? saved : x];
+      });
+    } catch (e) {
+      Haptic.error();
+      if (mounted) setState(() => _editError = messageOf(e));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   void _close() {
     FocusScope.of(context).unfocus();
     setState(() {
       _open = false;
       _adding = false;
+      _editing = null;
       _phoneError = null;
       _q.clear();
     });
@@ -178,7 +236,7 @@ class _CustomerPickerState extends State<CustomerPicker> {
               duration: skDuration(context, 180),
               curve: Curves.easeOutCubic,
               alignment: Alignment.topCenter,
-              child: !_open ? const SizedBox(width: double.infinity) : (_adding ? _addForm(context) : _list(context)),
+              child: !_open ? const SizedBox(width: double.infinity) : (_editing != null ? _editForm(context) : (_adding ? _addForm(context) : _list(context))),
             ),
           ]),
         ),
@@ -239,12 +297,22 @@ class _CustomerPickerState extends State<CustomerPicker> {
                         key: ValueKey('customer-hint-${h.id}'),
                         onTap: () => _choose(h),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                          padding: const EdgeInsets.fromLTRB(14, 2, 4, 2),
                           child: Row(children: [
                             Icon(Icons.person_outline_rounded, size: 20, color: cs.onSurfaceVariant),
                             const SizedBox(width: 12),
                             Expanded(child: Text(h.name.isEmpty ? 'No name' : h.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w500))),
-                            if (h.phone != null) Text(widget.formatPhone?.call(h.phone!) ?? h.phone!, style: SkText.mono.copyWith(fontSize: 12, color: cs.onSurfaceVariant)),
+                            if (h.phone != null)
+                              Text(widget.formatPhone?.call(h.phone!) ?? h.phone!, style: SkText.mono.copyWith(fontSize: 12, color: cs.onSurfaceVariant))
+                            else
+                              Text('No mobile', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant.withValues(alpha: 0.7))),
+                            IconButton(
+                              key: ValueKey('customer-edit-${h.id}'),
+                              tooltip: 'Edit customer',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: () => _startEdit(h),
+                              icon: Icon(Icons.edit_outlined, size: 18, color: cs.primary),
+                            ),
                           ]),
                         ),
                       ),
@@ -292,6 +360,52 @@ class _CustomerPickerState extends State<CustomerPicker> {
             onPressed: _doneAdding,
             icon: const Icon(Icons.person_add_alt_1_rounded),
             label: const Text('Add customer'),
+          ),
+        ]),
+      ),
+    ]);
+  }
+
+  Widget _editForm(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.6)),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(4, 4, 14, 0),
+        child: Row(children: [
+          IconButton(tooltip: 'Back', onPressed: () => setState(() => _editing = null), icon: const Icon(Icons.arrow_back_rounded, size: 20)),
+          const Expanded(child: Text('Edit customer', style: TextStyle(fontWeight: FontWeight.w600))),
+        ]),
+      ),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          TextField(
+            key: const ValueKey('customer-edit-name'),
+            controller: _editName,
+            textCapitalization: TextCapitalization.words,
+            maxLength: 80,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(labelText: 'Name', counterText: ''),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            key: const ValueKey('customer-edit-phone'),
+            controller: _editPhone,
+            autofocus: _editPhone.text.isEmpty,
+            keyboardType: TextInputType.phone,
+            onSubmitted: (_) => _saveEdit(),
+            decoration: InputDecoration(labelText: 'Mobile', hintText: 'Local number, or with + and country code', errorText: _editError),
+          ),
+          const SizedBox(height: 6),
+          Text('Saved for everyone in the salon.', style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            key: const ValueKey('customer-edit-save'),
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            onPressed: _saving ? null : _saveEdit,
+            icon: _saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.check_rounded),
+            label: const Text('Save customer'),
           ),
         ]),
       ),

@@ -181,6 +181,36 @@ void main() {
     expect(find.byKey(const ValueKey('customer-search')), findsNothing);
   });
 
+  testWidgets('edit a saved customer: adds the mobile for the salon, and the bill follows', (t) async {
+    final a = FakeAdapter({
+      ...base(),
+      'PUT /api/customers/1': (o) => {'id': 1, 'name': 'Omar K', 'phone': '0509876543'},
+    });
+    await pumpHost(t, host(a));
+    await t.pumpAndSettle();
+    await typeAmount(t, '25');
+    await t.pumpAndSettle();
+    await toCustomer(t);
+    await t.tap(find.byKey(const ValueKey('customer-picker')));
+    await t.pumpAndSettle();
+    await t.tap(find.text('Omar'));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('customer-picker')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('customer-edit-1')));
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const ValueKey('customer-edit-name')), 'Omar K');
+    await t.enterText(find.byKey(const ValueKey('customer-edit-phone')), '050 987 6543');
+    await t.tap(find.byKey(const ValueKey('customer-edit-save')));
+    await t.pumpAndSettle();
+    final put = a.calls.singleWhere((c) => c.method == 'PUT');
+    expect(put.data, {'name': 'Omar K', 'phone': '050 987 6543'});
+    expect(find.text('Omar K'), findsWidgets);
+    await t.tap(find.byKey(const ValueKey('customer-picker')));
+    await t.pumpAndSettle();
+    expect(inPicker('Omar K'), findsOneWidget);
+  });
+
   testWidgets('double tap saves once', (t) async {
     final hold = Completer<Object?>();
     final a = FakeAdapter({...base(), 'POST /api/sales': (o) => hold.future});

@@ -83,6 +83,10 @@ class SalesApi {
         query: q.trim().isEmpty ? {'page_size': 8} : {'q': q.trim(), 'page_size': 6},
       );
 
+  /// Corrects a saved customer (e.g. adds the mobile to a name-only one). Anyone on the team can.
+  Future<CustomerHint> updateCustomer(int id, {required String name, required String phone}) =>
+      api.put('/api/customers/$id', {'name': name.trim(), 'phone': phone.trim()}, (j) => CustomerHint.fromJson(j as Map<String, dynamic>));
+
   /// Today's own expense; an empty or 0 amount removes it.
   Future<void> saveExpense(String amount, String note) => api.put('/api/expenses', {'amount': amount, 'note': note}, (_) {});
 

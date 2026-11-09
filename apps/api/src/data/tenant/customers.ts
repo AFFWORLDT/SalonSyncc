@@ -94,6 +94,39 @@ export function customersRepo(db: D1Database, orgId: string) {
         .bind(orgId, name, phone, Date.now(), rename ? 1 : 0);
     },
 
+    /**
+     * A customer with a name but no mobile: reuse the salon's saved one with that name (any case) and no mobile, else
+     * add it, so a name-only customer is in everyone's list next time.
+     */
+    nameOnlyStmt(name: string): D1PreparedStatement {
+      return db
+        .prepare(
+          `INSERT INTO customers (org_id, name, phone, created_at)
+           SELECT ?1, ?2, NULL, ?3 WHERE NOT EXISTS (SELECT 1 FROM customers WHERE org_id = ?1 AND phone IS NULL AND name = ?2 COLLATE NOCASE)`,
+        )
+        .bind(orgId, name, Date.now());
+    },
+
+    /** The id of the name-only customer, evaluated inside a batch (after nameOnlyStmt). */
+    idByName(name: string): { sql: string; binds: unknown[] } {
+      return { sql: "(SELECT id FROM customers WHERE org_id = ? AND phone IS NULL AND name = ? COLLATE NOCASE ORDER BY id LIMIT 1)", binds: [orgId, name] };
+    },
+
+    /** The customer's id subquery and its find-or-create statement, for a sale's batch. */
+    forSale(c: { phone: string | null; name: string | null; rename: boolean }): { id: { sql: string; binds: unknown[] }; stmt: D1PreparedStatement } | null {
+      if (c.phone) return { id: this.idByPhone(c.phone), stmt: this.upsertStmt(c.name, c.phone, c.rename) };
+      if (c.name) return { id: this.idByName(c.name), stmt: this.nameOnlyStmt(c.name) };
+      return null;
+    },
+
+    /** Changes a customer's name and mobile (anyone on the team can). Null when the customer isn't in this salon. */
+    async edit(id: number, name: string | null, phone: string | null): Promise<CustomerSuggestionRow | null> {
+      return db
+        .prepare("UPDATE customers SET name = ?, phone = ? WHERE org_id = ? AND id = ? RETURNING id, name, phone")
+        .bind(name, phone, orgId, id)
+        .first<CustomerSuggestionRow>();
+    },
+
     /** The id of the customer with this phone, evaluated inside a batch (after upsertStmt). */
     idByPhone(phone: string): { sql: string; binds: unknown[] } {
       return { sql: "(SELECT id FROM customers WHERE org_id = ? AND phone = ?)", binds: [orgId, phone] };
@@ -113,37 +146,32 @@ export function customersRepo(db: D1Database, orgId: string) {
         .run();
     },
 
-    /** Nothing typed yet: this barber's own most recent customers. */
-    async recentForBarber(barberId: number): Promise<CustomerSuggestionRow[]> {
+    /** Nothing typed yet: the salon's most recent customers (whoever served them), so the whole team shares one list. */
+    async recent(): Promise<CustomerSuggestionRow[]> {
       const r = await db
         .prepare(
-          `SELECT c.id, c.name, c.phone FROM customers c JOIN sales s ON s.org_id = c.org_id AND s.customer_id = c.id
-           WHERE c.org_id = ? AND s.barber_id = ? AND s.deleted_at IS NULL
-           GROUP BY c.id ORDER BY MAX(s.created_at) DESC LIMIT ${LIMIT}`,
+          `SELECT id, name, phone FROM customers WHERE org_id = ? AND COALESCE(name, phone) IS NOT NULL
+           ORDER BY COALESCE(last_visit_at, created_at) DESC, id DESC LIMIT ${LIMIT}`,
         )
-        .bind(orgId, barberId)
+        .bind(orgId)
         .all<CustomerSuggestionRow>();
       return r.results;
     },
 
-    /**
-     * FM's barber search: any customer by their exact full phone, otherwise only customers this barber has served whose
-     * name or phone matches, so the list can't be pulled out prefix by prefix. `exactPhone` is '' when q isn't a phone.
-     */
-    async searchForBarber(barberId: number, q: string, exactPhone: string): Promise<CustomerSuggestionRow[]> {
+    /** Any of the salon's customers whose name or mobile matches (or whose full mobile is `exactPhone`). */
+    async search(q: string, exactPhone: string): Promise<CustomerSuggestionRow[]> {
       const digits = q.replace(/\D/g, "").replace(/^0+/, "");
       const r = await db
         .prepare(
           `SELECT id, name, phone FROM customers
            WHERE org_id = ?1 AND (CASE
              WHEN ?4 <> '' AND phone = ?4 THEN 1
-             WHEN id NOT IN (SELECT customer_id FROM sales WHERE org_id = ?1 AND barber_id = ?5 AND customer_id IS NOT NULL AND deleted_at IS NULL) THEN 0
              WHEN name LIKE ?2 ESCAPE '\\' THEN 1
              WHEN ?3 <> '' AND phone LIKE '%' || ?3 || '%' THEN 1
              ELSE 0 END) = 1
-           ORDER BY last_visit_at DESC LIMIT ${LIMIT}`,
+           ORDER BY COALESCE(last_visit_at, created_at) DESC, id DESC LIMIT ${LIMIT}`,
         )
-        .bind(orgId, `%${likeEscape(q)}%`, digits, exactPhone, barberId)
+        .bind(orgId, `%${likeEscape(q)}%`, digits, exactPhone)
         .all<CustomerSuggestionRow>();
       return r.results;
     },
