@@ -4,8 +4,10 @@
   // Affworld0@gmail.com's Cloudflare account. Never deploy this to any other account.
   "account_id": "dd501fac7d8aa896ead9530b9cd1b913",
   "compatibility_date": "2026-10-01",
-  // Static only: no Worker script. salonkit.online/api/* is routed to salonkit-app (more specific route wins).
-  "assets": { "directory": "./out", "not_found_handling": "404-page" },
+  // Static pages behind a tiny Worker (edge/worker.js) that sends http:// and www. to https://salonkit.online for good,
+  // so Google sees one address per page. salonkit.online/api/* is routed to salonkit-app (more specific route wins).
+  "main": "./edge/worker.js",
+  "assets": { "directory": "./out", "binding": "ASSETS", "not_found_handling": "404-page", "run_worker_first": true },
   "routes": [
     { "pattern": "salonkit.online/*", "zone_name": "salonkit.online" },
     { "pattern": "www.salonkit.online/*", "zone_name": "salonkit.online" }
