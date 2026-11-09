@@ -26,6 +26,7 @@ Future<void> start(WidgetTester t, {bool reduceMotion = false, bool salonId = tr
   await t.pumpWidget(MediaQuery(data: MediaQueryData(disableAnimations: reduceMotion), child: const SalonKitApp()));
   await t.pumpAndSettle();
   if (salonId) {
+    await t.ensureVisible(find.text('Use salon ID and password'));
     await t.tap(find.text('Use salon ID and password'));
     await t.pumpAndSettle();
   }
@@ -87,6 +88,7 @@ void main() {
   testWidgets('Continue opens sign-in branded with the salon', (t) async {
     await start(t);
     await typeSalon(t, 'Super Salon'.replaceAll(' ', '')); // "SuperSalon" normalizes to supersalon
+    await t.ensureVisible(find.text('Continue'));
     await t.tap(find.text('Continue'));
     await t.pumpAndSettle();
     expect(find.text('Sign in to Super Salon'), findsOneWidget);
@@ -97,14 +99,17 @@ void main() {
   testWidgets('wrong password shows server text; right one signs in', (t) async {
     await start(t);
     await typeSalon(t, 'supersalon');
+    await t.ensureVisible(find.text('Continue'));
     await t.tap(find.text('Continue'));
     await t.pumpAndSettle();
-    await t.enterText(find.widgetWithText(TextField, 'Email or username'), 'ali');
-    await t.enterText(find.widgetWithText(TextField, 'Password'), 'nope');
+    await t.enterText(find.byKey(const ValueKey('login-user')), 'ali');
+    await t.enterText(find.byKey(const ValueKey('login-pass')), 'nope');
+    await t.ensureVisible(find.widgetWithText(FilledButton, 'Sign in'));
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await t.pumpAndSettle();
     expect(find.text('Wrong salon ID, username or password'), findsOneWidget);
-    await t.enterText(find.widgetWithText(TextField, 'Password'), 'pass1234');
+    await t.enterText(find.byKey(const ValueKey('login-pass')), 'pass1234');
+    await t.ensureVisible(find.widgetWithText(FilledButton, 'Sign in'));
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await t.pumpAndSettle();
     expect(find.text('Hi ali 👋'), findsOneWidget);
@@ -116,20 +121,25 @@ void main() {
     await Get.find<AuthController>().boot();
     await t.pumpWidget(const SalonKitApp());
     await t.pumpAndSettle();
+    await t.ensureVisible(find.text('Use salon ID and password'));
     await t.tap(find.text('Use salon ID and password'));
     await t.pumpAndSettle();
     await typeSalon(t, 'supersalon');
+    await t.ensureVisible(find.text('Continue'));
     await t.tap(find.text('Continue'));
     await t.pumpAndSettle();
+    await t.ensureVisible(find.text('Sign in with an email code instead'));
     await t.tap(find.text('Sign in with an email code instead'));
     await t.pumpAndSettle();
     expect(find.text('Password'), findsNothing);
     await t.enterText(find.byKey(const ValueKey('login-email')), 'ali@mail.com');
+    await t.ensureVisible(find.widgetWithText(FilledButton, 'Email me a code'));
     await t.tap(find.widgetWithText(FilledButton, 'Email me a code'));
     await t.pumpAndSettle();
     expect(a.calls.where((c) => c.path == '/api/auth/code').single.data, {'email': 'ali@mail.com'});
     expect(find.textContaining('a 6-digit code is on its way'), findsOneWidget);
     await t.enterText(find.byKey(const ValueKey('login-code')), '123 456');
+    await t.ensureVisible(find.widgetWithText(FilledButton, 'Sign in'));
     await t.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await t.pumpAndSettle();
     final session = a.calls.where((c) => c.path == '/api/mobile/session').single.data as Map;
@@ -143,18 +153,23 @@ void main() {
     await Get.find<AuthController>().boot();
     await t.pumpWidget(const SalonKitApp());
     await t.pumpAndSettle();
+    await t.ensureVisible(find.text('Use salon ID and password'));
     await t.tap(find.text('Use salon ID and password'));
     await t.pumpAndSettle();
     await typeSalon(t, 'supersalon');
+    await t.ensureVisible(find.text('Continue'));
     await t.tap(find.text('Continue'));
     await t.pumpAndSettle();
+    await t.ensureVisible(find.byKey(const ValueKey('login-forgot')));
     await t.tap(find.byKey(const ValueKey('login-forgot')));
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('fp-email')), 'ali@mail.com');
+    await t.ensureVisible(find.widgetWithText(FilledButton, 'Email me a code'));
     await t.tap(find.widgetWithText(FilledButton, 'Email me a code'));
     await t.pumpAndSettle();
     await t.enterText(find.byKey(const ValueKey('fp-code')), '123456');
     await t.enterText(find.byKey(const ValueKey('fp-pass')), 'newpass1');
+    await t.ensureVisible(find.widgetWithText(FilledButton, 'Save and sign in'));
     await t.tap(find.widgetWithText(FilledButton, 'Save and sign in'));
     await t.pumpAndSettle();
     final reset = a.calls.singleWhere((c) => c.path == '/api/auth/password/reset').data as Map;
@@ -167,9 +182,11 @@ void main() {
   testWidgets('Not your salon? goes back to the first screen (just your email)', (t) async {
     await start(t);
     await typeSalon(t, 'supersalon');
+    await t.ensureVisible(find.text('Continue'));
     await t.tap(find.text('Continue'));
     await t.pumpAndSettle();
-    await t.tap(find.text('Not your salon?'));
+    await t.ensureVisible(find.text('Not your salon? Choose another'));
+    await t.tap(find.text('Not your salon? Choose another'));
     await t.pumpAndSettle();
     expect(find.text('Welcome back'), findsOneWidget);
     expect(find.text('Use salon ID and password'), findsOneWidget);

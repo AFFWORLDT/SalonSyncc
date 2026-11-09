@@ -210,6 +210,7 @@ void main() {
     await t.enterText(find.byType(TextField), 'supersalon');
     await t.pump(kSalonDebounce);
     await t.pumpAndSettle();
+    await t.ensureVisible(find.text('Continue'));
     await t.tap(find.text('Continue'));
     await t.pumpAndSettle();
   }
@@ -221,10 +222,12 @@ void main() {
     expect(find.byKey(const ValueKey('login-google')), findsOneWidget);
     expect(find.byKey(const ValueKey('login-apple')), findsOneWidget);
     expect(find.text('Sign in with an email code instead'), findsNothing);
+    await t.ensureVisible(find.byKey(const ValueKey('login-code-mode')));
     await t.tap(find.byKey(const ValueKey('login-code-mode')));
     await t.pumpAndSettle();
     expect(find.byKey(const ValueKey('login-email')), findsOneWidget);
     expect(find.text('Password'), findsNothing);
+    await t.ensureVisible(find.text('Sign in with your password instead'));
     await t.tap(find.text('Sign in with your password instead'));
     await t.pumpAndSettle();
     expect(find.text('Password'), findsOneWidget);
@@ -233,6 +236,7 @@ void main() {
   testWidgets('salon sign-in screen: Google with an email on a team signs straight in', (t) async {
     final a = await open(t, social: FakeSocial(token: 'tok-known'));
     await toSalonLogin(t);
+    await t.ensureVisible(find.byKey(const ValueKey('login-google')));
     await t.tap(find.byKey(const ValueKey('login-google')));
     await t.pumpAndSettle();
     expect((a.calls.singleWhere((c) => c.path == '/api/auth/social').data as Map)['id_token'], 'tok-known');
@@ -242,6 +246,7 @@ void main() {
   testWidgets('salon sign-in screen: Google with a new email goes to start a salon', (t) async {
     await open(t, social: FakeSocial(token: 'tok-new'));
     await toSalonLogin(t);
+    await t.ensureVisible(find.byKey(const ValueKey('login-google')));
     await t.tap(find.byKey(const ValueKey('login-google')));
     await t.pumpAndSettle();
     expect(find.textContaining('Signed in as nina@gmail.com'), findsOneWidget);
