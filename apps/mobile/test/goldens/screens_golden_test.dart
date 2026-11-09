@@ -80,8 +80,8 @@ void main() {
     'services': () => ServicesScreen(me: owner, api: ServicesAdminApi(c)),
     'customers': () => CustomersScreen(me: owner, api: CustomersApi(c), onOpen: (_) async {}),
     'settings': () => SettingsScreen(me: owner, api: SettingsApi(c), onSaved: () async {}),
-    'sale-done': () => SaleDone(sale: sale, fmt: owner.fmt, settings: owner.salon, slug: owner.org.slug, onDone: () {}, onNew: () {}),
     'bill': () => ListView(padding: const EdgeInsets.all(16), children: [BillView(sale: sale, settings: owner.salon, fmt: owner.fmt)]),
+    'sale-done': () => SaleDone(sale: sale, fmt: owner.fmt, settings: owner.salon, slug: owner.org.slug, onDone: () {}, onNew: () {}),
   };
 
   for (final e in screens.entries) {
