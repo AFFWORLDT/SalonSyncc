@@ -129,7 +129,7 @@ class _ServicesScreenState extends State<ServicesScreen> {
     final cs = Theme.of(context).colorScheme;
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+      child: ListView(padding: skPagePadding(context), children: [
         SkHeading(
           'Services',
           subtitle: 'What barbers pick on a new sale, and what prints on the bill.',

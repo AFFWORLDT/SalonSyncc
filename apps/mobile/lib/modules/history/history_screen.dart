@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/scale.dart';
+
 import '../../core/ui/heading.dart';
 import '../../core/format/fmt.dart';
 import '../../core/theme/app_theme.dart';
@@ -83,7 +85,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         );
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 32), children: [
+      child: ListView(padding: skPagePadding(context, top: 16), children: [
         SkHeading('My history'),
         const SizedBox(height: 8),
         Row(children: [

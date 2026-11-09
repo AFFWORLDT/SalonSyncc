@@ -110,7 +110,7 @@ class TodayScreenState extends State<TodayScreen> {
     final d = _today;
     return RefreshIndicator(
       onRefresh: _pull,
-      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+      child: ListView(padding: skPagePadding(context), children: [
         SkHeading('Hi ${me.user.name} 👋', subtitle: fmt.dateLabel(me.today), mono: true),
         const SizedBox(height: SkSpace.sm),
         if (_error != null && _list == null)

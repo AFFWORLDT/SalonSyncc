@@ -134,7 +134,7 @@ class _SheetScreenState extends State<SheetScreen> {
     final barber = d == null ? null : d.barbers.where((b) => b.id == _barberId).firstOrNull ?? (d.barbers.isEmpty ? null : d.barbers.first);
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+      child: ListView(padding: skPagePadding(context), children: [
         // Title with its icon, then the month and Excel.
         Row(children: [
           Container(

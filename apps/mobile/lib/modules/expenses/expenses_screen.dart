@@ -127,7 +127,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final avatars = {for (final x in _staff) x.id: x.avatarUrl};
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+      child: ListView(padding: skPagePadding(context), children: [
         SkHeading(
           'Expenses',
           action: ro

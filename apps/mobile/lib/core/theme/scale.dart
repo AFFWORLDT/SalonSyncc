@@ -10,6 +10,11 @@ abstract final class SkSpace {
   static const gutter = 16.0;
 }
 
+/// A scrolling page's padding: the side margins, and room at the bottom for whatever floats there (the glass tab bar,
+/// or the phone's gesture bar on pushed screens), so the last row is never hidden.
+EdgeInsets skPagePadding(BuildContext context, {double top = SkSpace.sm}) =>
+    EdgeInsets.fromLTRB(SkSpace.gutter, top, SkSpace.gutter, SkSpace.xxxl + MediaQuery.paddingOf(context).bottom);
+
 /// Corner radii: small controls, fields and tiles, cards, sheets.
 abstract final class SkRadius {
   static const sm = 10.0, md = 14.0, lg = 18.0, xl = 24.0;

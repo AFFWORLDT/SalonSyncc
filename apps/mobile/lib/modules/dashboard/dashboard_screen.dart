@@ -137,7 +137,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final best = o == null ? 0 : o.perBarber.fold(0, (m, x) => x.sales > m ? x.sales : m);
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, 0, SkSpace.gutter, SkSpace.xxxl), children: [
+      child: ListView(padding: skPagePadding(context, top: 0), children: [
         // Title, date and the range pills, over a soft salon photo on the right.
         Stack(clipBehavior: Clip.none, children: [
           const Positioned(top: -8, right: -SkSpace.gutter, child: _HeaderPhoto()),

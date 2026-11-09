@@ -57,7 +57,7 @@ class AccountScreen extends StatelessWidget {
     final auth = Get.find<AuthController>();
     final theme = Get.find<ThemeController>();
     final me = auth.me.value!;
-    return ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+    return ListView(padding: skPagePadding(context), children: [
       const SkHeading('My account'),
       Row(children: [
         SkAvatar(slug: me.org.slug, name: me.user.name, url: me.user.avatarUrl, size: 56),

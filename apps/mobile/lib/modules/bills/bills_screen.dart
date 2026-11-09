@@ -120,7 +120,7 @@ class _BillsScreenState extends State<BillsScreen> {
       onNotification: _onScroll,
       child: RefreshIndicator(
         onRefresh: _load,
-        child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+        child: ListView(padding: skPagePadding(context), children: [
           SkHeading(widget.admin ? 'Bills' : 'My bills', subtitle: widget.admin ? 'Every sale makes a bill. Open one to see or print it.' : null),
           SkSearchField(key: const ValueKey('bill-search'), controller: _q, onChanged: _typed, hint: 'Bill no., customer or phone'),
           const SizedBox(height: SkSpace.md),

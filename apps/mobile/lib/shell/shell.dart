@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:animations/animations.dart';
 import '../core/ui/tour.dart';
 import '../core/ui/toast.dart';
@@ -128,6 +130,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       final index = ids.indexOf(current);
       return Scaffold(
         backgroundColor: Colors.transparent,
+        // The pages scroll on under the glass tab bar (Scaffold gives them its height as bottom padding).
+        extendBody: true,
         body: SafeArea(
           bottom: false,
           child: Column(children: [
@@ -200,14 +204,29 @@ class _PillNavBar extends StatelessWidget {
       minimum: const EdgeInsets.only(bottom: 8),
       child: Container(
         margin: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-        padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: cs.surface,
           borderRadius: BorderRadius.circular(30),
-          border: Border.all(color: cs.outlineVariant.withValues(alpha: dark ? 0.7 : 0.4)),
-          boxShadow: const [BoxShadow(color: Color(0x1A000000), blurRadius: 20, offset: Offset(0, 6))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: dark ? 0.35 : 0.12), blurRadius: 24, offset: const Offset(0, 8))],
         ),
-        child: Row(children: [
+        // Frosted glass: one small blur behind the bar only, so it stays light on low-end phones.
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(30),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(30),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: dark
+                      ? [const Color(0xFF1A2A25).withValues(alpha: 0.62), const Color(0xFF0D1714).withValues(alpha: 0.55)]
+                      : [Colors.white.withValues(alpha: 0.72), Colors.white.withValues(alpha: 0.5)],
+                ),
+                border: Border.all(color: Colors.white.withValues(alpha: dark ? 0.12 : 0.7), width: 1.2),
+              ),
+              child: Row(children: [
           for (var i = 0; i < items.length; i++)
             Expanded(
               child: Semantics(
@@ -239,6 +258,9 @@ class _PillNavBar extends StatelessWidget {
               ),
             ),
         ]),
+            ),
+          ),
+        ),
       ),
     );
   }

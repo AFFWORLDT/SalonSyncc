@@ -142,7 +142,7 @@ class _SalesScreenState extends State<SalesScreen> {
       onNotification: _onScroll,
       child: RefreshIndicator(
         onRefresh: _load,
-        child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+        child: ListView(padding: skPagePadding(context), children: [
           // Title, a line under it, and the day on the right.
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(

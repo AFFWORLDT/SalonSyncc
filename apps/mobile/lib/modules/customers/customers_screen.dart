@@ -91,7 +91,7 @@ class _CustomersScreenState extends State<CustomersScreen> {
     final cs = Theme.of(context).colorScheme;
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+      child: ListView(padding: skPagePadding(context), children: [
         const SkHeading('Customers', subtitle: 'Everyone your salon has served. Tap one for their visits.'),
         SkSearchField(
           controller: _q,
@@ -246,7 +246,7 @@ class _CustomerProfileState extends State<CustomerProfile> {
               ? const Padding(padding: EdgeInsets.all(SkSpace.gutter), child: SkSkeletonList(count: 4, height: 72))
               : RefreshIndicator(
                   onRefresh: _load,
-                  child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, 0, SkSpace.gutter, SkSpace.xxxl), children: [
+                  child: ListView(padding: skPagePadding(context, top: 0), children: [
                     // Who: initials, name, mobile and since when.
                     Row(children: [
                       SkAvatar(slug: me.org.slug, name: c.name ?? '?', size: 60),

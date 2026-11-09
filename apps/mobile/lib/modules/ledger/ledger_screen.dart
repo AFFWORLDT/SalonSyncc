@@ -149,7 +149,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
   Widget build(BuildContext context) {
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+      child: ListView(padding: skPagePadding(context), children: [
         const SkHeading('Ledger', subtitle: 'Every money movement, newest first. Nothing here is ever rewritten.'),
         Row(children: [
           for (final (tab, label, icon) in const [(false, 'Shop', Icons.storefront_outlined), (true, 'Barbers', Icons.content_cut_rounded)]) ...[

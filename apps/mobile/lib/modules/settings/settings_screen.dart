@@ -363,7 +363,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _pageTitle = open?.$2;
     if (open == null) {
       // The menu: one row per page with what is set there now.
-      return ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+      return ListView(padding: skPagePadding(context), children: [
         const SkHeading('Settings', subtitle: 'Your salon, billing, messages and alerts'),
         SkFlatList(indent: 60, children: [
           for (final (id, title, icon, summary, _) in pages)

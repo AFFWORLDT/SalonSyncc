@@ -101,7 +101,7 @@ class _MonthlyScreenState extends State<MonthlyScreen> {
     final r = _r, totals = r?.totals;
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.fromLTRB(SkSpace.gutter, SkSpace.sm, SkSpace.gutter, SkSpace.xxxl), children: [
+      child: ListView(padding: skPagePadding(context), children: [
         SkHeading(
           'Monthly',
           action: !me.features.contains('excel_export')
