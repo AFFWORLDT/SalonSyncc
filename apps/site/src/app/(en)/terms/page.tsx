@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { pageOpenGraph } from "@/lib/seo";
-import { COMPANY } from "@/lib/brand";
+import { COMPANY, OFFICE_ADDRESS } from "@/lib/brand";
 import { LEGAL_EMAIL, LegalPage } from "@/components/legal-page";
 
 export const metadata: Metadata = {
@@ -71,7 +71,7 @@ export default function TermsPage() {
         },
         {
           title: "Contact",
-          body: [`${COMPANY}, United Arab Emirates. Email: ${LEGAL_EMAIL}`],
+          body: [`${COMPANY}, ${OFFICE_ADDRESS}. Email: ${LEGAL_EMAIL}`],
         },
       ]}
     />

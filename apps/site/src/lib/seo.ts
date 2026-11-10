@@ -1,5 +1,5 @@
 import { PLAN_DEFAULTS } from "@ss/features";
-import { BRAND_NAME, COMPANY, ROOT_DOMAIN, SUPPORT_EMAIL } from "@/lib/brand";
+import { BRAND_NAME, COMPANY, OFFICE, ROOT_DOMAIN, SUPPORT_EMAIL } from "@/lib/brand";
 
 /** The one public address of the site: every page's canonical URL, the sitemap and social previews use it. */
 export const SITE_URL = `https://${ROOT_DOMAIN || "salonkit.online"}`;
@@ -35,6 +35,7 @@ export function structuredData() {
       logo: `${SITE_URL}/icon-512.png`,
       ...(SUPPORT_EMAIL ? { email: SUPPORT_EMAIL } : {}),
       areaServed: "AE",
+      address: { "@type": "PostalAddress", streetAddress: `${OFFICE.street}, ${OFFICE.area}`, addressLocality: OFFICE.locality, addressRegion: OFFICE.locality, addressCountry: OFFICE.country },
     },
     { "@context": "https://schema.org", "@type": "WebSite", name: BRAND_NAME, url: SITE_URL },
     {

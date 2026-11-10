@@ -1,7 +1,7 @@
 "use client";
 
 import DoodleCrewFooter, { type CrewMember, type FooterColumn } from "@/components/ui/doodle-crew-footer";
-import { BRAND_NAME, COMPANY, SUPPORT_EMAIL } from "@/lib/brand";
+import { BRAND_NAME, COMPANY, OFFICE, OFFICE_MAPS_URL, SUPPORT_EMAIL } from "@/lib/brand";
 import { FEATURE_PAGES } from "@/lib/content";
 
 const COLUMNS: FooterColumn[] = [
@@ -23,7 +23,10 @@ const COLUMNS: FooterColumn[] = [
     title: "Help",
     links: [...(SUPPORT_EMAIL ? [{ label: "Email us", href: `mailto:${SUPPORT_EMAIL}` }] : []), { label: "Blog", href: "/blog/" }, { label: "Questions", href: "/#faq" }, { label: "العربية", href: "/ar/" }, { label: "Pricing", href: "/pricing/" }],
   },
-  { title: "Company", links: [{ label: COMPANY }] },
+  {
+    title: "Company",
+    links: [{ label: COMPANY }, { label: OFFICE.street, href: OFFICE_MAPS_URL }, { label: `${OFFICE.area}, ${OFFICE.locality}, UAE`, href: OFFICE_MAPS_URL }],
+  },
 ];
 
 // S A L O N K I T — letters 0…7. Every line is something the app really does.
