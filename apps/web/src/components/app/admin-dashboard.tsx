@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check, Minus, Plus } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, BarChart3, CalendarDays, Check, Minus, Percent, Plus, TrendingUp, Wallet } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
 import { qs } from "@/lib/api";
 import { money, dateLabel, businessToday, getFormat, monthShort, num } from "@/lib/format";
@@ -18,10 +18,10 @@ import { CompanyExpenseDialog } from "./company-expenses";
 import { useAuth } from "@/lib/auth-context";
 import { SetupChecklist } from "./setup-checklist";
 import { DateInput } from "./date-input";
-import { MoneyTile } from "./money-tile";
 import { HomePushPrompt } from "./push-prompt";
 import { SaleListSkeleton, SaleRow } from "./sale-row";
 import { UserAvatar } from "./user-avatar";
+import { useSaleSheet } from "./sale-sheet";
 
 type Preset = "1d" | "7d" | "30d" | "1y" | "custom";
 const PRESETS: { id: Preset; label: string; days: number }[] = [
@@ -49,6 +49,85 @@ function Delta({ now, before, label, sep }: { now: number; before: number; label
   );
 }
 
+/** The change against the previous period in a mint pill on the green hero ("↑ 233% vs yesterday"). */
+function DeltaChip({ now, before, label }: { now: number; before: number; label: string }) {
+  const d = deltaPercent(now, before);
+  if (d === null) return null;
+  const up = d >= 0;
+  return (
+    <span className={cn("num inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold", up ? "bg-[#7FE3B0]/15 text-[#7FE3B0]" : "bg-[#FF8A80]/15 text-[#FFB4AB]")}>
+      {up ? <ArrowUp className="size-4" /> : <ArrowDown className="size-4" />}
+      {Math.abs(d).toFixed(Math.abs(d) < 10 ? 1 : 0)}% vs {label}
+    </span>
+  );
+}
+
+/** One of the three figures under the hero's line: an icon in a soft circle, a label and the amount. */
+function HeroStat({
+  icon,
+  label,
+  value,
+  hint,
+  action,
+  negative,
+  divider,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number | null;
+  hint?: React.ReactNode;
+  action?: React.ReactNode;
+  negative?: boolean;
+  divider?: boolean;
+}) {
+  return (
+    <div className={cn("flex min-w-0 flex-col gap-1.5 pr-3", divider && "border-l border-white/15 pl-3 sm:pl-5")}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex size-9 items-center justify-center rounded-full bg-white/12 text-[#7FE3B0]">{icon}</span>
+        {action}
+      </div>
+      <p className="text-sm text-white/75">{label}</p>
+      {value === null ? (
+        <Skeleton className="h-6 w-20 bg-white/15" />
+      ) : (
+        <p className={cn("num text-lg leading-tight font-extrabold sm:text-2xl", negative ? "text-[#FF8A80]" : "text-white")}>{money(value)}</p>
+      )}
+      {hint && <p className="text-xs text-white/70 [&_.text-success]:text-[#7FE3B0] [&_.text-destructive]:text-[#FFB4AB]">{hint}</p>}
+    </div>
+  );
+}
+
+/** A range choice: a white pill with a hairline, or deep green when picked. */
+function RangePill({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={on}
+      onClick={onClick}
+      className={cn(
+        "num inline-flex h-10 min-w-14 items-center justify-center gap-1.5 rounded-full border px-4 text-sm font-bold transition-colors",
+        on ? "border-transparent bg-primary text-primary-foreground shadow-[0_6px_14px_-6px_color-mix(in_oklab,var(--primary)_70%,transparent)]" : "border-border bg-card text-foreground hover:bg-muted"
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/** A section's bold title with a green link on the right ("Barbers today · Daily sheet →"). */
+function SectionTitle({ title, href, link }: { title: string; href: string; link: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-1">
+      <h2 className="text-xl font-extrabold tracking-tight">{title}</h2>
+      <Link href={href} className="inline-flex items-center gap-1 text-sm font-bold text-primary hover:underline">
+        {link}
+        <ArrowRight className="size-4" />
+      </Link>
+    </div>
+  );
+}
+
 export function AdminDashboard() {
   const today = businessToday();
   // Opens on today (owner, 2026-10-28); 7D, 30D and 1Y are one tap away.
@@ -57,6 +136,7 @@ export function AdminDashboard() {
   const [to, setTo] = useState(today);
   const [addExpense, setAddExpense] = useState(false);
   const { has, readOnly } = useAuth();
+  const { openNew } = useSaleSheet();
   // Longer ranges are part of the advanced reports feature (spec: "dashboard ranges").
   const presets = has("reports_advanced") ? PRESETS : PRESETS.slice(0, 1);
 
@@ -75,163 +155,164 @@ export function AdminDashboard() {
   const vs = preset === "1d" ? "yesterday" : "previous period";
   const word = single ? (from === today ? "today" : "that day") : "in range";
 
+  const top = data ? Math.max(1, ...data.per_barber.map((b) => b.sales)) : 1;
+
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-6">
       {has("push") && !readOnly && <HomePushPrompt />}
       <SetupChecklist />
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[28px] leading-tight sm:text-[32px]">Dashboard</h1>
+          <p className="mt-1 flex items-center gap-2 text-[15px] text-muted-foreground">
             {rangeLabel}
-            {to === today ? " · live" : ""}
+            {to === today && (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="size-2 rounded-full bg-success" aria-hidden />
+                Live
+              </span>
+            )}
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:items-end">
-          <div className="flex rounded-lg bg-muted p-1" role="radiogroup" aria-label="Range">
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Range">
             {presets.map((x) => (
-              <button
-                key={x.id}
-                type="button"
-                role="radio"
-                aria-checked={preset === x.id}
-                onClick={() => choose(x)}
-                className={cn(
-                  "num h-8 min-w-11 rounded-md px-3 text-sm font-semibold transition-colors",
-                  preset === x.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-                )}
-              >
+              <RangePill key={x.id} on={preset === x.id} onClick={() => choose(x)}>
                 {x.label}
-              </button>
+              </RangePill>
             ))}
-            <button
-              type="button"
-              role="radio"
-              aria-checked={preset === "custom"}
-              onClick={() => setPreset("custom")}
-              className={cn(
-                "h-8 rounded-md px-3 text-sm font-semibold transition-colors",
-                preset === "custom" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
-              )}
-            >
+            <RangePill on={preset === "custom"} onClick={() => setPreset("custom")}>
+              <CalendarDays className="size-4" />
               Custom
-            </button>
+            </RangePill>
           </div>
           {preset === "custom" && (
             <div className="flex items-center gap-2">
-              <DateInput aria-label="From" max={to} value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} className="h-9 w-40" />
+              <DateInput aria-label="From" max={to} value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} className="h-10 w-40" />
               <span className="text-sm text-muted-foreground">to</span>
-              <DateInput aria-label="To" min={from} max={today} value={to} onChange={(e) => e.target.value && setTo(e.target.value)} className="h-9 w-40" />
+              <DateInput aria-label="To" min={from} max={today} value={to} onChange={(e) => e.target.value && setTo(e.target.value)} className="h-10 w-40" />
             </div>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <MoneyTile
-          label={`Sales ${word}`}
-          value={t?.sales ?? null}
-          hint={t ? <>{t.count} customers{p && <Delta now={t.sales} before={p.sales} label={vs} sep />}</> : undefined}
-          big
-          className="col-span-2 bg-primary/5 lg:col-span-1"
-        />
-        <MoneyTile
-          label={`Expense ${word}`}
-          value={t?.expense ?? null}
-          hint={t?.company_expense ? `incl. ${money(t.company_expense)} company` : undefined}
-          action={
-            has("expenses") && !readOnly ? (
-              <Button size="icon-sm" variant="outline" aria-label="Add company expense" className="-my-1.5 -mr-1.5 rounded-full" onClick={() => setAddExpense(true)}>
-                <Plus />
-              </Button>
-            ) : undefined
-          }
-        />
-        <MoneyTile label={`Commission ${word}`} value={t?.commission ?? null} />
-        <MoneyTile
-          label={`Profit ${word}`}
-          value={t?.profit ?? null}
-          tone={t && t.profit < 0 ? "destructive" : "success"}
-          hint={t && p ? <Delta now={t.profit} before={p.profit} label={vs} /> : undefined}
-          className="col-span-2 lg:col-span-1"
-        />
-      </div>
+      {/* The hero: sales on deep green, as in the phone app; expense, commission and profit underneath. */}
+      <section className="relative overflow-hidden rounded-[26px] bg-linear-to-br from-[#0E5A48] to-[#0A3E32] p-6 text-white shadow-[0_18px_40px_-18px_rgb(10_62_50/0.6)] sm:p-7">
+        <div className="pointer-events-none absolute -top-24 -right-20 size-72 rounded-full bg-white/[0.06]" aria-hidden />
+        <div className="relative flex items-start justify-between gap-3">
+          <p className="text-lg font-bold">Sales {word}</p>
+          <BarChart3 className="size-6 text-white/90" aria-hidden />
+        </div>
+        {t ? (
+          <p className="num relative mt-2 text-[44px] leading-none font-extrabold tracking-tight sm:text-[52px]">{money(t.sales)}</p>
+        ) : (
+          <Skeleton className="relative mt-3 h-12 w-48 bg-white/15" />
+        )}
+        <div className="relative mt-4 flex flex-wrap items-center gap-3">
+          {t && p && <DeltaChip now={t.sales} before={p.sales} label={vs} />}
+          {t && <span className="text-[15px] text-white/80">{t.count} customers</span>}
+        </div>
+        <div className="relative mt-5 grid grid-cols-3 border-t border-white/15 pt-5">
+          <HeroStat
+            icon={<Wallet className="size-4" />}
+            label={`Expense ${word}`}
+            value={t?.expense ?? null}
+            hint={t?.company_expense ? `incl. ${money(t.company_expense)} company` : undefined}
+            action={
+              has("expenses") && !readOnly ? (
+                <button
+                  type="button"
+                  aria-label="Add company expense"
+                  onClick={() => setAddExpense(true)}
+                  className="flex size-8 items-center justify-center rounded-full bg-white/12 text-white transition-colors hover:bg-white/20"
+                >
+                  <Plus className="size-4" />
+                </button>
+              ) : undefined
+            }
+          />
+          <HeroStat icon={<Percent className="size-4" />} label={`Commission ${word}`} value={t?.commission ?? null} divider />
+          <HeroStat
+            icon={<TrendingUp className="size-4" />}
+            label={`Profit ${word}`}
+            value={t?.profit ?? null}
+            negative={!!t && t.profit < 0}
+            hint={t && p ? <Delta now={t.profit} before={p.profit} label={vs} /> : undefined}
+            divider
+          />
+        </div>
+      </section>
 
-      <div className="grid gap-5 lg:grid-cols-[1.1fr_1fr]">
-        <Card className="gap-0 p-0">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <p className="text-sm font-semibold">Barbers {word}</p>
-            <Link href={`/sheet?month=${to.slice(0, 7)}`} className="text-xs font-medium text-primary">
-              Daily sheet →
-            </Link>
-          </div>
+      {!readOnly && (
+        <Button size="lg" className="h-14 w-full text-base lg:hidden" onClick={() => openNew()}>
+          <Plus />
+          New sale
+        </Button>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
+        <section className="flex flex-col gap-3">
+          <SectionTitle title={`Barbers ${word}`} href={`/sheet?month=${to.slice(0, 7)}`} link="Daily sheet" />
           {!data ? (
-            <div className="space-y-2 p-4">
-              {Array.from({ length: 6 }, (_, i) => (
-                <Skeleton key={i} className="h-8" />
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 3 }, (_, i) => (
+                <Skeleton key={i} className="h-20 rounded-[22px]" />
               ))}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-muted-foreground">
-                    <th className="px-4 py-2 font-medium">Barber</th>
-                    <th className="px-2 py-2 text-right font-medium">Cust.</th>
-                    <th className="px-2 py-2 text-right font-medium">Sales</th>
-                    <th className="px-2 py-2 text-right font-medium">Comm.</th>
-                    <th className="px-4 py-2 text-right font-medium">Exp.</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {data.per_barber.map((b) => (
-                    <tr key={b.id}>
-                      <td className="px-4 py-2 font-medium">
-                        <span className="flex items-center gap-2.5">
-                          <UserAvatar name={b.name} url={b.avatar_url} size={28} />
-                          {b.name}
-                        </span>
-                      </td>
-                      <td className="num px-2 py-2.5 text-right text-muted-foreground">{b.count || "–"}</td>
-                      <td className="num px-2 py-2.5 text-right font-semibold">{num(b.sales, true)}</td>
-                      <td className="num px-2 py-2.5 text-right">{num(b.commission, true)}</td>
-                      <td className="num px-4 py-2.5 text-right">
+            <ul className="flex flex-col gap-3">
+              {data.per_barber.map((b) => (
+                <li key={b.id}>
+                  <Card className="flex-row items-center gap-4 px-4 py-4">
+                    <UserAvatar name={b.name} url={b.avatar_url} size={48} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="truncate text-base font-bold">{b.name}</p>
+                        <p className="num shrink-0 text-base font-extrabold">{money(b.sales)}</p>
+                      </div>
+                      <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <span className="num">{b.count} cust</span>
+                        <span aria-hidden>•</span>
+                        <span className="num">Comm {num(b.commission, true)}</span>
+                        <span aria-hidden>•</span>
                         {b.expense_entered ? (
-                          <span className="inline-flex items-center gap-1">
-                            {num(b.expense)}
+                          <span className="num inline-flex items-center gap-1">
+                            exp {num(b.expense)}
                             {single && <Check className="size-3.5 text-success" />}
                           </span>
                         ) : (
-                          <Minus className="ml-auto size-3.5 text-muted-foreground" />
+                          <span className="inline-flex items-center gap-1">
+                            exp <Minus className="size-3.5" />
+                          </span>
                         )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-
-        <Card className="gap-0 p-0">
-          <div className="flex items-center justify-between border-b px-4 py-3">
-            <p className="text-sm font-semibold">Latest sales {word}</p>
-            <Link href={single ? `/sales?day=${from}` : "/sales"} className="text-xs font-medium text-primary">
-              All sales →
-            </Link>
-          </div>
-          {!data ? (
-            <SaleListSkeleton rows={5} />
-          ) : data.recent.length ? (
-            <ul className="flex flex-col divide-y p-1">
-              {data.recent.map((s) => (
-                <SaleRow key={s.id} sale={s} editable showBarber showDay={!single} />
+                      </p>
+                      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                        <div className="h-full rounded-full bg-primary" style={{ width: `${b.sales > 0 ? Math.max(4, (b.sales / top) * 100) : 0}%` }} />
+                      </div>
+                    </div>
+                  </Card>
+                </li>
               ))}
             </ul>
-          ) : (
-            <p className="px-4 py-8 text-center text-sm text-muted-foreground">No sales {word}.</p>
           )}
-        </Card>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <SectionTitle title={`Latest sales ${word}`} href={single ? `/sales?day=${from}` : "/sales"} link="All sales" />
+          <Card className="gap-0 p-0">
+            {!data ? (
+              <SaleListSkeleton rows={5} />
+            ) : data.recent.length ? (
+              <ul className="flex flex-col divide-y p-1.5">
+                {data.recent.map((s) => (
+                  <SaleRow key={s.id} sale={s} editable showBarber showDay={!single} />
+                ))}
+              </ul>
+            ) : (
+              <p className="px-4 py-10 text-center text-[15px] text-muted-foreground">No sales {word}.</p>
+            )}
+          </Card>
+        </section>
       </div>
 
       {data && data.series.length > 1 && (

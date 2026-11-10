@@ -138,7 +138,7 @@ export function AuthSplit({ children, scene, quote }: AuthSplitProps) {
       </div>
       <div className="relative z-10 flex min-h-full items-center justify-center p-6 md:order-2 md:py-12">
         <div className="w-full max-w-[460px] rounded-[2rem] border border-white/25 bg-white/10 p-2 shadow-[0_40px_90px_-25px_rgba(0,0,0,0.6)] backdrop-blur-md transition-transform duration-500 md:-translate-y-2">
-          <div className="relative overflow-hidden rounded-[1.6rem] border border-white/45 p-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_12px_30px_-12px_rgba(0,0,0,0.35)] backdrop-blur-2xl backdrop-saturate-150 [background-color:color-mix(in_oklab,var(--background)_58%,transparent)] sm:p-9">
+          <div className="relative overflow-hidden rounded-[1.6rem] border border-white/45 p-7 shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_12px_30px_-12px_rgba(0,0,0,0.35)] backdrop-blur-2xl backdrop-saturate-150 [background-color:color-mix(in_oklab,var(--background)_94%,transparent)] sm:p-9">
             <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-40" style={{ background: "linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0))" }} />
             <div className="relative">{children}</div>
           </div>

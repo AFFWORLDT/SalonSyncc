@@ -1,5 +1,8 @@
 "use client";
 
+import { Bell, Globe, Link2, Mail, MessageSquare, MessagesSquare, ReceiptText, Store } from "lucide-react";
+import { IconCircle } from "@/components/app/brand-ui";
+
 import { useState } from "react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
@@ -89,8 +92,11 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
       <h1 className="text-2xl">Settings</h1>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Billing</CardTitle>
+        <CardHeader className="grid-cols-[auto_1fr] gap-x-4">
+          <IconCircle className="row-span-2">
+            <ReceiptText />
+          </IconCircle>
+          <CardTitle className="self-end text-lg">Billing</CardTitle>
           <CardDescription>Applies to new sales. Old sales keep the commission and VAT they were made with.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -136,8 +142,11 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
 
       {has("whatsapp") && (
       <Card>
-        <CardHeader>
-          <CardTitle>WhatsApp Business</CardTitle>
+        <CardHeader className="grid-cols-[auto_1fr] gap-x-4">
+          <IconCircle className="row-span-2">
+            <MessagesSquare />
+          </IconCircle>
+          <CardTitle className="self-end text-lg">WhatsApp Business</CardTitle>
           <CardDescription>
             {s.wa_ready
               ? "Messages go from the salon's WhatsApp number using templates approved by Meta. Save to apply changes."
@@ -275,8 +284,11 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
       )}
       {!has("whatsapp") && has("ratings") && (
         <Card>
-          <CardHeader>
-            <CardTitle>Reviews</CardTitle>
+          <CardHeader className="grid-cols-[auto_1fr] gap-x-4">
+            <IconCircle className="row-span-2">
+              <Link2 />
+            </IconCircle>
+            <CardTitle className="self-end text-lg">Reviews</CardTitle>
             <CardDescription>After rating their visit, every customer is invited to review you on Google. Their stars and comment come to you privately.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -288,8 +300,11 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle>WhatsApp thank-you</CardTitle>
+        <CardHeader className="grid-cols-[auto_1fr] gap-x-4">
+          <IconCircle className="row-span-2">
+            <MessageSquare />
+          </IconCircle>
+          <CardTitle className="self-end text-lg">WhatsApp thank-you</CardTitle>
           <CardDescription>After a sale with a mobile number, the barber taps “Send on WhatsApp” and the message opens ready to send.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -305,8 +320,11 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
 
       {has("push") && (
       <Card>
-        <CardHeader>
-          <CardTitle>Notifications</CardTitle>
+        <CardHeader className="grid-cols-[auto_1fr] gap-x-4">
+          <IconCircle className="row-span-2">
+            <Bell />
+          </IconCircle>
+          <CardTitle className="self-end text-lg">Notifications</CardTitle>
           <CardDescription>Sent to phones that turned notifications on in My account. Times are in the salon&apos;s time zone ({s.timezone}).</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -327,8 +345,11 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle>Emails to staff</CardTitle>
+        <CardHeader className="grid-cols-[auto_1fr] gap-x-4">
+          <IconCircle className="row-span-2">
+            <Mail />
+          </IconCircle>
+          <CardTitle className="self-end text-lg">Emails to staff</CardTitle>
           <CardDescription>For staff who have an email in their profile (Staff → edit). Each one sees only their own numbers.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -339,8 +360,11 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
 
 
       <Card>
-        <CardHeader>
-          <CardTitle>Region</CardTitle>
+        <CardHeader className="grid-cols-[auto_1fr] gap-x-4">
+          <IconCircle className="row-span-2">
+            <Globe />
+          </IconCircle>
+          <CardTitle className="self-end text-lg">Region</CardTitle>
           <CardDescription>Time zone, money and phone numbers for this salon.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -378,8 +402,11 @@ function SettingsForm({ initial }: { initial: SettingsResponse }) {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Salon details</CardTitle>
+        <CardHeader className="grid-cols-[auto_1fr] gap-x-4">
+          <IconCircle className="row-span-2">
+            <Store />
+          </IconCircle>
+          <CardTitle className="self-end text-lg">Salon details</CardTitle>
           <CardDescription>Shown on receipts.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">

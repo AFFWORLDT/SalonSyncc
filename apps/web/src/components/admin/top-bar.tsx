@@ -39,7 +39,7 @@ export function TopBar({ onOpenMobileNav, onToggleCollapsed, safeTop = true }: {
   }, [title, salon]);
 
   return (
-    <header className={`box-content flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card px-3 sm:px-4 lg:px-6 ${safeTop ? "pt-[env(safe-area-inset-top)]" : ""}`}>
+    <header className={`box-content flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card px-3 sm:px-4 lg:px-6 ${safeTop ? "pt-[env(safe-area-inset-top)]" : ""}`}>
       {isAdmin ? (
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={onOpenMobileNav} aria-label="Open navigation">
           <Menu />
@@ -50,7 +50,7 @@ export function TopBar({ onOpenMobileNav, onToggleCollapsed, safeTop = true }: {
       <Button variant="ghost" size="icon" className="hidden lg:inline-flex" onClick={onToggleCollapsed} aria-label="Toggle sidebar">
         <PanelLeft />
       </Button>
-      <p className="min-w-0 flex-1 truncate text-base font-semibold">{title}</p>
+      <p className="min-w-0 flex-1 truncate text-lg font-extrabold tracking-tight">{title}</p>
       <div className="flex justify-center md:flex-1">
         <CommandPalette />
       </div>

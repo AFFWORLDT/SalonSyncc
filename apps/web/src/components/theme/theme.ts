@@ -5,10 +5,10 @@
 
 export type Appearance = "system" | "light" | "dark";
 
-/** Default accent (the "SalonKit" choice): deep green on the cream light theme, a brighter green in dark. */
+/** Default accent (the "SalonKit" choice): the phone app's deep green (#0E5A48) on cream, a brighter green in dark. */
 export const DEFAULT_ACCENT = "#C08A5B";
 /** The light-mode colour of the default accent. */
-export const LIGHT_BRAND = "#1F7A6A";
+export const LIGHT_BRAND = "#0E5A48";
 /** The dark-mode colour of the default accent: the same green, a step brighter for dark backgrounds. */
 export const DARK_BRAND = "#2A9D88";
 /** Glow colours of the dark background mesh: deep teals. */
@@ -132,8 +132,8 @@ export function withAlpha(hex: string, a: number): string {
   return `rgb(${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255} / ${a})`;
 }
 
-/** How see-through glass surfaces are: cards and bars, and the more solid popovers/menus/dialogs (readability). */
-const GLASS = { light: { card: 0.62, popover: 0.86, border: 0.55 }, dark: { card: 0.5, popover: 0.82, border: 0.5 } } as const;
+/** How see-through surfaces are: nearly solid, like the phone app's soft white cards (popovers/menus/dialogs a touch more). */
+const GLASS = { light: { card: 0.94, popover: 0.96, border: 0.7 }, dark: { card: 0.9, popover: 0.94, border: 0.6 } } as const;
 
 /** The shadcn variable set for a resolved mode and accent. */
 export function themeVars(mode: "light" | "dark", accent: string): Record<string, string> {

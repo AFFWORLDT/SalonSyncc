@@ -63,15 +63,15 @@ body {
   overscroll-behavior: none;
 }
 
-/* Glassmorphism: the page is a soft mesh tinted with the salon's accent; surfaces (cards, bars, sidebar, menus,
-   dialogs) are see-through tokens (theme.ts GLASS) blurred over it. */
+/* The page is cream with a faint wash of the salon's accent (the phone app's flat cream); cards, bars, menus and
+   dialogs are near-solid tokens (theme.ts GLASS) with a light blur. */
 html {
   background-color: var(--background);
   background-image:
-    radial-gradient(at 8% 6%, color-mix(in oklab, var(--mesh-a, var(--primary)) 34%, transparent) 0, transparent 50%),
-    radial-gradient(at 92% 10%, color-mix(in oklab, var(--mesh-b, var(--primary)) 30%, transparent) 0, transparent 46%),
-    radial-gradient(at 72% 96%, color-mix(in oklab, var(--mesh-c, var(--primary)) 26%, transparent) 0, transparent 52%),
-    radial-gradient(at 10% 90%, color-mix(in oklab, var(--mesh-b, var(--primary)) 16%, transparent) 0, transparent 42%);
+    radial-gradient(at 8% 6%, color-mix(in oklab, var(--mesh-a, var(--primary)) 12%, transparent) 0, transparent 50%),
+    radial-gradient(at 92% 10%, color-mix(in oklab, var(--mesh-b, var(--primary)) 10%, transparent) 0, transparent 46%),
+    radial-gradient(at 72% 96%, color-mix(in oklab, var(--mesh-c, var(--primary)) 9%, transparent) 0, transparent 52%),
+    radial-gradient(at 10% 90%, color-mix(in oklab, var(--mesh-b, var(--primary)) 6%, transparent) 0, transparent 42%);
   background-attachment: fixed;
 }
 .bg-card,
@@ -84,6 +84,12 @@ html {
 .glass {
   background-color: var(--card);
   border: 1px solid var(--border);
+}
+
+/* Page titles: extra bold and tight, as in the phone app. */
+h1 {
+  font-weight: 800;
+  letter-spacing: -0.025em;
 }
 
 body {

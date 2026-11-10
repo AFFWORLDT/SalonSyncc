@@ -39,11 +39,11 @@ export function StatCard({
   const pct = delta ?? null;
   const up = pct != null && pct >= 0;
   return (
-    <Card className={cn("gap-2 p-4", className)}>
-      <p className="font-mono text-xs tracking-wide text-muted-foreground uppercase">{label}</p>
+    <Card className={cn("gap-2 p-5", className)}>
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-3xl leading-none font-semibold tabular-nums">{format(value)}</p>
+          <p className="text-3xl leading-none font-extrabold tracking-tight tabular-nums">{format(value)}</p>
           {pct != null && (
             <p
               className={cn(

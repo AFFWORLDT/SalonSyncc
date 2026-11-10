@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { Plus, ReceiptText, Sparkles, X, CircleDollarSign } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
 import { money, dateLabel, businessToday } from "@/lib/format";
 import type { Paged, Sale, User } from "@/lib/types";
@@ -12,6 +12,9 @@ import { DateInput } from "@/components/app/date-input";
 import { ErrorState } from "@/components/admin/states";
 import { SimpleSelect } from "@/components/app/simple-select";
 import { SaleListSkeleton, SaleRow } from "@/components/app/sale-row";
+import { SummaryTile } from "@/components/app/brand-ui";
+import { useSaleSheet } from "@/components/app/sale-sheet";
+import { useAuth } from "@/lib/auth-context";
 
 const PAGE = 50;
 
@@ -21,6 +24,8 @@ export default function SalesPage() {
   const [mode, setMode] = useState("all");
   const [pages, setPages] = useState(1);
   const users = useApi<User[]>("/api/users");
+  const { openNew } = useSaleSheet();
+  const { readOnly } = useAuth();
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -39,8 +44,22 @@ export default function SalesPage() {
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl">Sales</h1>
+    <div className="flex flex-col gap-5">
+      <div>
+        <h1 className="text-[28px] leading-tight sm:text-[32px]">Sales</h1>
+        <p className="mt-1 text-[15px] text-muted-foreground">Track and manage your salon sales</p>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <SummaryTile icon={<ReceiptText />} label="Bills" value={shown ? shown.total : null} />
+        <SummaryTile icon={<CircleDollarSign />} tone="gold" label="Average bill" value={shown ? money(shown.total ? Math.round((shown.sum ?? 0) / shown.total) : 0) : null} />
+        <SummaryTile icon={<Sparkles />} hero label="Total" value={shown ? money(shown.sum ?? 0) : null} />
+      </div>
+      {!readOnly && (
+        <Button size="lg" className="h-14 w-full text-base lg:hidden" onClick={() => openNew()}>
+          <Plus />
+          New sale
+        </Button>
+      )}
       <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
         <div className="relative col-span-2 sm:col-span-1">
           <DateInput

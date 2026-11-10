@@ -155,7 +155,7 @@ export default function LoginPage() {
           ) : (
             <BrandLogo />
           )}
-          <h1 className="text-2xl font-bold">{brand?.name ? `Sign in to ${brand.name}` : "Sign in to your salon"}</h1>
+          <h1 className="text-[28px] leading-tight">{brand?.name ? `Sign in to ${brand.name}` : "Sign in to your salon"}</h1>
           <p className="text-balance text-sm text-muted-foreground">
             {mode === "code" ? "We\u2019ll email a sign-in code to the address on your staff profile." : needOrg ? "Enter your salon ID, then your email or the username your salon gave you." : "Sign in with your email or the username your salon gave you."}
           </p>
@@ -166,7 +166,7 @@ export default function LoginPage() {
             {google && googleUrl && (
               <a
                 href={googleUrl}
-                className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-lg border border-black/10 bg-white text-[15px] font-medium text-[#1f1f1f] shadow-sm transition duration-150 ease-out hover:bg-[#f7f7f5] active:scale-[0.98]"
+                className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-full border border-black/10 bg-white text-[15px] font-medium text-[#1f1f1f] shadow-sm transition duration-150 ease-out hover:bg-[#f7f7f5] active:scale-[0.98]"
               >
                 <GoogleMark />
                 Continue with Google
@@ -178,7 +178,7 @@ export default function LoginPage() {
             </Button>
             <div className="flex items-center gap-3 text-xs text-muted-foreground" aria-hidden>
               <span className="h-px flex-1 bg-current opacity-25" />
-              or use your password
+              <span className="rounded-full bg-muted px-3.5 py-1 text-[13px]">or use your password</span>
               <span className="h-px flex-1 bg-current opacity-25" />
             </div>
           </div>
@@ -197,7 +197,7 @@ export default function LoginPage() {
                 placeholder="e.g. superbeard"
                 value={org}
                 onChange={(e) => setOrg(e.target.value)}
-                className="h-11"
+                className="h-12 rounded-full px-5"
               />
             </div>
           )}
@@ -214,10 +214,10 @@ export default function LoginPage() {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="h-11"
+                  className="h-12 rounded-full px-5"
                 />
               </div>
-              <PasswordInput id="password" label="Password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className="h-11" />
+              <PasswordInput id="password" label="Password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className="h-12 rounded-full ps-5" />
             </>
           ) : (
             <>
@@ -234,7 +234,7 @@ export default function LoginPage() {
                   readOnly={codeSent}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="h-11"
+                  className="h-12 rounded-full px-5"
                 />
               </div>
               {codeSent && (
@@ -250,15 +250,15 @@ export default function LoginPage() {
                     autoFocus
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
-                    className="h-12 text-center font-mono text-xl tracking-[0.4em]"
+                    className="h-12 rounded-full text-center font-mono text-xl tracking-[0.4em]"
                   />
                 </div>
               )}
             </>
           )}
-          {notice && !error && <p className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">{notice}</p>}
+          {notice && !error && <p className="rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm">{notice}</p>}
           {error && (
-            <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <p role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
               {error}
             </p>
           )}

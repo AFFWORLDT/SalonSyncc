@@ -11,7 +11,7 @@ import { haptic } from "@/lib/haptics";
 
 const SHORT: Record<string, string> = { Dashboard: "Home", "Daily sheet": "Sheet", "My history": "History", "My account": "Account", "My bills": "Bills" };
 
-/** Phone navigation: tabs on both sides of a big "+" (new sale) button. Hidden on desktop. */
+/** Phone navigation, as in the phone app: a floating frosted-glass pill with tabs on both sides of a big "+" (new sale). Hidden on desktop. */
 export function BottomBar() {
   const { me } = useAuth();
   const { openNew } = useSaleSheet();
@@ -36,11 +36,13 @@ export function BottomBar() {
         onClick={() => haptic("tap")}
         aria-current={active ? "page" : undefined}
         className={cn(
-          "flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1.5 text-[11px] font-medium transition-colors",
+          "flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-1 text-[11px] font-semibold transition-colors",
           active ? "text-primary" : "text-muted-foreground active:text-foreground"
         )}
       >
-        <Icon className="size-5" />
+        <span className={cn("flex h-7 w-12 items-center justify-center rounded-full transition-colors", active && "bg-primary/12")}>
+          <Icon className="size-5" />
+        </span>
         <span className="max-w-full truncate">{SHORT[item.label] ?? item.label}</span>
       </Link>
     );
@@ -49,8 +51,9 @@ export function BottomBar() {
   return (
     <nav
       aria-label="Tabs"
-      className="flex shrink-0 items-stretch border-t border-border bg-card px-1 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden [html[data-kb=open]_&]:hidden"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-30 px-3 pb-[max(env(safe-area-inset-bottom),12px)] lg:hidden [html[data-kb=open]_&]:hidden"
     >
+      <div className="pointer-events-auto flex h-16 items-stretch rounded-full border border-white/50 bg-linear-to-b from-card/80 to-card/60 px-1.5 shadow-[0_12px_30px_-10px_rgb(10_62_50/0.35)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/10">
       {all.slice(0, half).map(tab)}
       <div className="flex flex-1 items-center justify-center">
         <button
@@ -61,12 +64,13 @@ export function BottomBar() {
           }}
           aria-label="New sale"
           data-tour="tab-new-sale"
-          className="-mt-5 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg ring-4 ring-background transition-transform active:scale-95"
+          className="flex size-12 items-center justify-center rounded-full bg-primary bg-linear-to-br from-primary to-[color-mix(in_oklab,var(--primary),black_30%)] text-primary-foreground shadow-[0_8px_18px_-6px_color-mix(in_oklab,var(--primary)_70%,transparent)] transition-transform active:scale-95"
         >
-          <Plus className="size-7" />
+          <Plus className="size-6" />
         </button>
       </div>
       {all.slice(half).map(tab)}
+      </div>
     </nav>
   );
 }

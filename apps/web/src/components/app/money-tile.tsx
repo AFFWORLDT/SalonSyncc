@@ -22,9 +22,9 @@ export function MoneyTile({
   action?: React.ReactNode;
 }) {
   return (
-    <Card className={cn("gap-1.5 p-4", className)}>
+    <Card className={cn("gap-1.5 p-5", className)}>
       <div className="flex min-h-5 items-center justify-between gap-2">
-        <p className="font-mono text-[11px] tracking-wide text-muted-foreground uppercase">{label}</p>
+        <p className="text-sm font-medium text-muted-foreground">{label}</p>
         {action}
       </div>
       {value === null ? (
@@ -32,7 +32,7 @@ export function MoneyTile({
       ) : (
         <p
           className={cn(
-            "num leading-none font-semibold",
+            "num leading-none font-extrabold tracking-tight",
             big ? "text-3xl sm:text-4xl" : "text-xl sm:text-2xl",
             tone === "success" && "text-success",
             tone === "destructive" && "text-destructive",

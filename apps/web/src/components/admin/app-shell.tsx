@@ -144,11 +144,11 @@ function Frame({ children }: { children: React.ReactNode }) {
             {!me?.support && <ProductTour />}
             <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
               <PullToRefresh scrollRef={mainRef} />
-              <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-6 sm:p-6 lg:p-8">
+              <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-28 sm:p-6 sm:pb-28 lg:p-8">
                 <div className="mx-auto w-full max-w-6xl">{readOnly && !READONLY_OK.some((p) => pathname === p || pathname.startsWith(p + "/")) ? <ExpiredScreen /> : children}</div>
               </main>
+              <BottomBar />
             </div>
-            <BottomBar />
           </div>
         </div>
       </SaleSheetProvider>
