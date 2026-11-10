@@ -20,7 +20,7 @@ import '../../models/sale.dart';
 import 'expense_card.dart';
 import 'sale_row.dart';
 
-const kReadOnly = 'Your subscription has ended. Upgrade to add or change sales.';
+const kReadOnly = "This salon can't add or change sales right now. Contact the salon owner.";
 
 /// The barber's day: totals, today's expense, "New sale", and today's bills (tap to edit).
 class TodayScreen extends StatefulWidget {

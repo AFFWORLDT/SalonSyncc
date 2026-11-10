@@ -26,6 +26,7 @@ import '../models/me.dart';
 import '../models/role.dart';
 import '../modules/account/account_module.dart';
 import '../modules/account/change_password.dart';
+import '../modules/account/delete_account.dart';
 
 /// Opens my profile: who I am, every screen that isn't a tab, and my account settings, as one clean list
 /// (Groww-style: a big photo, then plain rows with an icon and a hairline between them).
@@ -248,6 +249,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _Row(icon: Icons.logout_rounded, title: 'Sign out', danger: true, onTap: () async {
                 if (await confirmSignOut(context)) await auth.signOut();
               }),
+              _Row(
+                key: const ValueKey('profile-delete-account'),
+                icon: Icons.delete_forever_outlined,
+                title: 'Delete account',
+                subtitle: me.user.role == 'owner' ? 'Close your salon and erase your details' : 'Erase your account and details',
+                danger: true,
+                onTap: () => showDeleteAccount(context, me),
+              ),
             ]),
             const SizedBox(height: 16),
             const _HelpCard(),
@@ -280,7 +289,6 @@ const _subtitles = {
   'announcements': 'Updates from your salon',
   'ratings': 'What customers say',
   'audit': 'Who changed what, and when',
-  'plan': 'Your SalonKit plan',
 };
 
 /// "👑 Owner · Groot Salon" on a soft gold pill (a plain mint pill for other roles).
@@ -450,7 +458,7 @@ class _RoundButton extends StatelessWidget {
 
 /// One row: the icon in a soft mint circle, a title with a line under it, and a chevron (or a value).
 class _Row extends StatelessWidget {
-  const _Row({required this.icon, required this.title, required this.onTap, this.subtitle, this.value, this.counts = const [], this.danger = false});
+  const _Row({super.key, required this.icon, required this.title, required this.onTap, this.subtitle, this.value, this.counts = const [], this.danger = false});
   final IconData icon;
   final String title;
   final String? subtitle, value;

@@ -159,7 +159,7 @@ class _SignupScreenState extends State<SignupScreen> {
       tagline: '7 days of every feature. No card needed.',
       child: AutofillGroup(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  Text('Start your free trial', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.4)),
+                  Text('Create your salon', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700, letterSpacing: -0.4)),
                   const SizedBox(height: 6),
                   Text(
                     social == null ? '7 days free, every feature. No card needed.' : 'Signed in as ${social!.email}. Now tell us about your salon: 7 days free, no card needed.',
@@ -253,7 +253,7 @@ class _SignupScreenState extends State<SignupScreen> {
                   FilledButton(
                     style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
                     onPressed: _busy ? null : _submit,
-                    child: _busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Start free trial'),
+                    child: _busy ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Create salon'),
                   ),
                 ]),
               ),

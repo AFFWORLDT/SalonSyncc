@@ -148,6 +148,6 @@ void main() {
     await t.pumpWidget(host(FakeAdapter(ok()), Me.fromJson(j)));
     await t.pumpAndSettle();
     expect(find.text('New sale'), findsNothing);
-    expect(find.text('Your subscription has ended. Upgrade to add or change sales.'), findsOneWidget);
+    expect(find.text("This salon can't add or change sales right now. Contact the salon owner."), findsOneWidget);
   });
 }

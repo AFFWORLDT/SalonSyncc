@@ -228,7 +228,7 @@ class SkNote extends StatelessWidget {
   }
 }
 
-/// A soft sage pill that leads somewhere else ("New salon? Start a 7-day free trial").
+/// A soft sage pill that leads somewhere else ("New salon? Create your salon").
 class SkSoftPill extends StatelessWidget {
   const SkSoftPill({super.key, required this.icon, required this.label, required this.onTap});
   final IconData icon;

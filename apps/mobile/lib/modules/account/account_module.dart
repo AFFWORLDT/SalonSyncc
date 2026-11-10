@@ -15,6 +15,7 @@ import '../../core/features/feature_module.dart';
 import '../../core/theme/theme_controller.dart';
 import '../../data/account_api.dart';
 import 'change_password.dart';
+import 'delete_account.dart';
 import '../../models/role.dart';
 
 /// My account: who is signed in, change password, appearance, the biometric lock, sign out, switch salon.
@@ -99,6 +100,11 @@ class AccountScreen extends StatelessWidget {
           onTap: () async {
             if (await confirmSignOut(context)) await auth.signOut();
           },
+        ),
+        ListTile(
+          leading: SkIconCircle(Icons.delete_forever_outlined, color: Theme.of(context).colorScheme.error),
+          title: Text('Delete account', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          onTap: () => showDeleteAccount(context, me),
         ),
       ]),
     ]);

@@ -53,7 +53,7 @@ class _StaffScreenState extends State<StaffScreen> {
   }
 
   void _toast(String s) => showSkToast(context, s);
-  String _limitText() => 'Your plan allows ${widget.me.maxStaff} active staff. Upgrade your plan to add more.';
+  String _limitText() => 'Your salon can have ${widget.me.maxStaff} active staff right now.';
 
   Future<void> _form([Staff? s]) async {
     final r = await showModalBottomSheet<String>(
@@ -132,7 +132,7 @@ class _StaffScreenState extends State<StaffScreen> {
           FilledButton.icon(onPressed: full || me.readOnly || all == null ? null : () => _form(), icon: const Icon(Icons.person_add_alt_rounded), label: const Text('Add staff')),
         ]),
         Text('Shop default commission: ${pctLabel(me.salon.defaultCommissionPct)} (change in Settings)', style: t.bodySmall),
-        if (max != null && all != null) Text('$active of $max staff on your plan${full ? ' · upgrade your plan to add more' : ''}', style: t.bodySmall),
+        if (max != null && all != null) Text('$active of $max active staff', style: t.bodySmall),
         const SizedBox(height: 12),
         if (_error != null && all == null)
           ErrorState(error: _error!, onRetry: _load)

@@ -102,12 +102,12 @@ void main() {
     expect(find.textContaining('expired or was already used'), findsOneWidget);
   });
 
-  testWidgets('new salon: free trial from the app, signed in as its owner', (t) async {
+  testWidgets('new salon: created from the app, signed in as its owner', (t) async {
     final a = await open(t);
     await t.ensureVisible(find.byKey(const ValueKey('start-trial')));
     await t.tap(find.byKey(const ValueKey('start-trial')));
     await t.pumpAndSettle();
-    expect(find.text('Start your free trial'), findsOneWidget);
+    expect(find.text('Create your salon'), findsOneWidget);
     await t.enterText(find.byKey(const ValueKey('su-salon')), 'New Cuts');
     await t.enterText(find.byKey(const ValueKey('su-name')), 'Nina Owner');
     await t.enterText(find.byKey(const ValueKey('su-email')), 'nina@cuts.com');
@@ -116,8 +116,8 @@ void main() {
     expect(find.text('newcuts.salonkit.online is yours'), findsNothing); // "new-cuts" is the suggestion
     expect(find.text('new-cuts.salonkit.online is yours'), findsOneWidget);
     await t.enterText(find.byKey(const ValueKey('su-pass')), 'longpass1');
-    await t.ensureVisible(find.widgetWithText(FilledButton, 'Start free trial'));
-    await t.tap(find.widgetWithText(FilledButton, 'Start free trial'));
+    await t.ensureVisible(find.widgetWithText(FilledButton, 'Create salon'));
+    await t.tap(find.widgetWithText(FilledButton, 'Create salon'));
     await t.pumpAndSettle();
     final su = a.calls.singleWhere((c) => c.path == '/api/public/signup');
     final body = su.data as Map;
@@ -177,8 +177,8 @@ void main() {
     await t.enterText(find.byKey(const ValueKey('su-salon')), 'New Cuts');
     await t.pump(const Duration(milliseconds: 500));
     await t.pumpAndSettle();
-    await t.ensureVisible(find.widgetWithText(FilledButton, 'Start free trial'));
-    await t.tap(find.widgetWithText(FilledButton, 'Start free trial'));
+    await t.ensureVisible(find.widgetWithText(FilledButton, 'Create salon'));
+    await t.tap(find.widgetWithText(FilledButton, 'Create salon'));
     await t.pumpAndSettle();
     final body = a.calls.singleWhere((c) => c.path == '/api/public/signup').data as Map;
     expect([body['id_token'], body.containsKey('email'), body.containsKey('password'), body['owner_name']], ['tok-new', false, false, 'Nina New']);

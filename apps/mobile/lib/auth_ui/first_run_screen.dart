@@ -104,7 +104,7 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
         r.sent = true;
         r.error = null;
       } on StaffLimit {
-        r.error = 'Your plan has no room for more staff';
+        r.error = "You can't add more staff right now";
       } on ApiError catch (e) {
         r.error = e.message;
       }
@@ -149,7 +149,7 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
           const SizedBox(height: 12),
           Text('You\'re all set', style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
-          Text('Your 7-day free trial has started. Ring up your first sale with New sale.', textAlign: TextAlign.center, style: t.bodyMedium?.copyWith(color: c.onSurfaceVariant)),
+          Text('Your salon is ready. Ring up your first sale with New sale.', textAlign: TextAlign.center, style: t.bodyMedium?.copyWith(color: c.onSurfaceVariant)),
         ]),
     };
     final last = _step >= 2;

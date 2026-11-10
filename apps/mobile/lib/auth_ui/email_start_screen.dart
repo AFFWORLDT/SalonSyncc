@@ -12,7 +12,7 @@ import 'salon_screen.dart';
 import 'signup_screen.dart';
 
 /// First screen: just your email. We email a 6-digit code and a one-tap link; the server finds your salon from the
-/// email (one email = one salon). The salon ID + password way and a new salon's free trial are one tap away.
+/// email (one email = one salon). The salon ID + password way and creating a new salon are one tap away.
 class EmailStartScreen extends StatefulWidget {
   const EmailStartScreen({super.key});
   @override
@@ -186,7 +186,7 @@ class _EmailStartScreenState extends State<EmailStartScreen> {
           SkSoftPill(
             key: const ValueKey('start-trial'),
             icon: Icons.edit_calendar_outlined,
-            label: 'New salon? Start a 7-day free trial',
+            label: 'New salon? Create your salon',
             onTap: () => Navigator.of(context).push(SkRoute<void>(builder: (_) => const SignupScreen())),
           ),
           const SizedBox(height: 18),

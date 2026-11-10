@@ -157,7 +157,7 @@ class AuthController extends GetxController {
     return null;
   }
 
-  /// A new salon on the 7-day free trial, signed in straight away as its owner. With [idToken] (Google / Apple) the
+  /// A new salon, signed in straight away as its owner. With [idToken] (Google / Apple) the
   /// email and password are not sent: the verified email is the owner's, and they sign in with Google / Apple or a code.
   Future<void> signUp({required String salonName, required String ownerName, String email = '', required String slug, String password = '', String? phone, required String country, String? idToken}) async {
     final r = await clientFor(rootBase()).post('/api/public/signup', {
@@ -211,6 +211,18 @@ class AuthController extends GetxController {
       await api.delete('/api/mobile/session', (_) => null).then((_) {}, onError: (_) {});
     }
     await _forget();
+    await afterSignOut?.call();
+  }
+
+  /// My account was deleted on the server (its sessions are gone already): forget this phone's sign-in, and the
+  /// salon too when it went with it (the owner deleted it).
+  Future<void> accountDeleted({required bool salonGone}) async {
+    await _forget();
+    if (salonGone) {
+      await store.clearSalon();
+      salon.value = null;
+      state.value = AuthState.needSalon;
+    }
     await afterSignOut?.call();
   }
 

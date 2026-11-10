@@ -34,7 +34,7 @@ class Throttled extends ApiError {
 }
 
 class Paused extends ApiError {
-  const Paused() : super("This salon's account is paused. Contact the salon owner.");
+  const Paused() : super("This salon can't make changes right now. Contact the salon owner.");
 }
 
 class ServerError extends ApiError {

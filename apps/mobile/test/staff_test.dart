@@ -34,7 +34,7 @@ void main() {
     await pump(t);
     expect(find.text('Staff'), findsOneWidget);
     expect(find.text('Shop default commission: 0% (change in Settings)'), findsOneWidget);
-    expect(find.text('2 of 10 staff on your plan'), findsOneWidget);
+    expect(find.text('2 of 10 active staff'), findsOneWidget);
     expect(find.text('Owner'), findsWidgets);
     expect(find.text('Barbers'), findsOneWidget);
     expect(find.text('@sam · 40%'), findsOneWidget);
@@ -43,7 +43,7 @@ void main() {
 
   testWidgets('at the limit: Add disabled, upgrade hint', (t) async {
     await pump(t, me: owner(maxStaff: 2));
-    expect(find.text('2 of 2 staff on your plan · upgrade your plan to add more'), findsOneWidget);
+    expect(find.text('2 of 2 active staff'), findsOneWidget);
     expect(t.widget<FilledButton>(find.widgetWithText(FilledButton, 'Add staff')).onPressed, isNull);
   });
 
@@ -68,7 +68,7 @@ void main() {
     expect(body['username'], 'omarkhan');
     expect(body['email'], 'omar@mail.com');
     expect(body.containsKey('sort_order'), isFalse, reason: 'blank = the server puts them last in the sheet');
-    expect(find.text('Your plan allows 10 active staff. Upgrade your plan to add more.'), findsOneWidget);
+    expect(find.text('Your salon can have 10 active staff right now.'), findsOneWidget);
   });
 
   testWidgets('adding someone with an email sends them an invite link (switch on by default)', (t) async {

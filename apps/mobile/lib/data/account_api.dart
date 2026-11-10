@@ -14,5 +14,8 @@ class AccountApi {
 
   Future<void> clearBanner() => api.delete('/api/me/banner', (_) {});
 
+  /// Deletes my account for good (the owner's deletes the whole salon). [confirm]: the salon ID (owner) or "DELETE".
+  Future<void> deleteAccount(String confirm) => api.delete('/api/me', (_) {}, body: {'confirm': confirm});
+
   Future<void> changePassword(String current, String next) => api.put('/api/me/password', {'current': current, 'next': next}, (_) {});
 }
