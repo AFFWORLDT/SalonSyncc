@@ -79,7 +79,7 @@ export default function PrivacyPage() {
         {
           title: "Your choices and rights",
           body: [
-            "You can see and change most of your details in SalonKit itself. You can ask us for a copy of your data, to correct it, or to delete your account and data, by emailing " +
+            "You can see and change most of your details in SalonKit itself, and delete your account in the app (Profile → Delete account): staff accounts are deleted straight away, and an owner's deletion closes the salon. You can also ask us for a copy of your data, to correct it, or to delete your account and data, by emailing " +
               LEGAL_EMAIL +
               " from the email on your account. Salon customers can ask the salon, or us, to remove their details.",
           ],
