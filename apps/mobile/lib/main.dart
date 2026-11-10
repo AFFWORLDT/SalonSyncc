@@ -38,8 +38,9 @@ import 'core/version/version_check.dart';
 
 Future<void> main() => run();
 
-/// [crashReports] off in the e2e tests: the test runner owns FlutterError.onError.
-Future<void> run({bool crashReports = true}) async {
+/// [crashReports] off in the e2e tests: the test runner owns FlutterError.onError. [push] off for store screenshots
+/// (no notification prompt over the screen).
+Future<void> run({bool crashReports = true, bool push = true}) async {
   WidgetsFlutterBinding.ensureInitialized();
   // Firebase (push + crash reports) needs google-services.json / GoogleService-Info.plist. Without them the app runs
   // with both off; it must never fail to start over it.
@@ -92,7 +93,7 @@ Future<void> run({bool crashReports = true}) async {
   });
   postSignInSteps.add(offerBiometricLock);
   final registry = FeatureRegistry(appModules);
-  if (firebase) {
+  if (firebase && push) {
     final push = await setUpPush(auth, registry);
     postSignInSteps.add((_) async {
       final me = auth.me.value;
