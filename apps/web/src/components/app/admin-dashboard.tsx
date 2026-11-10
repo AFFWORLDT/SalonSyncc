@@ -81,18 +81,18 @@ function HeroStat({
   divider?: boolean;
 }) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-1.5 pr-3", divider && "border-l border-white/15 pl-3 sm:pl-5")}>
+    <div className={cn("flex min-w-0 flex-col gap-1.5 pr-2 sm:pr-3", divider && "border-l border-white/15 pl-2.5 sm:pl-5")}>
       <div className="flex items-center justify-between gap-2">
-        <span className="flex size-9 items-center justify-center rounded-full bg-white/12 text-[#7FE3B0]">{icon}</span>
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/12 text-[#7FE3B0] sm:size-9">{icon}</span>
         {action}
       </div>
-      <p className="text-sm text-white/75">{label}</p>
+      <p className="text-xs leading-snug text-white/75 sm:text-sm">{label}</p>
       {value === null ? (
         <Skeleton className="h-6 w-20 bg-white/15" />
       ) : (
-        <p className={cn("num text-lg leading-tight font-extrabold sm:text-2xl", negative ? "text-[#FF8A80]" : "text-white")}>{money(value)}</p>
+        <p className={cn("num text-base leading-tight font-extrabold [overflow-wrap:anywhere] sm:text-2xl", negative ? "text-[#FF8A80]" : "text-white")}>{money(value)}</p>
       )}
-      {hint && <p className="text-xs text-white/70 [&_.text-success]:text-[#7FE3B0] [&_.text-destructive]:text-[#FFB4AB]">{hint}</p>}
+      {hint && <p className="text-[11px] leading-snug text-white/70 sm:text-xs [&_.text-success]:text-[#7FE3B0] [&_.text-destructive]:text-[#FFB4AB]">{hint}</p>}
     </div>
   );
 }
@@ -119,8 +119,8 @@ function RangePill({ on, onClick, children }: { on: boolean; onClick: () => void
 function SectionTitle({ title, href, link }: { title: string; href: string; link: string }) {
   return (
     <div className="flex items-center justify-between gap-3 px-1">
-      <h2 className="text-xl font-extrabold tracking-tight">{title}</h2>
-      <Link href={href} className="inline-flex items-center gap-1 text-sm font-bold text-primary hover:underline">
+      <h2 className="min-w-0 truncate text-xl font-extrabold tracking-tight">{title}</h2>
+      <Link href={href} className="inline-flex shrink-0 items-center gap-1 text-sm font-bold text-primary hover:underline">
         {link}
         <ArrowRight className="size-4" />
       </Link>
@@ -197,14 +197,14 @@ export function AdminDashboard() {
       </div>
 
       {/* The hero: sales on deep green, as in the phone app; expense, commission and profit underneath. */}
-      <section className="relative overflow-hidden rounded-[26px] bg-linear-to-br from-[#0E5A48] to-[#0A3E32] p-6 text-white shadow-[0_18px_40px_-18px_rgb(10_62_50/0.6)] sm:p-7">
+      <section className="relative overflow-hidden rounded-[26px] bg-linear-to-br from-[#0E5A48] to-[#0A3E32] p-5 text-white shadow-[0_18px_40px_-18px_rgb(10_62_50/0.6)] sm:p-7">
         <div className="pointer-events-none absolute -top-24 -right-20 size-72 rounded-full bg-white/[0.06]" aria-hidden />
         <div className="relative flex items-start justify-between gap-3">
           <p className="text-lg font-bold">Sales {word}</p>
           <BarChart3 className="size-6 text-white/90" aria-hidden />
         </div>
         {t ? (
-          <p className="num relative mt-2 text-[44px] leading-none font-extrabold tracking-tight sm:text-[52px]">{money(t.sales)}</p>
+          <p className="num relative mt-2 text-[40px] leading-none font-extrabold tracking-tight sm:text-[52px]">{money(t.sales)}</p>
         ) : (
           <Skeleton className="relative mt-3 h-12 w-48 bg-white/15" />
         )}
@@ -224,7 +224,7 @@ export function AdminDashboard() {
                   type="button"
                   aria-label="Add company expense"
                   onClick={() => setAddExpense(true)}
-                  className="flex size-8 items-center justify-center rounded-full bg-white/12 text-white transition-colors hover:bg-white/20"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/12 text-white transition-colors hover:bg-white/20"
                 >
                   <Plus className="size-4" />
                 </button>
@@ -250,8 +250,8 @@ export function AdminDashboard() {
         </Button>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_1fr]">
-        <section className="flex flex-col gap-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <section className="flex min-w-0 flex-col gap-3">
           <SectionTitle title={`Barbers ${word}`} href={`/sheet?month=${to.slice(0, 7)}`} link="Daily sheet" />
           {!data ? (
             <div className="flex flex-col gap-3">
@@ -263,14 +263,14 @@ export function AdminDashboard() {
             <ul className="flex flex-col gap-3">
               {data.per_barber.map((b) => (
                 <li key={b.id}>
-                  <Card className="flex-row items-center gap-4 px-4 py-4">
-                    <UserAvatar name={b.name} url={b.avatar_url} size={48} />
+                  <Card className="flex-row items-center gap-3 px-4 py-4 sm:gap-4">
+                    <UserAvatar name={b.name} url={b.avatar_url} size={44} className="shrink-0" />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-baseline justify-between gap-3">
                         <p className="truncate text-base font-bold">{b.name}</p>
                         <p className="num shrink-0 text-base font-extrabold">{money(b.sales)}</p>
                       </div>
-                      <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
                         <span className="num">{b.count} cust</span>
                         <span aria-hidden>•</span>
                         <span className="num">Comm {num(b.commission, true)}</span>
@@ -297,7 +297,7 @@ export function AdminDashboard() {
           )}
         </section>
 
-        <section className="flex flex-col gap-3">
+        <section className="flex min-w-0 flex-col gap-3">
           <SectionTitle title={`Latest sales ${word}`} href={single ? `/sales?day=${from}` : "/sales"} link="All sales" />
           <Card className="gap-0 p-0">
             {!data ? (
