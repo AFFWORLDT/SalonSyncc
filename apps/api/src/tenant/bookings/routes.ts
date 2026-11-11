@@ -20,7 +20,7 @@ import {
   type BookingSettingsRow,
   type BookingStatus,
 } from "../../data/tenant";
-import { canonicalPhone } from "../../lib/phone";
+import { canonicalPhone, whatsappDigits } from "../../lib/phone";
 import { moneyText } from "../../lib/money";
 import { allowedRecipient } from "../../lib/whatsapp";
 import { anyFree, daysBetween, freeSlots, hhmm, isDay, localNow, parseHhmm, pickStaff, type WeekHours } from "../../lib/slots";
@@ -99,11 +99,13 @@ const whenText = (b: Pick<BookingRow, "day" | "start_min">, locale: string) => {
   return `${d}, ${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h >= 12 ? "pm" : "am"}`;
 };
 
-const toApi = (b: BookingRow, staffName: (id: number) => string) => ({
+type StaffOf = (id: number) => { name: string; avatar: string | null };
+const toApi = (b: BookingRow, staffOf: StaffOf, cc: string) => ({
   id: b.id,
   ref: b.ref,
   staff_id: b.staff_id,
-  staff_name: staffName(b.staff_id),
+  staff_name: staffOf(b.staff_id).name,
+  staff_avatar: staffOf(b.staff_id).avatar,
   day: b.day,
   start: hhmm(b.start_min),
   end: hhmm(b.end_min),
@@ -111,6 +113,7 @@ const toApi = (b: BookingRow, staffName: (id: number) => string) => ({
   total: b.total,
   customer_name: b.customer_name,
   customer_phone: b.customer_phone,
+  customer_wa: whatsappDigits(b.customer_phone, cc),
   customer_email: b.customer_email,
   note: b.note,
   status: b.status,
@@ -363,9 +366,12 @@ bookingPublic.post("/b/:token/cancel", publicRateLimit("book"), async (c) => {
 export const bookings = new Hono<AppEnv>();
 bookings.use("*", requireFeature(FEATURE));
 
-const staffNameFn = async (c: Context<AppEnv>) => {
+const staffNameFn = async (c: Context<AppEnv>): Promise<StaffOf> => {
   const users = await usersRepo(c.env.DB, c.var.tenant.org.id).list();
-  return (id: number) => users.find((u) => u.id === id)?.name ?? "Former staff";
+  return (id: number) => {
+    const u = users.find((x) => x.id === id);
+    return { name: u?.name ?? "Former staff", avatar: u && u.avatar_v > 0 ? `/api/public/avatar/${u.id}/${u.avatar_v}` : null };
+  };
 };
 
 /** Bookings between two days (admins: everyone's; staff: their own). */
@@ -378,7 +384,7 @@ bookings.get("/", async (c) => {
   const u = c.var.tenant.user;
   const rows = await bookingsRepo(c.env.DB, c.var.tenant.org.id).list(from, to, isAdmin(u) ? null : u.id);
   const name = await staffNameFn(c);
-  return c.json({ today, items: rows.map((b) => toApi(b, name)) });
+  return c.json({ today, items: rows.map((b) => toApi(b, name, s.phone_country)) });
 });
 
 /** The settings page: rules, durations per service, who takes bookings, plus the lists to choose from. */
@@ -480,7 +486,7 @@ bookings.post("/", requireAdmin, async (c) => {
   const row = await createBooking(c.env, org.id, withStaff, { staff: staffId, day, start, services: pickServices(cat, b.services), name, phone, email: null, note: clean(b.note, 300) }, Date.now(), "manual", c.var.tenant.user.id, true);
   if (cat.bs.wa_template) c.executionCtx.waitUntil(announce(c.env, org, withStaff, row, false));
   const nameOf = await staffNameFn(c);
-  return c.json(toApi(row, nameOf), 201);
+  return c.json(toApi(row, nameOf, cat.s.phone_country), 201);
 });
 
 /** Status changes: completed, no-show, cancelled, or back to confirmed (if the time is still free). */

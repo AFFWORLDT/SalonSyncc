@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarClock, ChevronLeft, ChevronRight, Phone, Plus, Settings2 } from "lucide-react";
+import { CalendarCheck2, CalendarClock, CalendarRange, Check, Clock3, MessageCircle, MoreHorizontal, Phone, Plus, Settings2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage, qs } from "@/lib/api";
 import { notifyDataChanged, useApi } from "@/hooks/use-api";
@@ -14,6 +14,8 @@ import { Field } from "@/components/app/field";
 import { SimpleSelect } from "@/components/app/simple-select";
 import { ErrorState } from "@/components/admin/states";
 import { Badge } from "@/components/ui/badge";
+import { UserAvatar } from "@/components/app/user-avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,6 +32,7 @@ interface Booking {
   ref: string;
   staff_id: number;
   staff_name: string;
+  staff_avatar: string | null;
   day: string;
   start: string;
   end: string;
@@ -37,6 +40,7 @@ interface Booking {
   total: number;
   customer_name: string;
   customer_phone: string;
+  customer_wa: string;
   customer_email: string | null;
   note: string | null;
   status: Status;
@@ -80,7 +84,6 @@ const ampm = (t: string) => {
   const [h, m] = t.split(":").map(Number);
   return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h >= 12 ? "pm" : "am"}`;
 };
-const waLink = (phone: string) => `https://wa.me/${phone.replace(/\D/g, "")}`;
 
 /** Online bookings from the salon's website, plus bookings the salon adds by hand. */
 export default function BookingsPage() {
@@ -93,41 +96,81 @@ export default function BookingsPage() {
 
 function BookingsInner() {
   const { isAdmin } = useAuth();
-  const [tab, setTab] = useState<"day" | "upcoming" | "settings">("day");
+  const [tab, setTab] = useState<"bookings" | "settings">("bookings");
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
-      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
-        <TabsList>
-          <TabsTrigger value="day">Day</TabsTrigger>
-          <TabsTrigger value="upcoming">Next 14 days</TabsTrigger>
-          {isAdmin && (
+      {isAdmin && (
+        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+          <TabsList>
+            <TabsTrigger value="bookings">
+              <CalendarCheck2 className="size-3.5" /> Bookings
+            </TabsTrigger>
             <TabsTrigger value="settings">
               <Settings2 className="size-3.5" /> Settings
             </TabsTrigger>
-          )}
-        </TabsList>
-      </Tabs>
-      {tab === "settings" && isAdmin ? <BookingSettingsCard /> : <BookingList mode={tab === "day" ? "day" : "upcoming"} />}
+          </TabsList>
+        </Tabs>
+      )}
+      {tab === "settings" && isAdmin ? <BookingSettingsCard /> : <BookingBoard />}
     </div>
   );
 }
 
-function BookingList({ mode }: { mode: "day" | "upcoming" }) {
+const AHEAD = 30;
+const dayBits = (day: string) => {
+  const d = new Date(`${day}T00:00:00Z`);
+  return {
+    wd: d.toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" }),
+    dn: d.getUTCDate(),
+    mo: d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" }),
+  };
+};
+const relDay = (day: string, today: string) => {
+  const n = Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+  return n === 0 ? "Today" : n === 1 ? "Tomorrow" : n === -1 ? "Yesterday" : null;
+};
+const toMin = (t: string) => {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+};
+
+/**
+ * Upcoming bookings at a glance: totals, a strip of the next 30 days with a count on each, and the bookings grouped
+ * by day. Tapping a day shows just that day; "Upcoming" shows everything from today on. Older days via the date picker.
+ */
+function BookingBoard() {
   const { isAdmin } = useAuth();
-  const [day, setDay] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(null); // null = all upcoming
+  const [showClosed, setShowClosed] = useState(false);
   const [adding, setAdding] = useState(false);
-  const first = useApi<BookingList>(day ? null : "/api/bookings");
-  const base = day ?? first.data?.today ?? null;
-  const from = base;
-  const to = base && mode === "upcoming" ? addDays(base, 13) : base;
+  const head = useApi<BookingList>("/api/bookings");
+  const today = head.data?.today ?? null;
+  const past = !!(picked && today && picked < today);
+  const from = past ? picked : today;
+  const to = past ? picked : today ? addDays(today, AHEAD) : null;
   const { data, error, reload } = useApi<BookingList>(from && to ? `/api/bookings${qs({ from, to })}` : null);
-  const items = useMemo(() => data?.items ?? [], [data]);
+  const all = useMemo(() => data?.items ?? [], [data]);
+
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const live = all.filter((b) => b.status === "confirmed");
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const b of all) if (b.status === "confirmed") m.set(b.day, (m.get(b.day) ?? 0) + 1);
+    return m;
+  }, [all]);
+  const week = today ? live.filter((b) => b.day <= addDays(today, 6)).length : 0;
+  const todays = today ? live.filter((b) => b.day === today) : [];
+  const next = today ? live.find((b) => b.day > today || toMin(b.end) > nowMin) : undefined;
+  const revenue = live.reduce((t, b) => t + b.total, 0);
+
+  const shown = all.filter((b) => (picked ? b.day === picked : true)).filter((b) => showClosed || b.status === "confirmed" || (picked !== null && b.status !== "cancelled"));
+  const hidden = all.filter((b) => (picked ? b.day === picked : true)).length - shown.length;
   const groups = useMemo(() => {
     const m = new Map<string, Booking[]>();
-    for (const b of items) m.set(b.day, [...(m.get(b.day) ?? []), b]);
+    for (const b of shown) m.set(b.day, [...(m.get(b.day) ?? []), b]);
     return [...m.entries()];
-  }, [items]);
-  const active = items.filter((b) => b.status === "confirmed");
+  }, [shown]);
 
   async function setStatus(b: Booking, status: Status) {
     try {
@@ -140,100 +183,184 @@ function BookingList({ mode }: { mode: "day" | "upcoming" }) {
     }
   }
 
-  if ((error || first.error) && !data) return <ErrorState message={error ?? first.error ?? "Couldn't load bookings"} onRetry={reload} />;
+  if ((error || head.error) && !data) return <ErrorState message={error ?? head.error ?? "Couldn't load bookings"} onRetry={reload} />;
+  if (!data || !today) return <Skeleton className="h-96 rounded-2xl" />;
+
   return (
     <>
+      {/* At a glance */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+        {[
+          { label: "Today", value: todays.length, hint: todays.length ? `next ${ampm(todays.find((b) => toMin(b.end) > nowMin)?.start ?? todays[0].start)}` : "none yet" },
+          { label: "Next 7 days", value: week, hint: "booked" },
+          { label: "Upcoming", value: live.length, hint: money(revenue) },
+        ].map((t) => (
+          <Card key={t.label} className="gap-0.5 rounded-2xl p-3 sm:p-4">
+            <p className="text-xs font-medium text-muted-foreground">{t.label}</p>
+            <p className="num text-2xl font-semibold sm:text-3xl">{t.value}</p>
+            <p className="truncate text-xs text-muted-foreground">{t.hint}</p>
+          </Card>
+        ))}
+      </div>
+
+      {next && !picked && (
+        <Card className="flex-row items-center gap-3 rounded-2xl border-primary/20 bg-primary/[0.06] p-3.5">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground">
+            <Clock3 className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="font-semibold">
+              Next: {next.customer_name} · {relDay(next.day, today) ?? dayLabel(next.day)}, {ampm(next.start)}
+            </p>
+            <p className="truncate text-muted-foreground">
+              {next.services.map((s) => s.name).join(", ")} with {next.staff_name}
+            </p>
+          </div>
+        </Card>
+      )}
+
+      {/* Day strip */}
+      <div className="-mx-4 flex items-stretch gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0">
+        <button
+          type="button"
+          onClick={() => setPicked(null)}
+          className={cn("flex w-[4.25rem] shrink-0 flex-col items-center justify-center rounded-2xl border px-2 py-2 text-xs font-semibold transition", picked === null ? "border-primary bg-primary text-primary-foreground shadow-sm" : "bg-card hover:border-primary/40")}
+        >
+          <CalendarRange className="mb-1 size-4" />
+          Upcoming
+        </button>
+        {Array.from({ length: AHEAD + 1 }, (_, i) => addDays(today, i)).map((d) => {
+          const p = dayBits(d);
+          const n = counts.get(d) ?? 0;
+          const on = picked === d;
+          return (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setPicked(d)}
+              className={cn("relative flex w-14 shrink-0 flex-col items-center rounded-2xl border py-2 transition", on ? "border-primary bg-primary text-primary-foreground shadow-sm" : "bg-card hover:border-primary/40", d === today && !on && "border-primary/50")}
+            >
+              <span className={cn("text-[11px] uppercase", on ? "opacity-80" : "text-muted-foreground")}>{d === today ? "Today" : p.wd}</span>
+              <span className="num text-lg font-semibold leading-tight">{p.dn}</span>
+              <span className={cn("mt-0.5 h-4 min-w-4 rounded-full px-1 text-[10px] font-bold leading-4", n ? (on ? "bg-primary-foreground text-primary" : "bg-primary text-primary-foreground") : "opacity-0")}>{n}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
-        {mode === "day" && base && (
-          <>
-            <Button variant="outline" size="icon" aria-label="Previous day" onClick={() => setDay(addDays(base, -1))}>
-              <ChevronLeft />
-            </Button>
-            <DateInput aria-label="Day" value={base} onChange={(e) => e.target.value && setDay(e.target.value)} className="h-9 w-40" />
-            <Button variant="outline" size="icon" aria-label="Next day" onClick={() => setDay(addDays(base, 1))}>
-              <ChevronRight />
-            </Button>
-            {data && base !== data.today && (
-              <Button variant="ghost" size="sm" onClick={() => setDay(null)}>
-                Today
-              </Button>
-            )}
-          </>
+        <DateInput aria-label="Go to a date" value={picked ?? ""} onChange={(e) => setPicked(e.target.value || null)} className="h-9 w-40" />
+        {hidden > 0 && (
+          <Button variant="ghost" size="sm" onClick={() => setShowClosed(true)}>
+            Show {hidden} done or cancelled
+          </Button>
         )}
-        <span className="text-sm text-muted-foreground">
-          {data ? `${active.length} booked${items.length > active.length ? `, ${items.length - active.length} other` : ""}` : ""}
-        </span>
+        {showClosed && (
+          <Button variant="ghost" size="sm" onClick={() => setShowClosed(false)}>
+            Hide done and cancelled
+          </Button>
+        )}
         {isAdmin && (
-          <Button className="ml-auto" size="sm" onClick={() => setAdding(true)}>
+          <Button className="ml-auto rounded-full" size="sm" onClick={() => setAdding(true)}>
             <Plus /> Add booking
           </Button>
         )}
       </div>
 
-      {!data ? (
-        <Skeleton className="h-40 rounded-xl" />
-      ) : items.length === 0 ? (
-        <Card className="items-center gap-2 p-10 text-center">
-          <CalendarClock className="size-8 text-muted-foreground" />
-          <p className="font-medium">{mode === "day" ? `No bookings on ${dayLabel(base!)}` : "No bookings in the next 14 days"}</p>
-          <p className="text-sm text-muted-foreground">Bookings made on your website appear here straight away, and you get an email for each one.</p>
+      {groups.length === 0 ? (
+        <Card className="items-center gap-2 rounded-2xl p-10 text-center">
+          <span className="grid size-14 place-items-center rounded-full bg-muted">
+            <CalendarClock className="size-7 text-muted-foreground" />
+          </span>
+          <p className="font-medium">{picked ? `No bookings on ${dayLabel(picked)}` : "No upcoming bookings yet"}</p>
+          <p className="max-w-sm text-sm text-muted-foreground">Bookings made on your website appear here straight away, and you get an email for each one.</p>
         </Card>
       ) : (
         groups.map(([d, list]) => (
           <section key={d} className="flex flex-col gap-2">
-            {mode === "upcoming" && <h2 className="px-1 text-sm font-semibold text-muted-foreground">{dayLabel(d)}</h2>}
+            <div className="flex items-baseline gap-2 px-1 pt-1">
+              <h2 className="text-sm font-semibold">{relDay(d, today) ?? dayBits(d).wd}</h2>
+              <span className="text-sm text-muted-foreground">
+                {dayBits(d).dn} {dayBits(d).mo} · {list.filter((b) => b.status === "confirmed").length} booked
+              </span>
+            </div>
             {list.map((b) => (
-              <Card key={b.id} className={cn("flex-row gap-4 p-4", b.status === "cancelled" && "opacity-60")}>
-                <div className="w-16 shrink-0 text-center">
-                  <p className="num text-lg font-semibold leading-tight">{ampm(b.start)}</p>
-                  <p className="text-xs text-muted-foreground">to {ampm(b.end)}</p>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold">{b.customer_name}</p>
-                    <Badge className={cn("border-0", STATUS[b.status].cls)}>{STATUS[b.status].label}</Badge>
-                    {b.source === "website" && <Badge variant="outline">Website</Badge>}
-                  </div>
-                  <p className="mt-0.5 text-sm text-muted-foreground">
-                    {b.services.map((s) => s.name).join(", ")} · with {b.staff_name} · {money(b.total)}
-                  </p>
-                  {b.note && <p className="mt-1 text-sm italic text-muted-foreground">&ldquo;{b.note}&rdquo;</p>}
-                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                    <a href={`tel:${b.customer_phone}`} className="inline-flex items-center gap-1 font-medium text-primary">
-                      <Phone className="size-3.5" /> {b.customer_phone}
-                    </a>
-                    <a href={waLink(b.customer_phone)} target="_blank" rel="noopener" className="font-medium text-primary">
-                      WhatsApp
-                    </a>
-                    <span className="text-xs text-muted-foreground">Ref {b.ref}</span>
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {b.status === "confirmed" ? (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => setStatus(b, "completed")}>
-                          Done
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setStatus(b, "no_show")}>
-                          No-show
-                        </Button>
-                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => confirm(`Cancel ${b.customer_name}'s booking?`) && setStatus(b, "cancelled")}>
-                          Cancel
-                        </Button>
-                      </>
-                    ) : (
-                      <Button size="sm" variant="ghost" onClick={() => setStatus(b, "confirmed")}>
-                        Mark as booked again
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </Card>
+              <BookingCard key={b.id} b={b} onStatus={(s) => setStatus(b, s)} past={d < today || (d === today && toMin(b.end) <= nowMin)} />
             ))}
           </section>
         ))
       )}
-      {adding && base && <AddBooking day={base} onClose={() => setAdding(false)} onDone={reload} />}
+      {adding && <AddBooking day={picked ?? today} onClose={() => setAdding(false)} onDone={reload} />}
     </>
+  );
+}
+
+function BookingCard({ b, onStatus, past }: { b: Booking; onStatus: (s: Status) => void; past: boolean }) {
+  const st = STATUS[b.status];
+  return (
+    <Card className={cn("relative gap-0 overflow-hidden rounded-2xl p-0", b.status === "cancelled" && "opacity-60")}>
+      <span className={cn("absolute inset-y-0 left-0 w-1", b.status === "confirmed" ? "bg-primary" : b.status === "completed" ? "bg-sky-500" : b.status === "no_show" ? "bg-amber-500" : "bg-muted-foreground/30")} aria-hidden />
+      <div className="flex gap-3 p-4 pl-5">
+        <div className="w-[4.5rem] shrink-0">
+          <p className="num whitespace-nowrap text-base font-semibold leading-tight sm:text-lg">{ampm(b.start)}</p>
+          <p className="text-xs text-muted-foreground">{ampm(b.end)}</p>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="truncate text-base font-semibold">{b.customer_name}</p>
+            <Badge className={cn("shrink-0 border-0", st.cls)}>{st.label}</Badge>
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {b.services.map((s) => (
+              <span key={s.id} className="rounded-full bg-muted px-2.5 py-0.5 text-xs">
+                {s.name}
+              </span>
+            ))}
+          </div>
+          <div className="mt-2.5 flex items-center gap-2 text-sm">
+            <UserAvatar name={b.staff_name} url={b.staff_avatar} size={22} />
+            <span className="truncate text-muted-foreground">{b.staff_name}</span>
+            <span className="ml-auto num font-semibold">{money(b.total)}</span>
+          </div>
+          {b.note && <p className="mt-2 rounded-lg bg-muted/60 px-3 py-2 text-sm italic text-muted-foreground">&ldquo;{b.note}&rdquo;</p>}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-1 border-t bg-muted/30 px-3 py-2">
+        <Button size="sm" variant="ghost" className="h-8 rounded-full" nativeButton={false} render={<a href={`tel:${b.customer_phone}`} />}>
+          <Phone className="size-3.5" /> Call
+        </Button>
+        <Button size="sm" variant="ghost" className="h-8 rounded-full" nativeButton={false} render={<a href={`https://wa.me/${b.customer_wa}`} target="_blank" rel="noopener" />}>
+          <MessageCircle className="size-3.5" /> WhatsApp
+        </Button>
+        <span className="hidden text-xs text-muted-foreground sm:inline">
+          {b.source === "website" ? "Website" : "Added by salon"} · {b.ref}
+        </span>
+        <span className="ml-auto flex gap-1">
+          {b.status === "confirmed" ? (
+            <>
+              <Button size="sm" variant={past ? "default" : "outline"} className="h-8 rounded-full" onClick={() => onStatus("completed")}>
+                <Check className="size-3.5" /> Done
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button size="icon" variant="ghost" className="size-8 rounded-full" aria-label="More actions" />}>
+                  <MoreHorizontal className="size-4" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onStatus("no_show")}>Mark no-show</DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive" onClick={() => confirm(`Cancel ${b.customer_name}'s booking?`) && onStatus("cancelled")}>
+                    Cancel booking
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+            <Button size="sm" variant="ghost" className="h-8 rounded-full" onClick={() => onStatus("confirmed")}>
+              <Undo2 className="size-3.5" /> Book again
+            </Button>
+          )}
+        </span>
+      </div>
+    </Card>
   );
 }
 
