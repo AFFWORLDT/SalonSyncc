@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  CalendarCheck,
   Bot,
   BookOpen,
   CalendarDays,
@@ -42,6 +43,7 @@ const ADMIN: NavGroup[] = [
     items: [
       { href: "/", label: "Dashboard", icon: Home, tab: true },
       { href: "/sales", label: "Sales", icon: Receipt, tab: true },
+      { href: "/bookings", label: "Bookings", icon: CalendarCheck, feature: "online_bookings" },
       { href: "/bills", label: "Bills", icon: ReceiptText },
       { href: "/expenses", label: "Expenses", icon: Wallet, feature: "expenses" },
     ],
@@ -76,6 +78,7 @@ const BARBER: NavGroup[] = [
     label: "Me",
     items: [
       { href: "/", label: "Today", icon: Home, tab: true },
+      { href: "/bookings", label: "My bookings", icon: CalendarCheck, feature: "online_bookings" },
       { href: "/history", label: "My history", icon: CalendarDays, tab: true },
       { href: "/bills", label: "My bills", icon: ReceiptText, tab: true },
       { href: "/account", label: "My account", icon: UserRound },

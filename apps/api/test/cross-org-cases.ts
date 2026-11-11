@@ -308,3 +308,24 @@ CASES.push(
   mcpCase("GET", "/api/mcp/requests/:id", "req"),
   mcpCase("POST", "/api/mcp/requests/:id", "req", { approve: true, write: true }),
 );
+
+// ---- Online bookings (feature online_bookings is override-only: switched on for every org, like mcp_api above) ----
+const bookingsOnForAll = () =>
+  env.DB.prepare("INSERT OR IGNORE INTO org_feature_overrides(org_id,feature_key,enabled,set_at) SELECT id,'online_bookings',1,0 FROM orgs").run();
+CASES.push({
+  name: "PATCH /api/bookings/:id",
+  method: "PATCH",
+  path: (id) => `/api/bookings/${id}`,
+  body: { status: "cancelled" },
+  seed: async (orgId) => {
+    await bookingsOnForAll();
+    const staffId = await seedStaff(orgId);
+    const r = await env.DB.prepare(
+      "INSERT INTO bookings(org_id,ref,token,staff_id,day,start_min,end_min,services,total,customer_name,customer_phone,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id",
+    )
+      .bind(orgId, `B${randomToken(4)}`, randomToken(12), staffId, "2026-12-01", 600, 660, "[]", 0, "X", "+971500000000", Date.now(), Date.now())
+      .first<{ id: number }>();
+    return r!.id;
+  },
+  read: (orgId, id) => env.DB.prepare("SELECT * FROM bookings WHERE org_id = ? AND id = ?").bind(orgId, id).first(),
+});

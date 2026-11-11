@@ -14,6 +14,7 @@ export const FEATURE_KEYS = [
   "whatsapp_campaigns",
   "public_services_api",
   "mcp_api",
+  "online_bookings",
 ] as const;
 
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
@@ -22,7 +23,7 @@ export type FeatureKey = (typeof FEATURE_KEYS)[number];
  * Features no plan can grant: only a super-admin per-salon override (org_feature_overrides, enabled = 1) turns them on.
  * effectiveFeatures drops them from plan features, so a plan row (or the trial plan) that lists one changes nothing.
  */
-export const OVERRIDE_ONLY: readonly FeatureKey[] = Object.freeze(["mcp_api"] as FeatureKey[]);
+export const OVERRIDE_ONLY: readonly FeatureKey[] = Object.freeze(["mcp_api", "online_bookings"] as FeatureKey[]);
 
 export type PlanId = "free" | "pro" | "pro_max";
 
@@ -141,4 +142,5 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
   whatsapp_campaigns: "WhatsApp campaigns",
   public_services_api: "Price list for your website",
   mcp_api: "AI connect (Claude and MCP)",
+  online_bookings: "Online bookings from your website",
 };

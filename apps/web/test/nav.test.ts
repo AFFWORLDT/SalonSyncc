@@ -13,7 +13,9 @@ describe("navigation", () => {
   });
   it("a barber gets the barber menu, never ratings or admin pages", () => {
     const h = hrefs(meFixture({ role: "barber", features: [...FEATURE_KEYS] }));
-    expect(h).toEqual(["/", "/history", "/bills", "/account"]);
+    expect(h).toEqual(["/", "/bookings", "/history", "/bills", "/account"]);
+    // Without online bookings (the usual case) the barber menu has no Bookings entry.
+    expect(hrefs(meFixture({ role: "barber", features: FEATURE_KEYS.filter((f) => f !== "online_bookings") }))).toEqual(["/", "/history", "/bills", "/account"]);
   });
   it("a free salon has no ledger, customers, ratings, audit or announcements", () => {
     const h = hrefs(meFixture({ role: "owner", features: PLAN_DEFAULTS.free.features }));

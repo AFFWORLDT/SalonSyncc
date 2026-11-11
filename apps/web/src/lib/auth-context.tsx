@@ -12,7 +12,7 @@ import { forgetPushToken } from "@/lib/push";
 const WRITABLE = new Set(["trial", "active", "grace", "past_due"]);
 const LAST_ORG = "ss_last_org";
 /** Pages that work without signing in. */
-export const PUBLIC_PATHS = ["/r", "/rate", "/platform"];
+export const PUBLIC_PATHS = ["/r", "/rate", "/book", "/platform"];
 
 interface AuthValue {
   me: MeResponse | null;

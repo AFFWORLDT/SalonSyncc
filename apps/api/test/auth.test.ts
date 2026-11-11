@@ -201,6 +201,13 @@ describe("auth", () => {
       "GET /api/public/banner/:id/:v",
       "GET /api/public/services",
       "OPTIONS /api/public/services",
+      // Online bookings from the salon's website (feature online_bookings): config, free times, book, view/cancel by link.
+      "OPTIONS /api/public/booking/*",
+      "GET /api/public/booking/config",
+      "GET /api/public/booking/slots",
+      "POST /api/public/booking",
+      "GET /api/public/booking/b/:token",
+      "POST /api/public/booking/b/:token/cancel",
       "GET /api/public/logo/:v",
       "GET /api/public/brand",
       "GET /api/public/app-config",
