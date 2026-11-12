@@ -35,6 +35,16 @@ whose service account is the API's `FCM_SERVICE_ACCOUNT` secret), apps `online.s
 
 Without them the app builds and runs with push and crash reports off.
 
+## Over-the-air updates (Shorebird)
+
+Dart changes (bug fixes, screens, text) can ship without a store review. `shorebird.yaml` holds the app id; the app checks for a patch on launch, downloads it in the background and applies it on the next start.
+
+- A store build must be made with Shorebird, or it can't receive patches: `shorebird release android --flutter-version 3.41.7` (upload the .aab to Play) and `shorebird release ios --flutter-version 3.41.7` (then upload the .ipa). Bump the pubspec version first.
+- Ship a fix to that version: `shorebird patch android` / `shorebird patch ios` (same pubspec version as the release).
+- Needs a store build instead: new plugins/packages, native Android/iOS code, permissions, the icon or splash, or a new Flutter version.
+- Builds 1.0.0 (Play) and iOS build 6 were made with plain `flutter build`, so they get no patches; 1.0.1 is the first Shorebird release.
+- Console: https://console.shorebird.dev (org Propfusion).
+
 ## Adding a feature
 
 Create a `FeatureModule` (its server switch key, roles, title, icon, screen) under `lib/modules/<name>/` and add it to
