@@ -3,6 +3,7 @@ import { Hero } from "./hero";
 import { Showcase } from "./showcase";
 import { Stories } from "./stories";
 import { Trust } from "./trust";
+import { Testimonials } from "./testimonials";
 import { PricingPlans } from "./pricing";
 import { Cta } from "./cta";
 import { FaqSection } from "@/components/faq";
@@ -19,6 +20,7 @@ export function HomePage({ t }: { t: HomeCopy }) {
         <Showcase t={t} />
         <Stories t={t} />
         <Trust t={t} />
+        <Testimonials t={t} />
         <PricingPlans t={t} />
         <FaqSection faqs={t.faq.items} title={t.faq.title} lead={t.faq.lead} eyebrow={t.faq.eyebrow} lang={t.lang} />
         <Cta t={t} />

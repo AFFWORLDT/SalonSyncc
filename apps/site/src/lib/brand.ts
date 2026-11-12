@@ -13,3 +13,9 @@ export const OFFICE_MAPS_URL = "https://maps.app.goo.gl/zeyfsVePRoKyTKTy7";
 export function salonLoginUrl(slug: string): string {
   return ROOT_DOMAIN ? `https://${slug}.${ROOT_DOMAIN}/login/` : `http://localhost:8787/login/?org=${encodeURIComponent(slug)}`;
 }
+
+/**
+ * SalonKit's public social profiles. Add a URL only for a profile that really exists: it shows in the footer
+ * and in the Organization schema (sameAs). Empty = nothing shown.
+ */
+export const SOCIAL_LINKS: { network: "instagram" | "facebook" | "linkedin" | "youtube" | "tiktok" | "x"; url: string }[] = [];

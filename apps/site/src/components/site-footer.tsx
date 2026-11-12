@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- static export */
 import Link from "next/link";
 import { Mail, MapPin } from "lucide-react";
-import { BRAND_NAME, COMPANY, OFFICE, OFFICE_MAPS_URL, SUPPORT_EMAIL } from "@/lib/brand";
+import { BRAND_NAME, COMPANY, OFFICE, OFFICE_MAPS_URL, SOCIAL_LINKS, SUPPORT_EMAIL } from "@/lib/brand";
+import { NewsletterForm } from "@/components/home/newsletter-form";
 import { HOME_EN, type HomeCopy, type Link as FLink } from "@/components/home/copy";
 
 function Column({ title, links }: { title: string; links: FLink[] }) {
@@ -35,7 +36,23 @@ export function SiteFooter({ t = HOME_EN }: { t?: HomeCopy }) {
               {BRAND_NAME}
             </Link>
             <p className="mt-5 text-[15px] leading-relaxed text-[#f7f1e8]/65">{f.blurb}</p>
-            <img src="/img/decor/tools.webp" alt="" width={300} height={300} loading="lazy" decoding="async" className="mt-8 hidden w-40 rounded-[1.5rem] opacity-90 ring-1 ring-white/10 lg:block" />
+            <div className="mt-8">
+              <NewsletterForm t={{ title: t.newsletter.title, lead: t.newsletter.lead, placeholder: t.newsletter.placeholder, button: t.newsletter.button, sending: t.newsletter.sending, done: t.newsletter.done, error: t.newsletter.error, privacy: t.newsletter.privacy }} lang={t.lang} />
+            </div>
+            {SOCIAL_LINKS.length > 0 && (
+              <div className="mt-8">
+                <p className="text-sm font-semibold tracking-[0.12em] text-[#d9ad78] uppercase">{f.follow}</p>
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {SOCIAL_LINKS.map((l) => (
+                    <li key={l.url}>
+                      <a href={l.url} target="_blank" rel="me noopener" className="inline-flex rounded-full border border-white/15 px-3.5 py-1.5 text-sm text-[#f7f1e8]/80 capitalize hover:border-[#d9ad78] hover:text-[#f7f1e8]">
+                        {l.network === "x" ? "X" : l.network === "linkedin" ? "LinkedIn" : l.network === "youtube" ? "YouTube" : l.network === "tiktok" ? "TikTok" : l.network}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-10 sm:grid-cols-4">
             <Column title={f.product} links={f.productLinks} />

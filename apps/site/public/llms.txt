@@ -1,0 +1,37 @@
+# SalonKit
+
+> Salon and barber shop management software made in Dubai for salons in the UAE, by AFFWORLD FZ-LLC. Front-desk billing with 5% VAT tax invoices, staff commission, the daily sheet, WhatsApp bills and reminders, and Google review requests, in AED, in any web browser.
+
+## Key facts
+
+- Plans (AED): Free, AED 0 (up to 2 staff); Pro, AED 200 per month (up to 10 staff); Pro Max, AED 499 per month (unlimited staff, WhatsApp, ledger, audit log).
+- Every new salon gets 7 days of Pro Max free, no card needed.
+- UAE ready: amounts in AED, 5% VAT, tax invoices with the salon's TRN, Dubai time, +971 numbers.
+- Runs in the browser on phones, tablets and computers; each salon gets its own address (yoursalon.salonkit.online).
+- Languages: English and Arabic.
+- Company: AFFWORLD FZ-LLC, 2704 Prime Tower, Burj Khalifa Street, Business Bay, Dubai, UAE. Support: support@salonkit.online.
+
+## Product
+
+- [Home](https://salonkit.online/): what SalonKit does, plans and questions
+- [Pricing](https://salonkit.online/pricing/): Free, Pro and Pro Max in AED
+- [Salon billing software](https://salonkit.online/salon-billing-software-dubai/)
+- [Barber commission app](https://salonkit.online/barber-commission-app/)
+- [Daily sheet and Excel reports](https://salonkit.online/salon-daily-sheet-excel/)
+- [WhatsApp for salons](https://salonkit.online/whatsapp-for-salons/)
+- [Google reviews for salons](https://salonkit.online/google-reviews-for-salons/)
+- [VAT invoices for UAE salons](https://salonkit.online/salon-vat-invoice-uae/)
+
+## Guides
+
+- [Blog](https://salonkit.online/blog/): guides for salon owners in the UAE (VAT, commission, cash-up, WhatsApp, Google reviews)
+
+## Arabic
+
+- [الصفحة الرئيسية بالعربية](https://salonkit.online/ar/)
+
+## Company
+
+- [Support](https://salonkit.online/support/)
+- [Privacy policy](https://salonkit.online/privacy/)
+- [Terms](https://salonkit.online/terms/)

@@ -4,7 +4,7 @@ import { Google_Sans_Code, IBM_Plex_Sans_Arabic, Inter, Manrope } from "next/fon
 // Exposed as CSS variables consumed by globals.css.
 const manrope = Manrope({ variable: "--font-display", subsets: ["latin"], display: "swap" });
 const inter = Inter({ variable: "--font-body", subsets: ["latin"], display: "swap" });
-const sansCode = Google_Sans_Code({ variable: "--font-gsc", subsets: ["latin"], display: "swap" });
+const sansCode = Google_Sans_Code({ variable: "--font-gsc", subsets: ["latin"], display: "swap", preload: false });
 
 export const appFontClassName = `${manrope.variable} ${inter.variable} ${sansCode.variable}`;
 

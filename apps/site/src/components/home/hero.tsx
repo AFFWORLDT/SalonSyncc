@@ -30,6 +30,7 @@ export function Hero({ t }: { t: HomeCopy }) {
             {h.badge}
           </p>
           <h1 className={`${up} mt-6 text-[2.75rem] leading-[1.04] font-extrabold tracking-[-0.045em] [animation-delay:80ms] sm:text-6xl lg:text-[2.9rem] xl:text-[3.6rem]`}>
+            <span className="mb-4 block font-sans text-base font-semibold tracking-normal text-[#946226] sm:text-lg">{h.seoLine}</span>
             {h.line1}
             <br />
             <span className="xl:whitespace-nowrap">
@@ -65,7 +66,7 @@ export function Hero({ t }: { t: HomeCopy }) {
             <img src="/img/hair-wash.webp" alt={h.washAlt} width={405} height={285} decoding="async" className="aspect-[405/285] h-auto w-full object-cover" />
           </div>
           {/* The real app */}
-          <Phone src="/img/screens/phone-dashboard.webp" alt={h.phoneAlt} eager className="sk-float absolute -bottom-6 w-[30%] ltr:right-[-2%] rtl:left-[-2%] sm:-bottom-8" />
+          <Phone src="/img/screens/phone-dashboard.webp" alt={h.phoneAlt} className="sk-float absolute -bottom-6 w-[30%] ltr:right-[-2%] rtl:left-[-2%] sm:-bottom-8" />
           {/* Live cards */}
           <div className="sk-card sk-float absolute top-[12%] flex items-center gap-3 px-4 py-3 [animation-delay:-2s] ltr:left-[4%] rtl:right-[4%]">
             <span className="grid size-10 place-items-center rounded-full bg-[#25d366]/15 text-[#128c7e]">
@@ -92,9 +93,9 @@ export function Hero({ t }: { t: HomeCopy }) {
 
       {/* Feature strip */}
       <div className="relative mx-auto mt-20 max-w-7xl px-5 sm:mt-24 sm:px-8">
-        <ul className="sk-card grid grid-cols-1 gap-y-5 px-4 py-6 sm:grid-cols-3 sm:gap-y-6 lg:grid-cols-5 lg:divide-x lg:divide-[rgb(72_52_35/0.1)] lg:px-2 rtl:lg:divide-x-reverse">
+        <ul className="sk-card grid grid-cols-1 gap-y-5 px-4 py-6 sm:grid-cols-3 sm:gap-y-6 xl:grid-cols-6 xl:divide-x xl:divide-[rgb(72_52_35/0.1)] xl:px-2 rtl:xl:divide-x-reverse">
           {t.strip.map((s) => (
-            <li key={s.title} className="flex items-center gap-3 px-3 lg:justify-center">
+            <li key={s.title} className="flex items-center gap-3 px-3">
               <IconTile icon={s.icon} />
               <span>
                 <span className="block text-[15px] font-semibold leading-tight font-display">{s.title}</span>

@@ -23,7 +23,7 @@ export function PricingPlans({ t = HOME_EN, headingLevel = 2 }: { t?: HomeCopy; 
       <div className="relative mx-auto max-w-6xl">
         <Reveal className="mx-auto max-w-2xl text-center">
           <p className="sk-eyebrow">✦ {c.eyebrow}</p>
-          <H className="mt-5 text-4xl leading-[1.05] font-extrabold tracking-[-0.04em] text-balance sm:text-5xl">{c.title}</H>
+          <H className="mt-5 text-4xl leading-[1.05] font-extrabold tracking-[-0.04em] text-balance sm:text-5xl">{headingLevel === 1 ? c.pageTitle : c.title}</H>
           <p className="mt-5 text-lg text-muted-foreground">{c.lead}</p>
         </Reveal>
         <div className="mt-14 grid items-stretch gap-6 lg:grid-cols-3">

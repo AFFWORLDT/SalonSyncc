@@ -34,6 +34,10 @@ export const HOME_FAQS: Faq[] = [
     a: "SalonKit is salon and barber shop software made in Dubai. The front desk rings up bills, the app works out each barber's commission, keeps the daily sheet, sends WhatsApp bills and reminders, and asks customers for Google reviews. Amounts are in AED with 5% VAT.",
   },
   {
+    q: "How much does SalonKit cost?",
+    a: "SalonKit has three plans, priced in AED. Free costs nothing, for up to 2 staff, with sales and bills, expenses and the daily sheet. Pro is AED 200 a month for up to 10 staff and adds customers, ratings, monthly and yearly reports and Excel export. Pro Max is AED 499 a month for unlimited staff and adds the ledger, the audit log and WhatsApp bills, reminders and campaigns. Every salon starts with 7 days of Pro Max free, with no card needed.",
+  },
+  {
     q: "Is there a free trial?",
     a: "Yes. Every new salon gets 7 days of Pro Max, our biggest plan, free. No card is needed. After the trial you can stay on the Free plan or choose Pro or Pro Max.",
   },
@@ -283,3 +287,10 @@ export function faqJsonLd(faqs: Faq[], inLanguage = "en") {
     mainEntity: faqs.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
   };
 }
+
+/**
+ * Real customer quotes, shown on the home page (and only when this list has entries). Add a quote only with the
+ * person's permission, in their own words. Never invent quotes, names, ratings or numbers.
+ */
+export type Testimonial = { quote: string; name: string; role: string; salon: string; city: string; photo?: string; lang?: "en" | "ar" };
+export const TESTIMONIALS: Testimonial[] = [];

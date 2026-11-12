@@ -18,14 +18,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!p) return {};
   const path = `/blog/${p.slug}/`;
   return {
-    title: p.title,
+    title: p.seoTitle ?? p.title,
     description: p.description,
     alternates: { canonical: path },
     openGraph: {
       type: "article",
       url: path,
       siteName: BRAND_NAME,
-      title: p.title,
+      title: p.seoTitle ?? p.title,
       description: p.description,
       locale: "en_AE",
       publishedTime: p.date,

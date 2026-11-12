@@ -8,3 +8,16 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+# Build files have a content hash in their name: cache for a year.
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Images, video and brand files change rarely: a week, then revalidate.
+/img/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+/media/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+/brand/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400

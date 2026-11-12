@@ -1,7 +1,7 @@
-import { BarChart3, MessageCircle, ReceiptText, Scissors, Star } from "lucide-react";
+import { BarChart3, CreditCard, ReceiptText, Scissors, Star, UserRoundCheck } from "lucide-react";
 import type { StripItem } from "./copy";
 
-export const STRIP_ICON: Record<StripItem["icon"], typeof Star> = { bill: ReceiptText, staff: Scissors, reports: BarChart3, whatsapp: MessageCircle, reviews: Star };
+export const STRIP_ICON: Record<StripItem["icon"], typeof Star> = { bill: ReceiptText, payments: CreditCard, staff: Scissors, reports: BarChart3, regulars: UserRoundCheck, reviews: Star };
 
 /** A gold-on-cream round icon tile. */
 export function IconTile({ icon, className = "" }: { icon: StripItem["icon"]; className?: string }) {

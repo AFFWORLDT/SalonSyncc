@@ -37,7 +37,7 @@ export default function ArabicLayout({ children }: { children: React.ReactNode }
       <body className="[font-family:var(--font-ar),var(--font-body),ui-sans-serif,system-ui,sans-serif]">
         <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
         {children}
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData()).replace(/</g, "\\u003c") }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData("ar", AR.description)).replace(/</g, "\\u003c") }} />
         <Analytics />
       </body>
     </html>

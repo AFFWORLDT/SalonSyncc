@@ -1,4 +1,5 @@
 import type { PlanId } from "@ss/features";
+import type { NewsletterCopy } from "./newsletter-form";
 import { FEATURE_PAGES, HOME_FAQS, type Faq } from "@/lib/content";
 import { AR, AR_FAQS, AR_FEATURES, AR_PLAN_BLURB, arStaff } from "@/lib/content-ar";
 
@@ -8,7 +9,7 @@ import { AR, AR_FAQS, AR_FEATURES, AR_PLAN_BLURB, arStaff } from "@/lib/content-
  */
 export type Lang = "en" | "ar";
 export type Link = { label: string; href: string; desc?: string };
-export type StripItem = { icon: "bill" | "staff" | "reports" | "whatsapp" | "reviews"; title: string; desc: string };
+export type StripItem = { icon: "bill" | "payments" | "staff" | "reports" | "regulars" | "reviews"; title: string; desc: string };
 export type Story = {
   key: "billing" | "commission" | "reports" | "whatsapp" | "reviews" | "uae";
   eyebrow: string;
@@ -37,7 +38,7 @@ export type HomeCopy = {
     featureItems: Link[];
     resourceItems: Link[];
   };
-  hero: { badge: string; line1: string; grow: string; rest: string; lead: string; cta: string; demo: string; note: string; imgAlt: string; washAlt: string; phoneAlt: string; billCard: [string, string, string]; ratingCard: [string, string] };
+  hero: { badge: string; seoLine: string; line1: string; grow: string; rest: string; lead: string; cta: string; demo: string; note: string; imgAlt: string; washAlt: string; phoneAlt: string; billCard: [string, string, string]; ratingCard: [string, string] };
   strip: StripItem[];
   showcase: { eyebrow: string; title: string; lead: string; points: string[]; cta: string; laptopAlt: string; phoneAlt: string; liveCard: [string, string]; waCard: [string, string] };
   storiesTitle: { eyebrow: string; title: string; lead: string };
@@ -47,6 +48,7 @@ export type HomeCopy = {
   pricing: {
     eyebrow: string;
     title: string;
+    pageTitle: string;
     lead: string;
     free: string;
     forever: string;
@@ -61,6 +63,8 @@ export type HomeCopy = {
     badge: Record<PlanId, string>;
   };
   cta: { title: string; lead: string; button: string; note: string; imgAlt: string };
+  testimonials: { eyebrow: string; title: string };
+  newsletter: NewsletterCopy & { confirmed: string; unsubscribed: string; invalid: string; back: string; pageTitle: string };
   faq: { eyebrow: string; title: string; lead: string; items: Faq[] };
   demo: { title: string; close: string; unsupported: string };
   footer: {
@@ -75,6 +79,7 @@ export type HomeCopy = {
     email: string;
     rights: string;
     legal: Link[];
+    follow: string;
   };
 };
 
@@ -108,6 +113,7 @@ export const HOME_EN: HomeCopy = {
   },
   hero: {
     badge: "The complete salon management app",
+    seoLine: "Salon & barber shop software for Dubai and the UAE",
     line1: "Run your salon.",
     grow: "Grow",
     rest: "your business.",
@@ -123,9 +129,10 @@ export const HOME_EN: HomeCopy = {
   },
   strip: [
     { icon: "bill", title: "Smart billing", desc: "VAT bills in a few taps" },
+    { icon: "payments", title: "Cash & card tracking", desc: "Every bill records how it was paid" },
     { icon: "staff", title: "Staff & commission", desc: "Every barber's share, worked out" },
     { icon: "reports", title: "Reports & Excel", desc: "Daily sheet, months and years" },
-    { icon: "whatsapp", title: "WhatsApp reminders", desc: "Bills and visit reminders" },
+    { icon: "regulars", title: "Customers & reminders", desc: "Visit history, WhatsApp nudges" },
     { icon: "reviews", title: "Google reviews", desc: "Ratings for every barber" },
   ],
   showcase: {
@@ -228,6 +235,7 @@ export const HOME_EN: HomeCopy = {
   pricing: {
     eyebrow: "Simple pricing",
     title: "Flexible plans for every salon",
+    pageTitle: "SalonKit pricing: Free, Pro and Pro Max in AED",
     lead: "Every salon starts with 7 days of Pro Max, free. Then pick the plan that fits.",
     free: "Free",
     forever: "forever",
@@ -247,6 +255,22 @@ export const HOME_EN: HomeCopy = {
     button: "Start free trial",
     note: "7 days of Pro Max free · No card needed",
     imgAlt: "Black and white salon product bottles with folded towels",
+  },
+  testimonials: { eyebrow: "Salon owners", title: "What our customers say" },
+  newsletter: {
+    title: "Newsletter",
+    lead: "Tips for running a UAE salon and SalonKit news. No spam.",
+    placeholder: "Your email",
+    button: "Subscribe",
+    sending: "Sending…",
+    done: "Almost there: check your inbox and tap the link to confirm.",
+    error: "That didn't work. Please try again.",
+    privacy: "We never share your email. Unsubscribe any time.",
+    pageTitle: "Newsletter",
+    confirmed: "You're subscribed. Thanks for joining the SalonKit newsletter.",
+    unsubscribed: "You're unsubscribed. You won't get any more newsletter emails from us.",
+    invalid: "That link has expired or was already used. Subscribe again from the footer if you like.",
+    back: "Back to SalonKit",
   },
   faq: { eyebrow: "FAQ", title: "Questions salon owners ask", lead: "Straight answers about SalonKit for salons and barber shops in the UAE.", items: HOME_FAQS },
   demo: { title: "SalonKit in 60 seconds", close: "Close video", unsupported: "Your browser can't play this video." },
@@ -276,6 +300,7 @@ export const HOME_EN: HomeCopy = {
       { label: "Terms", href: "/terms/" },
       { label: "Delete account", href: "/delete-account/" },
     ],
+    follow: "Follow us",
   },
 };
 
@@ -299,7 +324,7 @@ export const HOME_AR: HomeCopy = {
       { label: "كل المزايا", href: "/ar/#features", desc: "الفواتير والموظفون والتقارير وواتساب" },
       { label: AR.pricing, href: "/ar/#pricing", desc: "المجانية وPro وPro Max بالدرهم" },
     ],
-    featureItems: AR_FEATURES.map((f) => ({ label: f.title, href: "/ar/#features" })),
+    featureItems: AR_FEATURES.map((f, i) => ({ label: f.title, href: slug(i), desc: "صفحة بالإنجليزية" })),
     resourceItems: [
       { label: "الأسئلة الشائعة", href: "/ar/#faq", desc: "إجابات واضحة عن SalonKit" },
       { label: "المدونة (بالإنجليزية)", href: "/blog/", desc: "أدلة لأصحاب الصالونات" },
@@ -308,6 +333,7 @@ export const HOME_AR: HomeCopy = {
   },
   hero: {
     badge: "تطبيق إدارة الصالون المتكامل",
+    seoLine: "برنامج إدارة وكاشير للصالونات ومحلات الحلاقة في دبي والإمارات",
     line1: "أدِر صالونك.",
     grow: "وطوّر",
     rest: "أعمالك.",
@@ -323,9 +349,10 @@ export const HOME_AR: HomeCopy = {
   },
   strip: [
     { icon: "bill", title: "فواتير ذكية", desc: "فواتير ضريبية بنقرات" },
+    { icon: "payments", title: "النقد والبطاقة", desc: "كل فاتورة تسجّل طريقة الدفع" },
     { icon: "staff", title: "الموظفون والعمولة", desc: "حصة كل حلاق محسوبة" },
     { icon: "reports", title: "تقارير وExcel", desc: "الكشف اليومي والشهري" },
-    { icon: "whatsapp", title: "تذكيرات واتساب", desc: "الفواتير وتذكيرات الزيارة" },
+    { icon: "regulars", title: "العملاء والتذكيرات", desc: "سجل الزيارات وتذكيرات واتساب" },
     { icon: "reviews", title: "مراجعات Google", desc: "تقييمات لكل حلاق" },
   ],
   showcase: {
@@ -370,6 +397,7 @@ export const HOME_AR: HomeCopy = {
   pricing: {
     eyebrow: "أسعار بسيطة",
     title: AR.pricingTitle,
+    pageTitle: "أسعار SalonKit: المجانية وPro وPro Max بالدرهم",
     lead: AR.pricingLead,
     free: AR.free,
     forever: "دائمًا",
@@ -384,6 +412,22 @@ export const HOME_AR: HomeCopy = {
     badge: { free: "للبداية", pro: "الأكثر طلبًا", pro_max: "كل شيء" },
   },
   cta: { title: AR.ctaTitle, lead: AR.ctaLead, button: AR.start, note: AR.appInEnglish, imgAlt: "عبوات منتجات صالون سوداء وبيضاء مع مناشف مطوية" },
+  testimonials: { eyebrow: "أصحاب الصالونات", title: "ماذا يقول عملاؤنا" },
+  newsletter: {
+    title: "النشرة البريدية",
+    lead: "نصائح لإدارة الصالون في الإمارات وأخبار SalonKit. بدون رسائل مزعجة.",
+    placeholder: "بريدك الإلكتروني",
+    button: "اشترك",
+    sending: "جارٍ الإرسال…",
+    done: "بقيت خطوة: افتح بريدك واضغط الرابط لتأكيد الاشتراك.",
+    error: "لم ينجح ذلك. حاول مرة أخرى.",
+    privacy: "لا نشارك بريدك أبدًا، ويمكنك إلغاء الاشتراك في أي وقت.",
+    pageTitle: "النشرة البريدية",
+    confirmed: "تم اشتراكك. شكرًا لانضمامك إلى نشرة SalonKit.",
+    unsubscribed: "تم إلغاء اشتراكك، ولن تصلك رسائل النشرة بعد الآن.",
+    invalid: "انتهت صلاحية هذا الرابط أو استُخدم من قبل. يمكنك الاشتراك مجددًا من أسفل الصفحة.",
+    back: "العودة إلى SalonKit",
+  },
   faq: { eyebrow: "الأسئلة", title: AR.faqTitle, lead: AR.faqLead, items: AR_FAQS },
   demo: { title: "SalonKit في 60 ثانية (بالإنجليزية)", close: "إغلاق الفيديو", unsupported: "متصفحك لا يستطيع تشغيل هذا الفيديو." },
   footer: {
@@ -412,5 +456,6 @@ export const HOME_AR: HomeCopy = {
       { label: "الشروط", href: "/terms/" },
       { label: "حذف الحساب", href: "/delete-account/" },
     ],
+    follow: "تابعنا",
   },
 };

@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Delete your account",
   description: "How to delete your SalonKit account, in the app or by email, and what happens to your data.",
   alternates: { canonical: "/delete-account/" },
+  robots: { index: false, follow: true },
   openGraph: pageOpenGraph("/delete-account/", "Delete your account", "How to delete your SalonKit account, in the app or by email, and what happens to your data."),
 };
 

@@ -200,6 +200,10 @@ describe("auth", () => {
       "GET /api/public/avatar/:id/:v",
       "GET /api/public/banner/:id/:v",
       "GET /api/public/services",
+      "POST /api/public/newsletter",
+      "GET /api/public/newsletter/confirm",
+      "GET /api/public/newsletter/unsubscribe",
+      "POST /api/public/newsletter/unsubscribe",
       "OPTIONS /api/public/services",
       // Online bookings from the salon's website (feature online_bookings): config, free times, book, view/cancel by link.
       "OPTIONS /api/public/booking/*",

@@ -18,6 +18,8 @@ export type Block =
 export interface Post {
   slug: string;
   title: string;
+  /** Shorter title for search results (60 characters or less), when `title` is longer. */
+  seoTitle?: string;
   /** Meta description, about 150 characters. */
   description: string;
   /** ISO date published (and updated, when it changes). */
@@ -35,6 +37,7 @@ export const POSTS: Post[] = [
   {
     slug: "how-to-get-more-google-reviews-for-your-salon",
     title: "How to get more Google reviews for your salon (the right way)",
+    seoTitle: "How to get more Google reviews for your salon",
     description: "Practical ways for UAE salons and barber shops to get more Google reviews, what Google's rules forbid, and how to reply to good and bad reviews.",
     date: "2026-11-04",
     minutes: 6,
@@ -294,6 +297,7 @@ export const POSTS: Post[] = [
   {
     slug: "whatsapp-reminders-for-salons",
     title: "WhatsApp reminders for salons: bring customers back without spamming",
+    seoTitle: "WhatsApp reminders for salons, without spamming",
     description: "How UAE salons use WhatsApp Business for bills, visit reminders and offers: what to send, when to send it, opt-in and opt-out, and message examples.",
     date: "2026-11-04",
     minutes: 6,

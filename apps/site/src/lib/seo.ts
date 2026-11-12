@@ -1,5 +1,5 @@
 import { PLAN_DEFAULTS } from "@ss/features";
-import { BRAND_NAME, COMPANY, OFFICE, ROOT_DOMAIN, SUPPORT_EMAIL } from "@/lib/brand";
+import { BRAND_NAME, COMPANY, OFFICE, ROOT_DOMAIN, SOCIAL_LINKS, SUPPORT_EMAIL } from "@/lib/brand";
 
 /** The one public address of the site: every page's canonical URL, the sitemap and social previews use it. */
 export const SITE_URL = `https://${ROOT_DOMAIN || "salonkit.online"}`;
@@ -10,7 +10,7 @@ export const GSC_VERIFICATION = process.env.NEXT_PUBLIC_GSC_VERIFICATION || "";
 
 export const SEO_TITLE = `${BRAND_NAME}: salon and barber shop software for Dubai and the UAE`;
 export const SEO_DESCRIPTION =
-  "Bills, staff commission, daily sheet, WhatsApp reminders, Google reviews and VAT invoices for salons and barber shops in Dubai and the UAE. Try it free for 7 days.";
+  "Salon and barber shop software for Dubai and the UAE: VAT bills, staff commission, daily sheet, WhatsApp reminders and Google reviews. 7 days free.";
 export const SEO_KEYWORDS = [
   "salon software Dubai",
   "salon management software UAE",
@@ -22,31 +22,47 @@ export const SEO_KEYWORDS = [
   "salon VAT invoice UAE",
 ];
 
-/** schema.org structured data for the home page: who we are, the site, and the app with its prices in AED. */
-export function structuredData() {
+/** schema.org structured data for every page: who we are (linked by @id), the site, and the app with its monthly prices in AED. */
+export function structuredData(lang: "en" | "ar" = "en", description = SEO_DESCRIPTION) {
   const plans = (["free", "pro", "pro_max"] as const).map((id) => PLAN_DEFAULTS[id]);
+  const org = `${SITE_URL}/#org`;
   return [
     {
       "@context": "https://schema.org",
       "@type": "Organization",
+      "@id": org,
       name: BRAND_NAME,
       legalName: COMPANY,
       url: SITE_URL,
-      logo: `${SITE_URL}/icon-512.png`,
-      ...(SUPPORT_EMAIL ? { email: SUPPORT_EMAIL } : {}),
-      areaServed: "AE",
+      logo: `${SITE_URL}/icon-192.png`,
+      foundingLocation: { "@type": "Place", name: "Dubai, United Arab Emirates" },
+      areaServed: { "@type": "Country", name: "United Arab Emirates" },
       address: { "@type": "PostalAddress", streetAddress: `${OFFICE.street}, ${OFFICE.area}`, addressLocality: OFFICE.locality, addressRegion: OFFICE.locality, addressCountry: OFFICE.country },
+      ...(SUPPORT_EMAIL
+        ? { email: SUPPORT_EMAIL, contactPoint: [{ "@type": "ContactPoint", contactType: "customer support", email: SUPPORT_EMAIL, availableLanguage: ["en", "ar"], areaServed: "AE" }] }
+        : {}),
+      ...(SOCIAL_LINKS.length ? { sameAs: SOCIAL_LINKS.map((l) => l.url) } : {}),
     },
-    { "@context": "https://schema.org", "@type": "WebSite", name: BRAND_NAME, url: SITE_URL },
+    { "@context": "https://schema.org", "@type": "WebSite", "@id": `${SITE_URL}/#website`, name: BRAND_NAME, url: SITE_URL, inLanguage: ["en", "ar"], publisher: { "@id": org } },
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
+      "@id": `${SITE_URL}/#app`,
       name: BRAND_NAME,
-      url: SITE_URL,
+      url: lang === "ar" ? `${SITE_URL}/ar/` : SITE_URL,
+      inLanguage: lang,
       applicationCategory: "BusinessApplication",
+      applicationSubCategory: "Salon management and POS software",
       operatingSystem: "Web browser (phones, tablets and computers)",
-      description: SEO_DESCRIPTION,
-      offers: plans.map((p) => ({ "@type": "Offer", name: p.name, price: String(p.priceMonthly ?? 0), priceCurrency: p.currency || "AED" })),
+      description,
+      publisher: { "@id": org },
+      offers: plans.map((p) => ({
+        "@type": "Offer",
+        name: p.name,
+        price: String(p.priceMonthly ?? 0),
+        priceCurrency: p.currency || "AED",
+        ...(p.priceMonthly ? { priceSpecification: { "@type": "UnitPriceSpecification", price: String(p.priceMonthly), priceCurrency: p.currency || "AED", unitCode: "MON", billingDuration: "P1M" } } : {}),
+      })),
     },
   ];
 }

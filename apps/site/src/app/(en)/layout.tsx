@@ -20,9 +20,10 @@ export const metadata: Metadata = {
     title: SEO_TITLE,
     description: SEO_DESCRIPTION,
     locale: "en_AE",
+    alternateLocale: ["ar_AE"],
     images: [{ url: "/og.jpg", width: 1200, height: 630, alt: `${BRAND_NAME}: salon software for the UAE` }],
   },
-  twitter: { card: "summary_large_image", title: SEO_TITLE, description: SEO_DESCRIPTION, images: ["/og.jpg"] },
+  twitter: { card: "summary_large_image", images: ["/og.jpg"] },
   icons: { icon: [{ url: "/favicon.ico", sizes: "any" }, { url: "/icon-192.png", type: "image/png", sizes: "192x192" }] },
   ...(GSC_VERIFICATION ? { verification: { google: GSC_VERIFICATION } } : {}),
 };
