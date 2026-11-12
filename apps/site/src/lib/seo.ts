@@ -63,3 +63,18 @@ export function pageOpenGraph(path: string, title: string, description: string) 
     images: [{ url: "/og.jpg", width: 1200, height: 630, alt: `${BRAND_NAME}: salon software for the UAE` }],
   };
 }
+
+/** schema.org VideoObject for the 60-second demo on the home page ("Watch demo"). */
+export function videoJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "VideoObject",
+    name: `${BRAND_NAME} in 60 seconds`,
+    description: "How a UAE salon rings up a VAT bill in three taps, gets the daily sheet and staff commission done for it, and brings customers back on WhatsApp.",
+    thumbnailUrl: `${SITE_URL}/media/salonkit-demo-poster.jpg`,
+    contentUrl: `${SITE_URL}/media/salonkit-demo.mp4`,
+    uploadDate: "2026-11-03",
+    duration: "PT1M0S",
+    inLanguage: "en",
+  };
+}

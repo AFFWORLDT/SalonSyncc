@@ -37,7 +37,7 @@ export default async function FeatureLanding({ params }: Props) {
   };
   return (
     <main className="relative overflow-hidden">
-      <div aria-hidden className="pointer-events-none absolute -left-40 top-20 size-[520px] rounded-full bg-[#2a9d88]/20 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -left-40 top-20 size-[520px] rounded-full bg-[#d9ad78]/25 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute -right-40 top-[40rem] size-[520px] rounded-full bg-[#b8935a]/20 blur-3xl" />
       <SiteNav dark={false} />
       <article className="relative px-6 pt-32 pb-16 sm:px-12">
@@ -55,7 +55,7 @@ export default async function FeatureLanding({ params }: Props) {
           <h1 className="mt-6 text-balance text-4xl font-semibold tracking-tight sm:text-6xl">{p.h1}</h1>
           <p className="mt-6 text-xl leading-relaxed text-muted-foreground">{p.lead}</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/signup/" className="inline-flex h-12 items-center rounded-full bg-primary px-6 font-semibold text-primary-foreground shadow-[0_10px_25px_rgba(31,122,106,0.3)] hover:brightness-110">
+            <Link href="/signup/" className="inline-flex h-12 items-center rounded-full bg-primary px-6 font-semibold text-primary-foreground shadow-[0_10px_25px_rgba(33,26,23,0.3)] hover:brightness-110">
               Start your 7-day free trial
             </Link>
             <Link href="/pricing/" className="inline-flex h-12 items-center rounded-full border border-foreground/15 bg-background/70 px-6 font-semibold hover:bg-background">
@@ -121,10 +121,10 @@ export default async function FeatureLanding({ params }: Props) {
             </ul>
           </section>
 
-          <section className="mt-20 rounded-3xl bg-gradient-to-br from-[#0f2e29] to-[#1f7a6a] p-10 text-center text-white shadow-[0_30px_60px_-20px_rgba(15,46,41,0.6)]">
+          <section className="mt-20 rounded-3xl bg-gradient-to-br from-[#211a17] to-[#946226] p-10 text-center text-white shadow-[0_30px_60px_-20px_rgba(15,46,41,0.6)]">
             <h2 className="text-3xl font-semibold tracking-tight">Try SalonKit free for 7 days</h2>
             <p className="mx-auto mt-3 max-w-md text-white/80">Every feature of Pro Max, no card needed. Your salon gets its own web address in a few minutes.</p>
-            <Link href="/signup/" className="mt-7 inline-flex h-12 items-center rounded-full bg-white px-7 font-semibold text-[#0f2e29] hover:bg-white/90">
+            <Link href="/signup/" className="mt-7 inline-flex h-12 items-center rounded-full bg-white px-7 font-semibold text-[#211a17] hover:bg-white/90">
               Start free trial
             </Link>
           </section>

@@ -16,7 +16,7 @@ export default function BlogIndex() {
   const posts = postsByDate();
   return (
     <main className="relative overflow-hidden">
-      <div aria-hidden className="pointer-events-none absolute -left-40 top-20 size-[520px] rounded-full bg-[#2a9d88]/20 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -left-40 top-20 size-[520px] rounded-full bg-[#d9ad78]/25 blur-3xl" />
       <SiteNav dark={false} />
       <section className="relative px-6 pt-32 pb-24 sm:px-12">
         <div className="mx-auto max-w-4xl">

@@ -15,8 +15,8 @@ export default function PricingPage() {
   return (
     <main>
       <SiteNav dark={false} />
-      <div className="pt-16">
-        <Pricing />
+      <div className="pt-12">
+        <Pricing headingLevel={1} />
       </div>
       <SiteFooter />
     </main>

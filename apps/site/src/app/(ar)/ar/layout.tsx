@@ -29,12 +29,13 @@ export const metadata: Metadata = {
   ...(GSC_VERIFICATION ? { verification: { google: GSC_VERIFICATION } } : {}),
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0f2e29" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#f7f1e8" };
 
 export default function ArabicLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ar" dir="rtl" className={arabicFontClassName}>
-      <body className="[font-family:var(--font-ar),var(--font-gsf),ui-sans-serif,system-ui,sans-serif]">
+      <body className="[font-family:var(--font-ar),var(--font-body),ui-sans-serif,system-ui,sans-serif]">
+        <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
         {children}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData()).replace(/</g, "\\u003c") }} />
         <Analytics />

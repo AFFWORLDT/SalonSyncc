@@ -48,9 +48,9 @@ export function BlogBody({ blocks }: { blocks: Block[] }) {
             </aside>
           );
         return (
-          <aside key={i} className="my-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-br from-[#0f2e29] to-[#1f7a6a] p-6 text-white">
+          <aside key={i} className="my-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-gradient-to-br from-[#211a17] to-[#946226] p-6 text-white">
             <p className="text-[16px]">{b.cta.text}</p>
-            <Link href={b.cta.href} className="inline-flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#0f2e29] hover:bg-white/90">
+            <Link href={b.cta.href} className="inline-flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#211a17] hover:bg-white/90">
               {b.cta.label} <ArrowRight className="size-4" aria-hidden />
             </Link>
           </aside>

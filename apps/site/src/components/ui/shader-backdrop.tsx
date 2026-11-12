@@ -18,8 +18,8 @@ function useReducedMotion(): boolean {
   return reduce;
 }
 
-/** Deep teals with a touch of the SalonKit gold (the type.dehertz.com mesh). */
-export const TEAL_MESH = ["#0f2e29", "#1d4a42", "#1f7a6a", "#2a9d88", "#b8935a"];
+/** Espresso browns warming into champagne gold (the site palette). */
+export const TEAL_MESH = ["#211a17", "#3a2c25", "#6b4a2c", "#a8763f", "#d9ad78"];
 
 /** Mounts children only while the element is on (or near) screen, so idle WebGL never runs. */
 function useNearViewport<T extends Element>() {
@@ -84,7 +84,7 @@ export function PulsingRing({ size = 120, children }: { size?: number; children:
         <PulsingBorder
           aria-hidden
           className="pointer-events-none absolute inset-0"
-          colors={["#3cc2a8", "#2a9d88", "#d9b77a"]}
+          colors={["#f5d5a9", "#d9ad78", "#c58a45"]}
           colorBack="#00000000"
           aspectRatio="square"
           scale={0.6}

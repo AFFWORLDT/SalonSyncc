@@ -1,70 +1,79 @@
-"use client";
-
-import DoodleCrewFooter, { type CrewMember, type FooterColumn } from "@/components/ui/doodle-crew-footer";
+/* eslint-disable @next/next/no-img-element -- static export */
+import Link from "next/link";
+import { Mail, MapPin } from "lucide-react";
 import { BRAND_NAME, COMPANY, OFFICE, OFFICE_MAPS_URL, SUPPORT_EMAIL } from "@/lib/brand";
-import { FEATURE_PAGES } from "@/lib/content";
+import { HOME_EN, type HomeCopy, type Link as FLink } from "@/components/home/copy";
 
-const COLUMNS: FooterColumn[] = [
-  {
-    title: "Product",
-    links: [
-      { label: "Start free trial", href: "/signup/" },
-      { label: "Sign in", href: "/login/" },
-      { label: "Pricing", href: "/pricing/" },
-      { label: "Features", href: "/#features" },
-    ],
-  },
-  { title: "Features", links: FEATURE_PAGES.map((p) => ({ label: p.label, href: `/${p.slug}/` })) },
-  {
-    title: "Across the UAE",
-    links: [{ label: "Dubai" }, { label: "Abu Dhabi" }, { label: "Sharjah" }, { label: "Ajman & the Northern Emirates" }],
-  },
-  {
-    title: "Help",
-    links: [...(SUPPORT_EMAIL ? [{ label: "Email us", href: `mailto:${SUPPORT_EMAIL}` }] : []), { label: "Blog", href: "/blog/" }, { label: "Questions", href: "/#faq" }, { label: "العربية", href: "/ar/" }, { label: "Pricing", href: "/pricing/" }],
-  },
-  {
-    title: "Company",
-    links: [{ label: COMPANY }, { label: OFFICE.street, href: OFFICE_MAPS_URL }, { label: `${OFFICE.area}, ${OFFICE.locality}, UAE`, href: OFFICE_MAPS_URL }],
-  },
-];
-
-// S A L O N K I T — letters 0…7. Every line is something the app really does.
-const CREW: CrewMember[] = [
-  { kind: "yeti", letter: 0, seat: "front", offset: -0.32, name: "Bruno", says: "Bill done. Next customer!" },
-  { kind: "bird", letter: 2, seat: "top", offset: 0.02, name: "Pip", says: "Your commission is ready." },
-  { kind: "mushroom", letter: 3, seat: "front", offset: 0.12, scale: 0.95, name: "Morel", says: "Daily sheet, all balanced." },
-  { kind: "kid", letter: 4, seat: "top", offset: -0.05, name: "Juno", says: "Time for a fresh cut?" },
-  { kind: "ghost", letter: 6, seat: "behind", offset: 0, name: "Boo", says: "5 stars on Google!" },
-  { kind: "cat", letter: 7, seat: "front", offset: 0.42, flip: true, name: "Patch", says: "Sent on WhatsApp." },
-];
-
-/** The home page footer: the sketchbook SALONKIT wordmark with the site's links (deHertz Type's footer). */
-export function SiteFooter() {
+function Column({ title, links }: { title: string; links: FLink[] }) {
   return (
-    <DoodleCrewFooter
-      logoSrc="/brand/mark.png"
-      wordmark="SALONKIT"
-      brand={BRAND_NAME}
-      blurb="The salon app made in Dubai: sales, VAT bills, staff commission, WhatsApp reminders and reports, in AED, on your phone."
-      tagline="Ring up the bill. We'll do the maths, the sheet and the reminders."
-      columns={COLUMNS}
-      actions={[
-        { label: "See pricing", href: "/pricing/", icon: "star", variant: "outline" },
-        { label: "Start free trial", href: "/signup/", icon: "bolt", variant: "solid" },
-      ]}
-      copyright={`© ${new Date().getFullYear()} ${COMPANY}. All rights reserved.`}
-      legal={[
-        { label: "Privacy", href: "/privacy/" },
-        { label: "Terms", href: "/terms/" },
-        { label: "Pricing", href: "/pricing/" },
-      ]}
-      socials={SUPPORT_EMAIL ? [{ label: SUPPORT_EMAIL, href: `mailto:${SUPPORT_EMAIL}` }] : []}
-      crew={CREW}
-      doodles={["sparkle", "star", "heart", "bolt", "spiral", "plane", "sparkle", "star"]}
-      palette={{ background: "#f6f2e9", ink: "#1c1b18", accent: "#1f7a6a" }}
-      serifFamily="var(--font-gsf), ui-sans-serif, system-ui, sans-serif"
-      className="border-t border-[#e0d9cb]"
-    />
+    <div>
+      <h2 className="text-sm font-semibold tracking-[0.12em] text-[#d9ad78] uppercase">{title}</h2>
+      <ul className="mt-4 grid gap-2.5">
+        {links.map((l) => (
+          <li key={l.href + l.label}>
+            <Link href={l.href} className="text-[15px] text-[#f7f1e8]/70 transition-colors hover:text-[#f7f1e8]">
+              {l.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** The site footer: brand, links, the Dubai office and legal links, on deep espresso with a salon still life. */
+export function SiteFooter({ t = HOME_EN }: { t?: HomeCopy }) {
+  const f = t.footer;
+  return (
+    <footer className="relative overflow-hidden bg-[#211a17] text-[#f7f1e8]">
+      <div aria-hidden className="pointer-events-none absolute -top-40 size-[560px] rounded-full bg-[#c58a45]/15 blur-3xl ltr:-right-40 rtl:-left-40" />
+      <div className="relative mx-auto max-w-7xl px-5 pt-20 pb-10 sm:px-8">
+        <div className="grid gap-12 lg:grid-cols-[1.3fr_2fr]">
+          <div className="max-w-sm">
+            <Link href={t.home} className="flex items-center gap-2.5 text-xl font-bold font-display">
+              <img src="/brand/mark.png" alt="" width={40} height={40} loading="lazy" className="size-10 rounded-full bg-black ring-1 ring-[#d9ad78]/40" />
+              {BRAND_NAME}
+            </Link>
+            <p className="mt-5 text-[15px] leading-relaxed text-[#f7f1e8]/65">{f.blurb}</p>
+            <img src="/img/decor/tools.webp" alt="" width={300} height={300} loading="lazy" decoding="async" className="mt-8 hidden w-40 rounded-[1.5rem] opacity-90 ring-1 ring-white/10 lg:block" />
+          </div>
+          <div className="grid grid-cols-2 gap-10 sm:grid-cols-4">
+            <Column title={f.product} links={f.productLinks} />
+            <Column title={f.features} links={f.featureLinks} />
+            <Column title={f.resources} links={f.resourceLinks} />
+            <div>
+              <h2 className="text-sm font-semibold tracking-[0.12em] text-[#d9ad78] uppercase">{f.company}</h2>
+              <address className="mt-4 grid gap-3 text-[15px] not-italic text-[#f7f1e8]/70">
+                <span lang="en">{COMPANY}</span>
+                <a href={OFFICE_MAPS_URL} target="_blank" rel="noopener" className="flex items-start gap-2 hover:text-[#f7f1e8]">
+                  <MapPin className="mt-0.5 size-4 shrink-0 text-[#d9ad78]" aria-hidden />
+                  <span lang="en">
+                    {OFFICE.street}, {OFFICE.area}, {OFFICE.locality}, UAE
+                  </span>
+                </a>
+                {SUPPORT_EMAIL && (
+                  <a href={`mailto:${SUPPORT_EMAIL}`} className="flex items-center gap-2 hover:text-[#f7f1e8]">
+                    <Mail className="size-4 shrink-0 text-[#d9ad78]" aria-hidden />
+                    {f.email}
+                  </a>
+                )}
+              </address>
+            </div>
+          </div>
+        </div>
+        <div className="mt-16 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-8 text-sm text-[#f7f1e8]/55">
+          <p>
+            © {new Date().getFullYear()} <span lang="en">{COMPANY}</span>. {f.rights}
+          </p>
+          <nav aria-label="Legal" className="flex flex-wrap gap-x-6 gap-y-2">
+            {f.legal.map((l) => (
+              <Link key={l.href} href={l.href} className="hover:text-[#f7f1e8]">
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      </div>
+    </footer>
   );
 }

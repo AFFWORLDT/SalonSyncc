@@ -1,12 +1,13 @@
-import { Google_Sans_Code, Google_Sans_Flex, IBM_Plex_Sans_Arabic } from "next/font/google";
+import { Google_Sans_Code, IBM_Plex_Sans_Arabic, Inter, Manrope } from "next/font/google";
 
-// The app's faces: Flex for text and headings, Code for numbers, ids and
-// uppercase labels. Exposed as CSS variables consumed by app-theme.css.
-const sansFlex = Google_Sans_Flex({ variable: "--font-gsf", subsets: ["latin"], display: "swap" });
+// The site's faces: Manrope for headings, Inter for text, Google Sans Code for numbers and small uppercase labels.
+// Exposed as CSS variables consumed by globals.css.
+const manrope = Manrope({ variable: "--font-display", subsets: ["latin"], display: "swap" });
+const inter = Inter({ variable: "--font-body", subsets: ["latin"], display: "swap" });
 const sansCode = Google_Sans_Code({ variable: "--font-gsc", subsets: ["latin"], display: "swap" });
 
-export const appFontClassName = `${sansFlex.variable} ${sansCode.variable}`;
+export const appFontClassName = `${manrope.variable} ${inter.variable} ${sansCode.variable}`;
 
-// The Arabic page's face (/ar/): IBM Plex Sans Arabic for Arabic text, Flex still covers Latin words and numbers.
+// The Arabic page's face (/ar/): IBM Plex Sans Arabic for Arabic text; Manrope and Inter still cover Latin words and numbers.
 const plexArabic = IBM_Plex_Sans_Arabic({ variable: "--font-ar", subsets: ["arabic"], weight: ["400", "500", "600", "700"], display: "swap" });
-export const arabicFontClassName = `${plexArabic.variable} ${sansFlex.variable} ${sansCode.variable}`;
+export const arabicFontClassName = `${plexArabic.variable} ${manrope.variable} ${inter.variable} ${sansCode.variable}`;

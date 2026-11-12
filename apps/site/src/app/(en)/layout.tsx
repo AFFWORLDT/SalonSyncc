@@ -27,12 +27,13 @@ export const metadata: Metadata = {
   ...(GSC_VERIFICATION ? { verification: { google: GSC_VERIFICATION } } : {}),
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0f2e29" };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#f7f1e8" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={appFontClassName}>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
         {children}
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData()).replace(/</g, "\\u003c") }} />
         <Analytics />
