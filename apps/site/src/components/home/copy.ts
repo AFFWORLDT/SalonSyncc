@@ -38,9 +38,11 @@ export type HomeCopy = {
     featureItems: Link[];
     resourceItems: Link[];
   };
-  hero: { badge: string; seoLine: string; line1: string; grow: string; rest: string; lead: string; cta: string; demo: string; note: string; imgAlt: string; washAlt: string; phoneAlt: string; billCard: [string, string, string]; ratingCard: [string, string] };
+  hero: { badge: string; seoLine: string; line1: string; grow: string; rest: string; lead: string; cta: string; demo: string; note: string; imgAlt: string; phoneAlt: string };
   strip: StripItem[];
-  showcase: { eyebrow: string; title: string; lead: string; points: string[]; cta: string; laptopAlt: string; phoneAlt: string; liveCard: [string, string]; waCard: [string, string] };
+  showcase: { eyebrow: string; title: string; lead: string; points: string[]; cta: string; laptopAlt: string; sheetAlt: string };
+  counter: { eyebrow: string; title: string; lead: string; saleAlt: string; invoiceAlt: string; monthlyAlt: string };
+  retention: { eyebrow: string; title: string; lead: string; photoAlt: string; ratingsAlt: string; customersAlt: string };
   storiesTitle: { eyebrow: string; title: string; lead: string };
   stories: Story[];
   storyAlts: Record<Story["key"], string>;
@@ -121,11 +123,8 @@ export const HOME_EN: HomeCopy = {
     cta: "Start free trial",
     demo: "Watch demo",
     note: "7 days of Pro Max free · No card needed · Prices in AED",
-    imgAlt: "A modern salon with lit arched mirrors and leather styling chairs",
-    washAlt: "A client relaxing during a hair wash at a salon basin",
+    imgAlt: "A luxury salon with gold arched mirrors, styling chairs and warm lighting",
     phoneAlt: "The SalonKit dashboard on a phone: today's sales, commission and profit",
-    billCard: ["Bill sent on WhatsApp", "Haircut + beard", "AED 75"],
-    ratingCard: ["New rating", "“Great fade, thanks Omar!”"],
   },
   strip: [
     { icon: "bill", title: "Smart billing", desc: "VAT bills in a few taps" },
@@ -142,9 +141,23 @@ export const HOME_EN: HomeCopy = {
     points: ["Live sales, commission and profit for today", "Every barber's customers and earnings at a glance", "The latest bills, with WhatsApp one tap away", "Compare with yesterday, the week, the month or the year"],
     cta: "Explore the features",
     laptopAlt: "The SalonKit dashboard on a computer: today's sales, each barber's earnings and the latest bills",
-    phoneAlt: "The SalonKit daily sheet on a phone",
-    liveCard: ["Sales today", "Updated with every bill"],
-    waCard: ["WhatsApp", "Bill and rating link sent"],
+    sheetAlt: "The SalonKit daily sheet: each barber's sales and commission per day, with the shop's expenses and profit",
+  },
+  counter: {
+    eyebrow: "At the counter",
+    title: "Billing and staff, sorted at the front desk",
+    lead: "A VAT bill in three taps, and every barber's commission added up as you go. No calculator, no notebook, no end-of-month arguments.",
+    saleAlt: "Ringing up a new sale in SalonKit: barber, services and total",
+    invoiceAlt: "A SalonKit tax invoice in AED with 5% VAT and the salon's TRN",
+    monthlyAlt: "The SalonKit monthly report: sales, commission and profit for each barber",
+  },
+  retention: {
+    eyebrow: "Customers & reviews",
+    title: "Bring customers back, and hear how it went",
+    lead: "Every customer is saved as you bill. SalonKit thanks them on WhatsApp, reminds them when it's time for the next cut, and asks how the visit went.",
+    photoAlt: "A barber cutting a client's hair in a warm, modern barber shop",
+    ratingsAlt: "Ratings in SalonKit: Google review taps and star ratings for each barber",
+    customersAlt: "The SalonKit customer list with visits and total spend",
   },
   storiesTitle: {
     eyebrow: "Features",
@@ -254,7 +267,7 @@ export const HOME_EN: HomeCopy = {
     lead: "Join the salons using SalonKit to simplify their day. Your salon gets its own address in minutes.",
     button: "Start free trial",
     note: "7 days of Pro Max free · No card needed",
-    imgAlt: "Black and white salon product bottles with folded towels",
+    imgAlt: "A dark, warmly lit salon with a round mirror and leather chairs",
   },
   testimonials: { eyebrow: "Salon owners", title: "What our customers say" },
   newsletter: {
@@ -341,11 +354,8 @@ export const HOME_AR: HomeCopy = {
     cta: AR.start,
     demo: "شاهد العرض",
     note: AR.trialNote,
-    imgAlt: "صالون عصري بمرايا مقوّسة مضيئة وكراسي تصفيف جلدية",
-    washAlt: "عميلة تسترخي أثناء غسل الشعر في الصالون",
+    imgAlt: "صالون فاخر بمرايا مقوّسة ذهبية وكراسي تصفيف وإضاءة دافئة",
     phoneAlt: "لوحة SalonKit على الهاتف: مبيعات اليوم والعمولة والربح",
-    billCard: ["أُرسلت الفاتورة عبر واتساب", "قص شعر + لحية", "75 درهمًا"],
-    ratingCard: ["تقييم جديد", "«قصة رائعة، شكرًا عمر!»"],
   },
   strip: [
     { icon: "bill", title: "فواتير ذكية", desc: "فواتير ضريبية بنقرات" },
@@ -362,9 +372,23 @@ export const HOME_AR: HomeCopy = {
     points: ["مبيعات اليوم والعمولة والربح مباشرة", "عملاء كل حلاق وأرباحه بنظرة واحدة", "أحدث الفواتير وواتساب بنقرة", "قارن مع الأمس والأسبوع والشهر والسنة"],
     cta: "اكتشف المزايا",
     laptopAlt: "لوحة SalonKit على الكمبيوتر: مبيعات اليوم وأرباح كل حلاق وأحدث الفواتير",
-    phoneAlt: "الكشف اليومي في SalonKit على الهاتف",
-    liveCard: ["مبيعات اليوم", "تتحدّث مع كل فاتورة"],
-    waCard: ["واتساب", "أُرسلت الفاتورة ورابط التقييم"],
+    sheetAlt: "الكشف اليومي في SalonKit: مبيعات كل حلاق وعمولته يوميًا مع مصاريف المحل وربحه",
+  },
+  counter: {
+    eyebrow: "عند مكتب الاستقبال",
+    title: "الفواتير والموظفون، منظّمة من مكتب الاستقبال",
+    lead: "فاتورة ضريبية بثلاث نقرات، وعمولة كل حلاق محسوبة أولًا بأول. بدون آلة حاسبة، وبدون دفتر، وبدون خلافات آخر الشهر.",
+    saleAlt: "تسجيل عملية بيع جديدة في SalonKit: الحلاق والخدمات والمجموع",
+    invoiceAlt: "فاتورة ضريبية من SalonKit بالدرهم مع ضريبة 5% ورقم التسجيل الضريبي",
+    monthlyAlt: "التقرير الشهري في SalonKit: المبيعات والعمولة والربح لكل حلاق",
+  },
+  retention: {
+    eyebrow: "العملاء والمراجعات",
+    title: "أعِد العملاء، واعرف رأيهم في الزيارة",
+    lead: "يُحفظ كل عميل مع كل فاتورة. يشكره SalonKit عبر واتساب، ويذكّره عندما يحين موعد القصة التالية، ويسأله عن زيارته.",
+    photoAlt: "حلاق يقص شعر عميل في محل حلاقة عصري دافئ",
+    ratingsAlt: "التقييمات في SalonKit: نقرات مراجعات Google وتقييم كل حلاق بالنجوم",
+    customersAlt: "قائمة العملاء في SalonKit مع عدد الزيارات وإجمالي الإنفاق",
   },
   storiesTitle: { eyebrow: "المزايا", title: AR.featuresTitle, lead: AR.featuresLead },
   stories: [
@@ -411,7 +435,7 @@ export const HOME_AR: HomeCopy = {
     blurb: AR_PLAN_BLURB,
     badge: { free: "للبداية", pro: "الأكثر طلبًا", pro_max: "كل شيء" },
   },
-  cta: { title: AR.ctaTitle, lead: AR.ctaLead, button: AR.start, note: AR.appInEnglish, imgAlt: "عبوات منتجات صالون سوداء وبيضاء مع مناشف مطوية" },
+  cta: { title: AR.ctaTitle, lead: AR.ctaLead, button: AR.start, note: AR.appInEnglish, imgAlt: "صالون داكن بإضاءة دافئة ومرآة دائرية وكراسي جلدية" },
   testimonials: { eyebrow: "أصحاب الصالونات", title: "ماذا يقول عملاؤنا" },
   newsletter: {
     title: "النشرة البريدية",

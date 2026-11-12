@@ -254,6 +254,16 @@ html.js .reveal[data-shown] {
   opacity: 1;
   transform: none;
 }
+/* Photographs ease in: a slow, small settle (no movement once loaded). */
+@keyframes sk-settle {
+  from {
+    opacity: 0;
+    transform: scale(1.035);
+  }
+}
+.sk-photo {
+  animation: sk-settle 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
 @keyframes sk-float {
   0%,
   100% {
@@ -289,7 +299,8 @@ html.js .reveal[data-shown] {
     transition: none;
   }
   .sk-float,
-  .sk-float-slow {
+  .sk-float-slow,
+  .sk-photo {
     animation: none;
   }
   .sk-draw {

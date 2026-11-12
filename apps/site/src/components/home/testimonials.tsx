@@ -12,12 +12,12 @@ export function Testimonials({ t }: { t: HomeCopy }) {
     <section className="px-5 py-24 sm:px-8 sm:py-28">
       <div className="mx-auto max-w-7xl">
         <Reveal className="max-w-2xl">
-          <p className="sk-eyebrow">{t.testimonials.eyebrow}</p>
+          <p className="text-[13px] font-semibold tracking-[0.16em] text-[#946226] uppercase">{t.testimonials.eyebrow}</p>
           <h2 className="mt-5 text-4xl leading-[1.05] font-extrabold tracking-[-0.04em] text-balance sm:text-5xl">{t.testimonials.title}</h2>
         </Reveal>
         <ul className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {items.map((q, i) => (
-            <Reveal as="li" key={q.name + q.salon} delay={i * 80} className="sk-card flex flex-col p-7">
+            <Reveal as="li" key={q.name + q.salon} delay={i * 80} className="flex flex-col border-t border-[rgb(72_52_35/0.16)] pt-7">
               <Quote className="size-7 text-[#d9ad78]" aria-hidden />
               <blockquote className="mt-4 flex-1 text-[17px] leading-relaxed">“{q.quote}”</blockquote>
               <div className="mt-6 flex items-center gap-3">

@@ -1,8 +1,7 @@
 import { SiteHeader } from "./site-header";
 import { Hero } from "./hero";
-import { Showcase } from "./showcase";
-import { Stories } from "./stories";
-import { Trust } from "./trust";
+import { Strip } from "./strip";
+import { ProductSplits, Counter, Retention } from "./sections";
 import { Testimonials } from "./testimonials";
 import { PricingPlans } from "./pricing";
 import { Cta } from "./cta";
@@ -17,11 +16,12 @@ export function HomePage({ t }: { t: HomeCopy }) {
       <SiteHeader t={{ lang: t.lang, home: t.home, nav: t.nav }} />
       <main>
         <Hero t={t} />
-        <Showcase t={t} />
-        <Stories t={t} />
-        <Trust t={t} />
-        <Testimonials t={t} />
+        <Strip t={t} />
+        <ProductSplits t={t} />
+        <Counter t={t} />
+        <Retention t={t} />
         <PricingPlans t={t} />
+        <Testimonials t={t} />
         <FaqSection faqs={t.faq.items} title={t.faq.title} lead={t.faq.lead} eyebrow={t.faq.eyebrow} lang={t.lang} />
         <Cta t={t} />
       </main>

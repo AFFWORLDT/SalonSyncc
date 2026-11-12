@@ -27,7 +27,6 @@ export function SiteFooter({ t = HOME_EN }: { t?: HomeCopy }) {
   const f = t.footer;
   return (
     <footer className="relative overflow-hidden bg-[#211a17] text-[#f7f1e8]">
-      <div aria-hidden className="pointer-events-none absolute -top-40 size-[560px] rounded-full bg-[#c58a45]/15 blur-3xl ltr:-right-40 rtl:-left-40" />
       <div className="relative mx-auto max-w-7xl px-5 pt-20 pb-10 sm:px-8">
         <div className="grid gap-12 lg:grid-cols-[1.3fr_2fr]">
           <div className="max-w-sm">
