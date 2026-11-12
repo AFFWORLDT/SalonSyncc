@@ -76,6 +76,22 @@ describe("slots maths", () => {
 });
 
 describe("public booking API", () => {
+  it("needs a Turnstile pass when Turnstile is on", async () => {
+    setServicesForTest(() => fakeServices({ turnstileOk: (t) => t === "good" }).services);
+    const { staff, svc } = await salon("bk-bot");
+    const b = { day: tomorrow(), time: "12:00", staff: staff[0], services: [svc[0]], name: "Rita", phone: "0501234567" };
+    const send = (extra: Record<string, unknown>) =>
+      app.fetch(
+        new Request(`https://bk-bot.${ROOT}/api/public/booking`, { method: "POST", headers: { ...json, "CF-Connecting-IP": "10.2.7.1", Origin: "https://site.example" }, body: JSON.stringify({ ...b, ...extra }) }),
+        { ...e, TURNSTILE_SECRET: "s" },
+        ctx,
+      );
+    const r = await send({});
+    expect(r.status).toBe(400);
+    expect(await r.json()).toMatchObject({ code: "turnstile" });
+    expect((await send({ turnstile: "good" })).status).toBe(201);
+  });
+
   it("is 404 unless the super admin switched the feature on", async () => {
     await salon("bk-off", false);
     expect((await pub("bk-off", "/config")).status).toBe(404);

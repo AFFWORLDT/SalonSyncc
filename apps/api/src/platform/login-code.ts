@@ -11,6 +11,7 @@ import type { Context } from "hono";
 import type { AppEnv } from "../env";
 import { HttpError } from "../core/errors";
 import { originGuard } from "../core/pipeline";
+import { fromBrowser, requireHuman } from "../core/bot-check";
 import { issueSession } from "../core/session";
 import { normalizeSlug, slugFromHost } from "../core/tenant";
 import { services } from "../core/services";
@@ -100,6 +101,8 @@ auth.post("/code", async (c) => {
   const b = await body(c);
   const email = emailOf(b.email);
   if (!EMAIL_RE.test(email) || email.length > 254) throw new HttpError(400, "Enter the email address on your staff profile");
+  // The web page shows a Turnstile check; the phone app can't, and keeps the per-IP and per-email limits below.
+  if (fromBrowser(c)) await requireHuman(c, b.turnstile);
   const ip = c.req.header("CF-Connecting-IP") ?? "unknown";
   const at = Date.now();
   const org = await orgFor(c, b.org, email);

@@ -5,6 +5,7 @@ import { isAdmin, requireAdmin } from "../../core/roles";
 import { requireFeature } from "../../core/pipeline";
 import { featuresFor } from "../../core/features-cache";
 import { resolvePublicOrg, publicRateLimit } from "../../core/public";
+import { requireHuman } from "../../core/bot-check";
 import { orgAppUrl } from "../../core/links";
 import { randomToken } from "../../core/crypto";
 import { services as svc } from "../../core/services";
@@ -305,6 +306,7 @@ bookingPublic.post("/", publicRateLimit("book"), async (c) => {
   allowOrigin(c, cat.bs.site_origins);
   const b = await body(c);
   if (clean(b.website, 200)) return c.json({ ok: true, ref: newRef() }, 201);
+  await requireHuman(c, b.turnstile);
   const day = b.day;
   if (!isDay(day)) throw bad("Choose a date");
   const start = parseHhmm(b.time);

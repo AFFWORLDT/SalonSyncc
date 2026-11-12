@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { requireHuman } from "../core/bot-check";
 import type { AppEnv } from "../env";
 import { HttpError } from "../core/errors";
 import { hashPassword, randomToken } from "../core/crypto";
@@ -88,10 +89,7 @@ publicApi.post("/signup", originGuard, async (c) => {
   if ((await rateHit(c.env.DB, `signup:${ipKey(ip(c))}`, window)) > SIGNUP_PER_HOUR) throw tooMany();
   if (!c.env.TURNSTILE_SECRET && (await rateHit(c.env.DB, "signup:all", window)) > SIGNUP_GLOBAL_PER_HOUR) throw tooMany();
 
-  if (c.env.TURNSTILE_SECRET) {
-    const token = typeof b.turnstile === "string" ? b.turnstile : "";
-    if (!token || !(await services(c.env).turnstile.verify(c.env.TURNSTILE_SECRET, token, ip(c)))) throw bad("Please complete the check");
-  }
+  await requireHuman(c, b.turnstile);
 
   const repo = signupRepo(c.env.DB);
   const problem = await repo.slugProblem(slug);

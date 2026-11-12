@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { lastOrg, useAuth } from "@/lib/auth-context";
 import { salonFromHost } from "@/lib/host";
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { AuthSplit, PasswordInput } from "@/components/ui/auth-ui";
 import { LOGIN_SCENES, pickScene, type LoginScene } from "@/lib/login-scenes";
 import { nextPath } from "@/lib/next-path";
+import { TURNSTILE_SITE_KEY, mountTurnstile } from "@/lib/turnstile";
 
 const TAGLINE = "Sales, bills and reports for your salon.";
 const QUOTES = ["Every chair, every bill, one place.", "Welcome back. Your salon is ready.", "Less paperwork, more fresh cuts."];
@@ -35,6 +36,23 @@ export default function LoginPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Cloudflare Turnstile (bot check) for password sign-in and emailing a code. Each token works once.
+  const widget = useRef<HTMLDivElement>(null);
+  const [human, setHuman] = useState("");
+  const needHuman = !!TURNSTILE_SITE_KEY && !human;
+  // The form renders after the auth check: mount the widget when its box appears.
+  const widgetBox = (el: HTMLDivElement | null) => {
+    widget.current = el;
+    if (el && !el.dataset.mounted) {
+      el.dataset.mounted = "1";
+      mountTurnstile(el, setHuman);
+    }
+  };
+  const newCheck = () => {
+    if (!TURNSTILE_SITE_KEY) return;
+    setHuman("");
+    window.turnstile?.reset();
+  };
   // The salon's own name and logo (GET /api/public/brand), so its team sees their salon, not SalonKit.
   // undefined while loading on a salon host (nothing drawn, so the SalonKit logo never flashes first).
   const [brand, setBrand] = useState<{ name: string | null; logo_url: string | null } | null | undefined>(undefined);
@@ -115,12 +133,14 @@ export default function LoginPage() {
     try {
       const body: Record<string, string> = { email: email.trim() };
       if (needOrg) body.org = org.trim().toLowerCase();
+      if (human) body.turnstile = human;
       await api("/api/auth/code", { body, redirectOn401: false });
       setCodeSent(true);
       setNotice(`If ${email.trim()} is on your staff profile, a 6-digit code is on its way. It works for 10 minutes.`);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
+      newCheck();
       setLoading(false);
     }
   }
@@ -132,10 +152,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (mode === "code") await loginWithCode(needOrg ? org : undefined, email.trim(), code.replace(/\s+/g, ""));
-      else await login(needOrg ? org : undefined, username.trim(), password);
+      else await login(needOrg ? org : undefined, username.trim(), password, human || undefined);
       router.replace(nextPath(window.location.search));
     } catch (err) {
       setError(errorMessage(err));
+      if (mode === "password") newCheck();
     } finally {
       setLoading(false);
     }
@@ -256,6 +277,7 @@ export default function LoginPage() {
               )}
             </>
           )}
+          {TURNSTILE_SITE_KEY && <div ref={widgetBox} className="min-h-[65px]" data-testid="turnstile" />}
           {notice && !error && <p className="rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm">{notice}</p>}
           {error && (
             <p role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
@@ -269,13 +291,13 @@ export default function LoginPage() {
             disabled={
               loading ||
               (needOrg && !org.trim()) ||
-              (mode === "password" ? !username || !password : !email.trim() || (codeSent && code.replace(/\s+/g, "").length !== 6))
+              (mode === "password" ? !username || !password || needHuman : !email.trim() || (codeSent ? code.replace(/\s+/g, "").length !== 6 : needHuman))
             }
           >
             {loading ? (mode === "code" && !codeSent ? "Sending…" : "Signing in…") : mode === "code" && !codeSent ? "Email me a code" : "Sign in"}
           </Button>
           {mode === "code" && codeSent && (
-            <Button type="button" variant="ghost" disabled={loading} onClick={sendCode}>
+            <Button type="button" variant="ghost" disabled={loading || needHuman} onClick={sendCode}>
               Send a new code
             </Button>
           )}

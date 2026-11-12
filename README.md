@@ -144,9 +144,9 @@ npm run e2e -w @ss/web                  # includes the signup -> handoff -> dash
 
 Going live needs:
 - **DNS** in the `salonkit.online` zone: apex `@` and `www`, AAAA `100::`, proxied. The wildcard `*` record already exists.
-- **Turnstile (optional):** create a widget for `salonkit.online` in the Cloudflare dashboard.
+- **Turnstile (optional):** create a widget for `salonkit.online` (and any salon website that books through the API) in the Cloudflare dashboard. With `TURNSTILE_SECRET` set it guards signup, web password sign-in, the emailed sign-in code (web only; the phone app sends no Origin and keeps the rate limits) and public bookings.
   - Run `wrangler secret put TURNSTILE_SECRET` in apps/api.
-  - Put `NEXT_PUBLIC_TURNSTILE_SITE_KEY=<site key>` in `apps/site/.env.production.local`, which is gitignored.
+  - Put `NEXT_PUBLIC_TURNSTILE_SITE_KEY=<site key>` in `apps/site/.env.production.local` and `apps/web/.env.production.local` (both gitignored), and rebuild. Deploy the pages before setting the secret.
 - **Deploy:**
   - Run `npm run db:migrate:remote` (or `wrangler d1 migrations apply salonkit-db --remote`) in apps/api, then build and deploy the web app and the API as before.
   - Then deploy the site: `cd apps/site && npm run build && wrangler deploy`. Use `XDG_CONFIG_HOME=~/.wrangler-affworld`.

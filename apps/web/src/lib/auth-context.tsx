@@ -28,7 +28,8 @@ interface AuthValue {
   readOnly: boolean;
   loading: boolean;
   /** `org` is the salon ID (slug); needed when the host isn't the salon's own subdomain. */
-  login: (org: string | undefined, username: string, password: string) => Promise<void>;
+  /** `turnstile`: the bot-check token from the sign-in page (required when Turnstile is on). */
+  login: (org: string | undefined, username: string, password: string, turnstile?: string) => Promise<void>;
   /** Signs in with the 6-digit code emailed by POST /api/auth/code. */
   loginWithCode: (org: string | undefined, email: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -115,8 +116,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const login = useCallback(
-    async (org: string | undefined, username: string, password: string) => {
+    async (org: string | undefined, username: string, password: string, turnstile?: string) => {
       const body: Record<string, string> = { username, password };
+      if (turnstile) body.turnstile = turnstile;
       if (org) body.org = org.trim().toLowerCase();
       await api("/api/auth/login", { body, redirectOn401: false });
       clearApiCache();

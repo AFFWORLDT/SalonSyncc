@@ -1,4 +1,5 @@
 import { Hono, type Context } from "hono";
+import { requireHuman } from "../core/bot-check";
 import type { AppEnv } from "../env";
 import { HttpError } from "../core/errors";
 import { checkPassword, hashPassword } from "../core/crypto";
@@ -72,13 +73,15 @@ export async function verifyLogin(c: Context<AppEnv>, body: { org?: unknown; use
 }
 
 auth.post("/login", async (c) => {
-  let body: { org?: unknown; username?: unknown; password?: unknown } = {};
+  let body: { org?: unknown; username?: unknown; password?: unknown; turnstile?: unknown } = {};
   try {
     const parsed = await c.req.json();
     if (parsed && typeof parsed === "object") body = parsed;
   } catch {
     /* falls through to the generic failure */
   }
+  // Web password sign-in only (the phone app signs in through /api/mobile/session).
+  await requireHuman(c, body.turnstile);
   const { org, user } = await verifyLogin(c, body);
   await issueSession(c, { uid: user.id, orgId: org.id, v: user.session_version });
   return c.json({ ok: true, slug: org.slug });
