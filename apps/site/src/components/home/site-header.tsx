@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { ArrowRight, ChevronDown, Menu, X } from "lucide-react";
 import { BRAND_NAME } from "@/lib/brand";
@@ -54,6 +55,8 @@ export function SiteHeader({ t }: { t: Pick<HomeCopy, "lang" | "home" | "nav"> }
     return () => window.removeEventListener("scroll", on);
   }, []);
   useEffect(() => {
+    // Lock both html and body: mobile Chrome/Safari still scroll the page when only body is locked.
+    document.documentElement.style.overflow = menu ? "hidden" : "";
     document.body.style.overflow = menu ? "hidden" : "";
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
     window.addEventListener("keydown", esc);
@@ -93,10 +96,12 @@ export function SiteHeader({ t }: { t: Pick<HomeCopy, "lang" | "home" | "nav"> }
         </div>
       </div>
 
-      {menu && (
+      {/* Portalled to <body>: the scrolled header's backdrop-filter makes it the containing block for fixed
+          children, which would shrink this full-screen menu to the header's 72px height. */}
+      {menu && createPortal(
         <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label={n.menu}>
           <button type="button" aria-label={n.close} className="absolute inset-0 bg-[#211a17]/40 backdrop-blur-sm" onClick={() => setMenu(false)} />
-          <div className="absolute inset-y-0 w-[min(88vw,380px)] overflow-y-auto bg-[#f7f1e8] p-6 shadow-2xl animate-in duration-300 ltr:right-0 ltr:slide-in-from-right rtl:left-0 rtl:slide-in-from-left">
+          <div className="absolute inset-y-0 w-[min(88vw,380px)] overflow-y-auto overscroll-contain bg-[#f7f1e8] p-6 shadow-2xl animate-in duration-300 ltr:right-0 ltr:slide-in-from-right rtl:left-0 rtl:slide-in-from-left">
             <div className="flex items-center justify-between">
               <span className="text-lg font-bold font-display">{BRAND_NAME}</span>
               <button type="button" onClick={() => setMenu(false)} aria-label={n.close} className="grid size-11 place-items-center rounded-full border border-foreground/10 bg-white">
@@ -133,7 +138,8 @@ export function SiteHeader({ t }: { t: Pick<HomeCopy, "lang" | "home" | "nav"> }
               </Link>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </header>
   );
