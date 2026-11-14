@@ -45,7 +45,7 @@ export function LuxeAuth({ scene, brandName, children }: { scene: LoginScene | n
             src={scene.src}
             alt={scene.alt}
             className="h-full w-full animate-in object-cover fade-in duration-700 motion-reduce:animate-none"
-            style={{ objectPosition: scene.pos }}
+            style={{ objectPosition: scene.pos, transform: scene.flip ? "scaleX(-1)" : undefined }}
           />
         )}
         {/* Readability: darker behind the headline, darkest under the card; a floor fade at the bottom. */}

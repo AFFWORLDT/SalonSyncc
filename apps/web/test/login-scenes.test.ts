@@ -4,10 +4,10 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 describe("login scenes", () => {
-  it("every scene has its photo and 5 mesh colours", () => {
+  it("every scene has its photo and a focal point", () => {
     for (const s of LOGIN_SCENES) {
       expect(existsSync(join(__dirname, "..", "public", s.src))).toBe(true);
-      expect(s.mesh).toHaveLength(5);
+      expect(s.pos).toMatch(/^\d+% \d+%$/);
     }
   });
   it("never shows the same photo twice in a row", () => {
