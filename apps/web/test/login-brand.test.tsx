@@ -4,7 +4,6 @@ import { AuthProvider } from "@/lib/auth-context";
 import LoginPage from "@/app/login/page";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push() {}, replace() {} }), usePathname: () => "/login/" }));
-vi.mock("@paper-design/shaders-react", () => ({ MeshGradient: () => null }));
 afterEach(() => {
   vi.unstubAllGlobals();
   window.history.replaceState(null, "", "/");

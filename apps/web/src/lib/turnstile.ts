@@ -8,9 +8,9 @@ declare global {
 }
 
 /** Loads the Turnstile script once and renders the widget into `el`; `onToken` gets each fresh token ("" when expired). */
-export function mountTurnstile(el: HTMLElement, onToken: (t: string) => void): void {
+export function mountTurnstile(el: HTMLElement, onToken: (t: string) => void, theme: "light" | "dark" = "light"): void {
   if (!TURNSTILE_SITE_KEY) return;
-  const render = () => window.turnstile?.render(el, { sitekey: TURNSTILE_SITE_KEY, callback: onToken, "expired-callback": () => onToken(""), theme: "light" });
+  const render = () => window.turnstile?.render(el, { sitekey: TURNSTILE_SITE_KEY, callback: onToken, "expired-callback": () => onToken(""), theme });
   if (window.turnstile) return void render();
   const s = document.createElement("script");
   s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";

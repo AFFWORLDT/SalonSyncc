@@ -3,6 +3,8 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
+/* Short desktop screens (1366×768, 1280×720): the sign-in card tightens so nothing scrolls. */
+@custom-variant short (@media (min-width: 1024px) and (max-height: 800px));
 
 /*
  * The dashboard uses the deHertz admin design system: the shadcn tokens are written

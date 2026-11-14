@@ -5,20 +5,18 @@ import { useRouter } from "next/navigation";
 import { lastOrg, useAuth } from "@/lib/auth-context";
 import { salonFromHost } from "@/lib/host";
 import { BRAND_NAME, ROOT_DOMAIN } from "@/lib/brand";
-import { Mail } from "lucide-react";
+import { ArrowRight, Check, KeyRound, Loader2, Lock, Mail, Store } from "lucide-react";
 import { GoogleMark } from "@/components/ui/google-mark";
 import { api, clearSessionCaches, errorMessage } from "@/lib/api";
-import { BrandLogo, LogoBadge } from "@/components/logo";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { AuthSplit, PasswordInput } from "@/components/ui/auth-ui";
+import { LogoBadge } from "@/components/logo";
+import { LuxeAuth, LuxeCard, LuxeDivider, LuxeField, LuxePassword } from "@/components/auth/luxe-auth";
+import { cn } from "@/lib/utils";
 import { LOGIN_SCENES, pickScene, type LoginScene } from "@/lib/login-scenes";
 import { nextPath } from "@/lib/next-path";
 import { TURNSTILE_SITE_KEY, mountTurnstile } from "@/lib/turnstile";
 
-const TAGLINE = "Sales, bills and reports for your salon.";
-const QUOTES = ["Every chair, every bill, one place.", "Welcome back. Your salon is ready.", "Less paperwork, more fresh cuts."];
+/** "Remember me": the email or username is kept in this browser and filled in next time (sessions are unchanged). */
+const REMEMBER = "ss_login_user";
 
 export default function LoginPage() {
   const { user, loading: authLoading, login, loginWithCode, refresh } = useAuth();
@@ -36,6 +34,17 @@ export default function LoginPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [remember, setRemember] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(REMEMBER);
+      if (saved) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setUsername((u) => u || saved);
+        setRemember(true);
+      }
+    } catch {}
+  }, []);
   // Cloudflare Turnstile (bot check) for password sign-in and emailing a code. Each token works once.
   const widget = useRef<HTMLDivElement>(null);
   const [human, setHuman] = useState("");
@@ -45,7 +54,7 @@ export default function LoginPage() {
     widget.current = el;
     if (el && !el.dataset.mounted) {
       el.dataset.mounted = "1";
-      mountTurnstile(el, setHuman);
+      mountTurnstile(el, setHuman, "dark");
     }
   };
   const newCheck = () => {
@@ -119,6 +128,8 @@ export default function LoginPage() {
   }, []);
 
   function switchMode(m: "password" | "code") {
+    // Carry a typed email across, so "Email me a code" / "Forgot password?" needs no retyping.
+    if (m === "code" && !email && username.includes("@")) setEmail(username.trim());
     setMode(m);
     setError(null);
     setNotice(null);
@@ -152,7 +163,13 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (mode === "code") await loginWithCode(needOrg ? org : undefined, email.trim(), code.replace(/\s+/g, ""));
-      else await login(needOrg ? org : undefined, username.trim(), password, human || undefined);
+      else {
+        await login(needOrg ? org : undefined, username.trim(), password, human || undefined);
+        try {
+          if (remember) localStorage.setItem(REMEMBER, username.trim());
+          else localStorage.removeItem(REMEMBER);
+        } catch {}
+      }
       router.replace(nextPath(window.location.search));
     } catch (err) {
       setError(errorMessage(err));
@@ -162,153 +179,175 @@ export default function LoginPage() {
     }
   }
 
+  const disabled =
+    loading ||
+    (needOrg && !org.trim()) ||
+    (mode === "password" ? !username || !password || needHuman : !email.trim() || (codeSent ? code.replace(/\s+/g, "").length !== 6 : needHuman));
+
   return (
-    <AuthSplit
-      scene={scene}
-      quote={{ text: QUOTES, author: brand?.name ?? BRAND_NAME }}
-    >
-      <div className="mx-auto grid w-full max-w-[350px] gap-8">
-        <div className="flex flex-col items-center gap-3 text-center">
+    <LuxeAuth scene={scene} brandName={BRAND_NAME}>
+      <LuxeCard>
+        <div className={cn("flex flex-col items-center text-center", "short:-mt-1")}>
           {brand === undefined ? (
-            <div className="h-24" aria-hidden />
-          ) : brand?.logo_url ? (
-            <LogoBadge src={brand.logo_url} alt={brand.name ?? ""} size={96} />
+            <div className={cn("size-[68px]", "short:size-14")} aria-hidden />
           ) : (
-            <BrandLogo />
+            <LogoBadge
+              src={brand?.logo_url}
+              alt={brand?.logo_url ? (brand.name ?? "") : BRAND_NAME}
+              size={68}
+              className={cn("ring-2 ring-[var(--lux-gold)]/70 shadow-[0_8px_24px_-8px_rgba(217,173,120,0.45)] dark:ring-[var(--lux-gold)]/70", "short:!size-14")}
+            />
           )}
-          <h1 className="text-[28px] leading-tight">{brand?.name ? `Sign in to ${brand.name}` : "Sign in to your salon"}</h1>
-          <p className="text-balance text-sm text-muted-foreground">
-            {mode === "code" ? "We\u2019ll email a sign-in code to the address on your staff profile." : needOrg ? "Enter your salon ID, then your email or the username your salon gave you." : "Sign in with your email or the username your salon gave you."}
+          <h1 className={cn("mt-4 text-[28px] text-white sm:text-[30px]", "short:mt-3 short:text-[26px]")}>Welcome back</h1>
+          <p className="mt-1.5 text-[15px] text-[var(--lux-muted)]">
+            {mode === "code" ? "We\u2019ll email a code to the address on your staff profile." : brand?.name ? `Sign in to ${brand.name}` : "Sign in to your salon account"}
           </p>
         </div>
 
-        {mode === "password" && (
-          <div className="-mb-3 grid gap-3">
-            {google && googleUrl && (
-              <a
-                href={googleUrl}
-                className="inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-full border border-black/10 bg-white text-[15px] font-medium text-[#1f1f1f] shadow-sm transition duration-150 ease-out hover:bg-[#f7f7f5] active:scale-[0.98]"
-              >
-                <GoogleMark />
-                Continue with Google
-              </a>
+        <div className={cn("mt-6 grid gap-3", "short:mt-5 short:gap-2.5")}>
+          {google && googleUrl && (
+            <a
+              href={googleUrl}
+              className="inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-[14px] bg-white text-[15px] font-semibold text-[#1f1f1f] shadow-[0_6px_18px_-8px_rgba(0,0,0,0.5)] transition duration-200 ease-out hover:bg-[#f4f1ec] focus-visible:ring-[3px] focus-visible:ring-[var(--lux-gold)]/50 focus-visible:outline-none active:scale-[0.99]"
+            >
+              <GoogleMark />
+              Continue with Google
+            </a>
+          )}
+          <button
+            type="button"
+            aria-pressed={mode === "code"}
+            onClick={() => switchMode(mode === "code" ? "password" : "code")}
+            className={cn(
+              "inline-flex h-11 w-full items-center justify-center gap-2.5 rounded-[14px] border text-[15px] font-semibold transition duration-200 ease-out focus-visible:ring-[3px] focus-visible:ring-[var(--lux-gold)]/40 focus-visible:outline-none active:scale-[0.99]",
+              mode === "code" ? "border-[var(--lux-gold)]/70 bg-[var(--lux-gold)]/10 text-[var(--lux-gold-light)]" : "border-white/20 bg-white/[0.03] text-white hover:border-white/35 hover:bg-white/[0.07]"
             )}
-            <Button type="button" variant="outline" size="lg" className="h-12 w-full gap-2.5 text-[15px]" onClick={() => switchMode("code")}>
-              <Mail className="size-5" />
-              Email me a sign-in code
-            </Button>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground" aria-hidden>
-              <span className="h-px flex-1 bg-current opacity-25" />
-              <span className="rounded-full bg-muted px-3.5 py-1 text-[13px]">or use your password</span>
-              <span className="h-px flex-1 bg-current opacity-25" />
-            </div>
-          </div>
-        )}
-        <form onSubmit={submit} autoComplete="on" className="grid gap-4">
+          >
+            <Mail className="size-[18px]" strokeWidth={1.7} aria-hidden />
+            Email me a sign-in code
+          </button>
+        </div>
+
+        <div className={cn("my-5", "short:my-4")}>
+          <LuxeDivider>{mode === "code" ? "Sign in with an emailed code" : "Or sign in with password"}</LuxeDivider>
+        </div>
+
+        <form onSubmit={submit} autoComplete="on" className={cn("grid gap-3", "short:gap-2.5")}>
           {needOrg && (
-            <div className="grid gap-2">
-              <Label htmlFor="org">Salon ID</Label>
-              <Input
-                id="org"
-                autoComplete="organization"
+            <LuxeField
+              id="org"
+              label="Salon ID"
+              placeholder="Salon ID (e.g. superbeard)"
+              icon={Store}
+              autoComplete="organization"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              required
+              value={org}
+              onChange={(e) => setOrg(e.target.value)}
+            />
+          )}
+          {mode === "password" ? (
+            <>
+              <LuxeField
+                id="username"
+                label="Email or username"
+                icon={Mail}
+                autoComplete="username"
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
                 required
-                placeholder="e.g. superbeard"
-                value={org}
-                onChange={(e) => setOrg(e.target.value)}
-                className="h-12 rounded-full px-5"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
               />
-            </div>
-          )}
-          {mode === "password" ? (
-            <>
-              <div className="grid gap-2">
-                <Label htmlFor="username">Email or username</Label>
-                <Input
-                  id="username"
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="h-12 rounded-full px-5"
-                />
+              <LuxePassword id="password" label="Password" icon={Lock} autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <div className="flex items-center justify-between pt-0.5 text-sm">
+                <label className="group flex cursor-pointer items-center gap-2 text-white/80 select-none">
+                  <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="peer sr-only" />
+                  <span className="grid size-[18px] place-items-center rounded-[5px] border border-white/30 bg-white/[0.04] transition-colors peer-checked:border-[var(--lux-gold)] peer-checked:bg-[var(--lux-gold)] peer-focus-visible:ring-[3px] peer-focus-visible:ring-[var(--lux-gold)]/35 [&>svg]:opacity-0 peer-checked:[&>svg]:opacity-100">
+                    <Check className="size-3.5 text-[var(--lux-espresso)]" strokeWidth={3} aria-hidden />
+                  </span>
+                  Remember me
+                </label>
+                <button type="button" onClick={() => switchMode("code")} className="rounded font-medium text-[var(--lux-gold)] transition-colors hover:text-[var(--lux-gold-light)] focus-visible:ring-2 focus-visible:ring-[var(--lux-gold)]/40 focus-visible:outline-none">
+                  Forgot password?
+                </button>
               </div>
-              <PasswordInput id="password" label="Password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} className="h-12 rounded-full ps-5" />
             </>
           ) : (
             <>
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  required
-                  readOnly={codeSent}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 rounded-full px-5"
-                />
-              </div>
+              <LuxeField
+                id="email"
+                label="Email"
+                placeholder="Email on your staff profile"
+                icon={Mail}
+                type="email"
+                autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                required
+                readOnly={codeSent}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
               {codeSent && (
-                <div className="grid gap-2">
-                  <Label htmlFor="code">6-digit code</Label>
-                  <Input
-                    id="code"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    pattern="[0-9 ]*"
-                    maxLength={7}
-                    required
-                    autoFocus
-                    value={code}
-                    onChange={(e) => setCode(e.target.value)}
-                    className="h-12 rounded-full text-center font-mono text-xl tracking-[0.4em]"
-                  />
-                </div>
+                <LuxeField
+                  id="code"
+                  label="6-digit code"
+                  icon={KeyRound}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9 ]*"
+                  maxLength={7}
+                  required
+                  autoFocus
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  inputClassName="font-mono text-lg tracking-[0.4em]"
+                />
               )}
             </>
           )}
-          {TURNSTILE_SITE_KEY && <div ref={widgetBox} className="min-h-[65px]" data-testid="turnstile" />}
-          {notice && !error && <p className="rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm">{notice}</p>}
+          {TURNSTILE_SITE_KEY && <div ref={widgetBox} className="flex min-h-[65px] justify-center" data-testid="turnstile" />}
+          {notice && !error && <p className="rounded-[14px] border border-[var(--lux-gold)]/35 bg-[var(--lux-gold)]/10 px-4 py-2.5 text-sm text-[var(--lux-ivory)]">{notice}</p>}
           {error && (
-            <p role="alert" className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <p role="alert" className="rounded-[14px] border border-[#e5806b]/40 bg-[#e5806b]/10 px-4 py-2.5 text-sm text-[#f3b4a6]">
               {error}
             </p>
           )}
-          <Button
+          <button
             type="submit"
-            size="lg"
-            className="mt-2 h-12 w-full text-base"
-            disabled={
-              loading ||
-              (needOrg && !org.trim()) ||
-              (mode === "password" ? !username || !password || needHuman : !email.trim() || (codeSent ? code.replace(/\s+/g, "").length !== 6 : needHuman))
-            }
+            disabled={disabled}
+            className="group mt-1 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[14px] bg-[linear-gradient(180deg,#EAC99C_0%,#D9AD78_55%,#C99A62_100%)] text-base font-bold text-[var(--lux-espresso)] shadow-[0_10px_28px_-10px_rgba(217,173,120,0.65),inset_0_1px_0_rgba(255,255,255,0.45)] transition duration-200 ease-out hover:brightness-[1.06] focus-visible:ring-[3px] focus-visible:ring-[var(--lux-gold)]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#1e1916] focus-visible:outline-none active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70 disabled:saturate-[0.85] disabled:hover:brightness-100"
           >
-            {loading ? (mode === "code" && !codeSent ? "Sending…" : "Signing in…") : mode === "code" && !codeSent ? "Email me a code" : "Sign in"}
-          </Button>
+            {loading ? (
+              <>
+                <Loader2 className="size-[18px] animate-spin" aria-hidden />
+                {mode === "code" && !codeSent ? "Sending…" : "Signing in…"}
+              </>
+            ) : (
+              <>
+                {mode === "code" && !codeSent ? "Email me a code" : "Sign in"}
+                <ArrowRight className="size-[18px] transition-transform duration-200 group-hover:translate-x-0.5" strokeWidth={2.2} aria-hidden />
+              </>
+            )}
+          </button>
           {mode === "code" && codeSent && (
-            <Button type="button" variant="ghost" disabled={loading || needHuman} onClick={sendCode}>
+            <button type="button" disabled={loading || needHuman} onClick={sendCode} className="h-10 rounded-[14px] text-sm font-medium text-white/80 transition-colors hover:bg-white/[0.05] hover:text-white disabled:opacity-50">
               Send a new code
-            </Button>
+            </button>
           )}
           {mode === "code" && (
-            <Button type="button" variant="link" className="justify-self-center" onClick={() => switchMode("password")}>
+            <button type="button" onClick={() => switchMode("password")} className="justify-self-center text-sm font-medium text-[var(--lux-gold)] transition-colors hover:text-[var(--lux-gold-light)]">
               Sign in with your password instead
-            </Button>
+            </button>
           )}
         </form>
-        <p className="text-center text-xs text-muted-foreground">{TAGLINE}</p>
-      </div>
-    </AuthSplit>
+        <p className={cn("mt-5 text-center text-xs text-white/50", "short:mt-4")}>Secure access to your salon workspace.</p>
+      </LuxeCard>
+    </LuxeAuth>
   );
 }

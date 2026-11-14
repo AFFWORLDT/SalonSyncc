@@ -6,7 +6,6 @@ import LoginPage from "@/app/login/page";
 // One router object, as in Next (a new one per render would re-run the page's mount effect and clear the salon ID).
 const router = { push() {}, replace() {} };
 vi.mock("next/navigation", () => ({ useRouter: () => router, usePathname: () => "/login/" }));
-vi.mock("@paper-design/shaders-react", () => ({ MeshGradient: () => null }));
 afterEach(() => {
   vi.unstubAllGlobals();
   window.history.replaceState(null, "", "/");

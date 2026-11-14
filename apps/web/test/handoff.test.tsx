@@ -8,7 +8,6 @@ import { meFixture } from "./fixtures";
 const replace = vi.fn();
 vi.mock("@/lib/push", () => ({ forgetPushToken: async () => {} }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ replace, push() {} }), usePathname: () => "/login/" }));
-vi.mock("@paper-design/shaders-react", () => ({ MeshGradient: () => null }));
 afterEach(() => {
   vi.unstubAllGlobals();
   replace.mockReset();
